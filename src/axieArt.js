@@ -78,7 +78,7 @@ export function portraitSVG(classId, fill){
 // /assets/axies/<classId-lowercase>.png), original SVG placeholder
 // underneath as automatic fallback (img.onerror removes itself).
 export function portraitHTML(classId, fill, extraClass){
-  const src = `/assets/axies/${classId.toLowerCase()}.png`;
+  const src = `${import.meta.env.BASE_URL}assets/axies/${classId.toLowerCase()}.png`;
   return `
     <div class="portrait ${extraClass||''}">
       <div class="portrait-svg">${portraitSVG(classId, fill)}</div>
