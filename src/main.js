@@ -1,195 +1,151 @@
-// Entry point: DOM wiring, canvas/input setup, and the animation loop that
-// ties physics, render, ui, ai and game together.
+// Entry point: DOM wiring for the team picker and the 3-lane board duel.
 import './style.css';
-import { POOL } from './cards.js';
-import { canvasPoint, updateProjectiles } from './physics.js';
-import { draw, updateEffects } from './render.js';
+import { AXIES } from './cards.js';
+import * as game from './game.js';
 import * as ui from './ui.js';
+import * as render from './render.js';
 import { aiTakeTurn } from './ai.js';
-import {
-  startNewMatch, launchCard, playDefenseCard, startYourTurn,
-  onProjectileHit, finishResolution,
-} from './game.js';
-
-const DECK_SIZE = 6;
-const MAX_DRAG = 130;
-// NOTE: bumped from 6.5 (original prototype) to 7.5 -- at 6.5 the max-power
-// throw falls ~80px short of the rival's hit radius at every angle, so no
-// shot can ever land. See README for details; tune to taste.
-const POWER_SCALE = 7.5;
 
 const deckScreen = document.getElementById('deckScreen');
 const duelScreen = document.getElementById('duelScreen');
 const startDuelBtn = document.getElementById('startDuelBtn');
 const switchDeckBtn = document.getElementById('switchDeckBtn');
 const resetBtn = document.getElementById('resetBtn');
-const canvas = document.getElementById('arena');
-const ctx = canvas.getContext('2d');
+const boardEl = document.getElementById('board');
 
-const GROUND_Y = canvas.height - 46;
-const positions = {
-  you: { x: 92, y: GROUND_Y - 34 },
-  rival: { x: canvas.width - 92, y: GROUND_Y - 34 },
-};
-
-let selectedDeck = [];
+let selectedClassIds = [];
 let state = null;
-let playerDeckDef = [];
+let lastYouClassIds = [];
+let lastRivalClassIds = [];
 
-// ================= Deck builder screen =================
-function renderDeckScreen(){
-  ui.renderPool(POOL, selectedDeck, toggleCard);
-  ui.renderDeckHeader(selectedDeck.length, DECK_SIZE);
+// ================= Team picker =================
+function renderRosterScreen(){
+  ui.renderRoster(AXIES, selectedClassIds, toggleClass);
+  ui.renderRosterHeader(selectedClassIds.length, game.LANES);
 }
-function toggleCard(card){
-  if (selectedDeck.includes(card)){
-    selectedDeck = selectedDeck.filter(c => c !== card);
-  } else if (selectedDeck.length < DECK_SIZE){
-    selectedDeck.push(card);
-  }
-  renderDeckScreen();
+function toggleClass(classId){
+  const idx = selectedClassIds.indexOf(classId);
+  if (idx !== -1) selectedClassIds.splice(idx, 1);
+  else if (selectedClassIds.length < game.LANES) selectedClassIds.push(classId);
+  renderRosterScreen();
 }
-renderDeckScreen();
+renderRosterScreen();
 
 startDuelBtn.addEventListener('click', () => {
   deckScreen.classList.add('hidden');
   duelScreen.classList.remove('hidden');
-  resizeCanvas();
-  beginMatch(selectedDeck);
+  const rivalClassIds = game.pickRivalClasses(selectedClassIds);
+  beginMatch(selectedClassIds.slice(), rivalClassIds);
 });
 switchDeckBtn.addEventListener('click', () => {
   duelScreen.classList.add('hidden');
   deckScreen.classList.remove('hidden');
 });
-resetBtn.addEventListener('click', () => beginMatch(playerDeckDef));
+resetBtn.addEventListener('click', () => beginMatch(lastYouClassIds, lastRivalClassIds));
 
 // ================= Match lifecycle =================
-function beginMatch(deckDef){
-  playerDeckDef = deckDef;
-  state = startNewMatch(deckDef, positions);
-  refreshAll();
-  ui.setHint('Escolha uma carta de ataque e arraste no campo pra mirar.');
+function beginMatch(youClassIds, rivalClassIds){
+  lastYouClassIds = youClassIds;
+  lastRivalClassIds = rivalClassIds;
+  state = game.freshState(youClassIds, rivalClassIds);
+  ui.hideBanner();
+  ui.buildBoard(state);
+  syncUI();
+  ui.setHint('Escolha uma carta pra jogar.');
 }
 
-function refreshAll(){
-  ui.updateHPBars(state);
-  ui.renderStatus(state);
+function syncUI(){
+  ui.updateBoard(state);
   ui.renderPips(state);
   ui.renderPiles(state);
-  renderHand();
+  ui.renderHand(state, { onPlay: onPlayerCardClick });
 }
 
-function renderHand(){
-  ui.renderHand(state, {
-    onSelectAttack: (card) => {
-      state.selectedCard = (state.selectedCard===card) ? null : card;
-      ui.setHint(state.selectedCard
-        ? 'Arraste no campo pra mirar e solte pra lançar.'
-        : 'Escolha uma carta de ataque e arraste no campo pra mirar.');
-      renderHand();
-    },
-    onPlayDefense: (card) => {
-      playDefenseCard(state, card);
-      refreshAll();
-      setTimeout(runAiTurn, 500);
-    },
+function applyResultFx(result){
+  if (!result) return;
+  const { side, card, casterIndex, targetIndex } = result;
+
+  if (card.role === 'defense'){
+    const el = ui.getLaneSideEl(side, casterIndex);
+    render.flashHeal(el);
+    render.spawnFloatingText(el, 'ESCUDO!', 'text-shield');
+    return;
+  }
+  if (card.role === 'heal'){
+    const el = ui.getLaneSideEl(side, casterIndex);
+    render.flashHeal(el);
+    render.spawnFloatingText(el, '+'+result.healed, 'text-heal');
+    return;
+  }
+  if (targetIndex === -1){
+    const el = ui.getLaneSideEl(side, casterIndex);
+    render.spawnFloatingText(el, 'Sem alvo!', 'text-dmg');
+    return;
+  }
+  const enemySide = side === 'you' ? 'rival' : 'you';
+  const el = ui.getLaneSideEl(enemySide, targetIndex);
+  render.flashHit(el);
+  render.shakeBoard(boardEl);
+  render.spawnFloatingText(el, '-'+result.dmg, 'text-dmg');
+  if (result.ambush) render.spawnFloatingText(el, 'AMBUSH! x2', 'text-ambush');
+  if (result.shielded) render.spawnFloatingText(el, 'BLOQUEADO!', 'text-block');
+  if (result.deathmarked) render.spawnFloatingText(el, '+10 MARCA', 'text-mark');
+  if (result.comboBonus) render.spawnFloatingText(el, 'COMBO! -'+result.comboBonus, 'text-combo');
+}
+
+function applyBleedFx(side, bleedResults){
+  const lanesArr = side === 'you' ? state.youLanes : state.rivalLanes;
+  bleedResults.forEach(({ lane, dmg }) => {
+    const laneIndex = lanesArr.indexOf(lane);
+    const el = ui.getLaneSideEl(side, laneIndex);
+    render.flashHit(el);
+    render.spawnFloatingText(el, '-'+dmg+' 🩸', 'text-bleed');
   });
+}
+
+function setHintForResult(side, result){
+  const who = side === 'you' ? 'Você' : 'O rival';
+  if (!result){ ui.setHint(`${who} não teve carta jogável e passou o turno.`); return; }
+  if (result.card.role === 'defense'){ ui.setHint(`${who} ativou ${result.card.name}!`); return; }
+  if (result.card.role === 'heal'){ ui.setHint(`${who} curou ${result.healed} com ${result.card.name}!`); return; }
+  if (result.targetIndex === -1){ ui.setHint('Sem alvo disponível!'); return; }
+  ui.setHint(`${result.card.name} causou ${result.dmg} de dano!`);
+}
+
+function finishMatch(){
+  if (state.winner === 'draw') ui.showBanner('Empate!', '');
+  else if (state.winner === 'you') ui.showBanner('Você venceu o duelo!', 'Todas as linhas rivais foram derrotadas.');
+  else ui.showBanner('Você perdeu o duelo.', 'Suas linhas foram derrotadas.');
+}
+
+function onPlayerCardClick(card){
+  const result = game.playerPlayCard(state, card);
+  applyResultFx(result);
+  syncUI();
+  setHintForResult('you', result);
+  if (state.gameOver){ finishMatch(); return; }
+  setTimeout(() => {
+    state.turn = 'rival';
+    ui.setHint('O rival está pensando...');
+    runAiTurn();
+  }, 500);
 }
 
 function runAiTurn(){
   aiTakeTurn(state, {
-    onDefensePlayed: () => {
+    onResolved: ({ bleedResults, result }) => {
+      applyBleedFx('rival', bleedResults);
+      applyResultFx(result);
+      syncUI();
+      setHintForResult('rival', result);
+      if (state.gameOver){ finishMatch(); return; }
       setTimeout(() => {
-        if (state.gameOver) return;
-        startYourTurn(state);
-        refreshAll();
-      }, 700);
-    },
-    onAttackLaunched: () => {},
-  });
-}
-
-function checkResolution(){
-  if (!state || !state.pendingResolve || state.pendingResolve.resolved) return;
-  const stillFlying = state.projectiles.some(p => p.from===state.pendingResolve.side);
-  if (stillFlying) return;
-  finishResolution(state, {
-    onYourTurnEnds: () => {
-      setTimeout(() => {
-        if (state.gameOver) return;
-        state.turn = 'rival';
-        runAiTurn();
-      }, 500);
-    },
-    onRivalTurnEnds: () => {
-      setTimeout(() => {
-        if (state.gameOver) return;
-        startYourTurn(state);
-        refreshAll();
+        const bleedYou = game.startYourTurn(state);
+        applyBleedFx('you', bleedYou);
+        syncUI();
+        if (state.gameOver){ finishMatch(); return; }
+        ui.setHint('Escolha uma carta pra jogar.');
       }, 700);
     },
   });
 }
-
-// ================= Canvas resize =================
-function resizeCanvas(){
-  const displayWidth = canvas.parentElement.clientWidth;
-  canvas.style.height = (displayWidth * (canvas.height/canvas.width)) + 'px';
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-
-// ================= Drag / aim (slingshot) =================
-const drag = { dragging:false, dragStart:null, dragCurrent:null, maxDrag:MAX_DRAG, powerScale:POWER_SCALE };
-
-function onDragStart(e){
-  if (!state || state.turn !== 'you' || !state.selectedCard) return;
-  if (state.selectedCard.type !== 'attack') return;
-  drag.dragging = true;
-  drag.dragStart = canvasPoint(canvas, e);
-  drag.dragCurrent = drag.dragStart;
-}
-function onDragMove(e){
-  if (!drag.dragging) return;
-  drag.dragCurrent = canvasPoint(canvas, e);
-}
-function onDragEnd(){
-  if (!drag.dragging) return;
-  drag.dragging = false;
-  const card = state.selectedCard;
-  if (!card){ drag.dragStart=null; drag.dragCurrent=null; return; }
-  let dx = drag.dragStart.x - drag.dragCurrent.x;
-  let dy = drag.dragStart.y - drag.dragCurrent.y;
-  let dist = Math.hypot(dx,dy);
-  if (dist < 12){ drag.dragStart=null; drag.dragCurrent=null; return; }
-  dist = Math.min(dist, MAX_DRAG);
-  const angle = Math.atan2(dy,dx);
-  const power = dist * POWER_SCALE;
-  launchCard(state, card, angle, power);
-  refreshAll();
-  ui.setHint('Voando...');
-  drag.dragStart=null; drag.dragCurrent=null;
-}
-
-canvas.addEventListener('mousedown', onDragStart);
-canvas.addEventListener('touchstart', onDragStart, {passive:true});
-canvas.addEventListener('mousemove', onDragMove);
-canvas.addEventListener('touchmove', onDragMove, {passive:true});
-window.addEventListener('mouseup', onDragEnd);
-window.addEventListener('touchend', onDragEnd);
-
-// ================= Main loop =================
-let lastTime = null;
-function loop(ts){
-  if (!lastTime) lastTime = ts;
-  const dt = Math.min(0.032, (ts-lastTime)/1000);
-  lastTime = ts;
-  if (state){
-    updateProjectiles(state, dt, positions, canvas.width, GROUND_Y, (p, targetSide) => onProjectileHit(state, p, targetSide));
-    updateEffects(dt);
-    checkResolution();
-    draw(ctx, canvas, state, positions, GROUND_Y, drag);
-  }
-  requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);

@@ -1,31 +1,48 @@
-// Core duel state and combat rules: energy, class triangle damage, status
-// effects (Bleed, Deathmark, Retain, Shield), Ambush and combo bonuses.
-import { shuffle, classMultiplier } from './cards.js';
-import { fireProjectile } from './physics.js';
-import { spawnFloatingText, spawnParticles, triggerShake, resetEffects } from './render.js';
-import * as ui from './ui.js';
+// Core board-duel rules: 3 lanes per side, energy, class-triangle damage,
+// status effects (Bleed, Deathmark, Retain, Shield/Cleanse, Heal), Ambush and
+// the Pena combo bonus. Targeting: 'short' cards hit the mirrored enemy lane,
+// 'long' cards hit whichever enemy lane has the least HP, support cards
+// (defense/heal) act on the caster's own lane.
+import { AXIES, axieById, classMultiplier, shuffle } from './cards.js';
 
-export const PLAYER_CLASS = 'Beast';
-export const RIVAL_CLASS = 'Aqua';
 export const MAX_HP = 100;
 export const MAX_ENERGY = 10;
 export const HAND_SIZE = 3;
+export const LANES = 3;
+export const ALL_CLASSES = AXIES.map(a => a.classId);
 
-export function freshState(deckDef, positions){
-  const deck = shuffle(deckDef);
+export function pickRivalClasses(excludeClassIds){
+  const remaining = ALL_CLASSES.filter(c => !excludeClassIds.includes(c));
+  return shuffle(remaining).slice(0, LANES);
+}
+
+function createLanes(classIds){
+  return classIds.map(classId => {
+    const axie = axieById(classId);
+    return { classId, name: axie.name, color: axie.color, hp: MAX_HP, maxHp: MAX_HP, status: {}, alive: true };
+  });
+}
+
+function buildDeck(classIds){
+  return classIds.flatMap(classId => {
+    const axie = axieById(classId);
+    return axie.cards.map(c => ({ ...c, cls: classId, color: axie.color, uid: `${classId}:${c.id}` }));
+  });
+}
+
+export function freshState(youClassIds, rivalClassIds){
+  const youLanes = createLanes(youClassIds);
+  const rivalLanes = createLanes(rivalClassIds);
+  const deck = shuffle(buildDeck(youClassIds));
   const hand = deck.splice(0, HAND_SIZE);
   return {
-    hpYou: MAX_HP, hpRival: MAX_HP,
+    youLanes, rivalLanes,
     energyYou: 3, energyRival: 3,
-    statusYou: {}, statusRival: {},
     firstHitDone: false,
     turn: 'you',
     deck, discard: [], hand,
-    selectedCard: null,
-    projectiles: [],
     gameOver: false,
-    pendingResolve: null,
-    positions,
+    winner: null,
   };
 }
 
@@ -40,168 +57,154 @@ export function drawCard(state){
   return card;
 }
 
-export function startNewMatch(deckDef, positions){
-  const state = freshState(deckDef, positions);
-  resetEffects();
-  ui.hideBanner();
-  return state;
+function cullDeadHand(state){
+  let guard = 0;
+  while (guard++ < 20){
+    const deadIdx = state.hand.findIndex(c => {
+      const lane = state.youLanes.find(l => l.classId === c.cls);
+      return lane && !lane.alive;
+    });
+    if (deadIdx === -1) break;
+    const [card] = state.hand.splice(deadIdx, 1);
+    state.discard.push(card);
+    if (!drawCard(state)) break;
+  }
 }
 
-function applyComboBonus(state, targetSide, amount){
-  if (targetSide==='you') state.hpYou = Math.max(0, state.hpYou - amount);
-  else state.hpRival = Math.max(0, state.hpRival - amount);
-  ui.updateHPBars(state);
-  const pos = targetSide==='you' ? state.positions.you : state.positions.rival;
-  spawnFloatingText(pos.x, pos.y-70, 'COMBO! -'+amount, '#ffd23f', 17);
-  spawnParticles(pos.x, pos.y-30, '#ffd23f', 16);
-  triggerShake(10, 0.3);
-  checkGameOver(state);
+function aliveIndices(lanes){
+  return lanes.map((l,i) => l.alive ? i : -1).filter(i => i >= 0);
 }
 
-export function applyDamage(state, target, amount, sourceCls, hitX, hitY){
-  const isYou = target === 'you';
-  const defCls = isYou ? PLAYER_CLASS : RIVAL_CLASS;
-  let mult = classMultiplier(sourceCls, defCls);
+function lowestHpIndex(lanes){
+  const alive = aliveIndices(lanes);
+  if (!alive.length) return -1;
+  return alive.reduce((best,i) => (lanes[i].hp < lanes[best].hp ? i : best), alive[0]);
+}
+
+function resolveTargetLane(enemyLanes, casterIndex, range){
+  if (range === 'short'){
+    if (enemyLanes[casterIndex] && enemyLanes[casterIndex].alive) return casterIndex;
+    const alive = aliveIndices(enemyLanes);
+    return alive.length ? alive[0] : -1;
+  }
+  if (range === 'long') return lowestHpIndex(enemyLanes);
+  return -1;
+}
+
+function applyDamage(lane, amount, attackerClassId){
+  const mult = classMultiplier(attackerClassId, lane.classId);
   let dmg = amount * mult;
-
-  const statusObj = isYou ? state.statusYou : state.statusRival;
   let deathmarked = false, shielded = false;
-  if (statusObj.deathmark){ dmg += 10; delete statusObj.deathmark; deathmarked = true; }
-  if (statusObj.shield){ dmg *= 0.5; delete statusObj.shield; shielded = true; }
+  if (lane.status.deathmark){ dmg += 10; delete lane.status.deathmark; deathmarked = true; }
+  if (lane.status.shield){ dmg *= 0.5; delete lane.status.shield; shielded = true; }
   dmg = Math.round(dmg);
-  if (isYou) state.hpYou = Math.max(0, state.hpYou - dmg);
-  else state.hpRival = Math.max(0, state.hpRival - dmg);
-  ui.updateHPBars(state);
-  ui.renderStatus(state);
-
-  const pos = isYou ? state.positions.you : state.positions.rival;
-  const px = hitX!==undefined ? hitX : pos.x;
-  const py = hitY!==undefined ? hitY : pos.y-20;
-  spawnParticles(px, py, isYou ? '#4c8fb0' : '#c97b3d', 12);
-  spawnFloatingText(px, py-10, '-'+dmg, '#ffdca0', 20);
-  if (shielded) spawnFloatingText(px, py-32, 'BLOQUEADO!', '#8fd0ff', 13);
-  if (deathmarked) spawnFloatingText(px, py-46, '+10 MARCA', '#c99bff', 13);
-  triggerShake(Math.min(14, 4 + dmg*0.25), 0.22);
-
-  return dmg;
+  lane.hp = Math.max(0, lane.hp - dmg);
+  if (lane.hp <= 0) lane.alive = false;
+  return { dmg, deathmarked, shielded };
 }
 
-export function applyBleed(state, target){
-  const statusObj = target === 'you' ? state.statusYou : state.statusRival;
-  statusObj.bleed = 2;
-}
+function applyBleed(lane){ lane.status.bleed = 2; }
 
-export function tickBleed(state, target){
-  const statusObj = target === 'you' ? state.statusYou : state.statusRival;
-  if (statusObj.bleed && statusObj.bleed > 0){
+function tickBleed(lane){
+  if (lane.status.bleed && lane.status.bleed > 0){
     const dmg = 5;
-    if (target==='you') state.hpYou = Math.max(0, state.hpYou - dmg);
-    else state.hpRival = Math.max(0, state.hpRival - dmg);
-    statusObj.bleed -= 1;
-    if (statusObj.bleed<=0) delete statusObj.bleed;
-    ui.updateHPBars(state);
-    ui.renderStatus(state);
-    const pos = target==='you' ? state.positions.you : state.positions.rival;
-    spawnFloatingText(pos.x, pos.y-40, '-'+dmg+' 🩸', '#e0685a', 15);
-    spawnParticles(pos.x, pos.y-20, '#b8452f', 6);
+    lane.hp = Math.max(0, lane.hp - dmg);
+    lane.status.bleed -= 1;
+    if (lane.status.bleed <= 0) delete lane.status.bleed;
+    if (lane.hp <= 0) lane.alive = false;
     return dmg;
   }
   return 0;
 }
 
-export function launchCard(state, card, angle, power){
+function applyHeal(lane, amount){
+  const before = lane.hp;
+  lane.hp = Math.min(lane.maxHp, lane.hp + amount);
+  return lane.hp - before;
+}
+
+function applyShield(lane, cleanse){
+  lane.status.shield = true;
+  if (cleanse){ delete lane.status.bleed; delete lane.status.deathmark; }
+}
+
+// Applies one card's effect and mutates state. Returns a result descriptor
+// used by main.js to drive floating-text/shake feedback.
+export function resolveCard(state, side, card, casterIndex){
+  const ownLanes = side === 'you' ? state.youLanes : state.rivalLanes;
+  const enemyLanes = side === 'you' ? state.rivalLanes : state.youLanes;
+  const casterLane = ownLanes[casterIndex];
+  const result = { side, card, casterIndex, targetIndex: -1, dmg: 0, healed: 0, ambush: false, shielded: false, deathmarked: false, comboBonus: 0, bleedTick: 0 };
+
+  if (card.role === 'defense'){
+    applyShield(casterLane, card.effect === 'shield_cleanse');
+    result.targetIndex = casterIndex;
+    return result;
+  }
+  if (card.role === 'heal'){
+    result.healed = applyHeal(casterLane, card.heal);
+    result.targetIndex = casterIndex;
+    return result;
+  }
+
+  const targetIndex = resolveTargetLane(enemyLanes, casterIndex, card.range);
+  if (targetIndex === -1) return result;
+  const targetLane = enemyLanes[targetIndex];
+
+  const ambush = !state.firstHitDone && card.effect === 'ambush';
+  let dmgToApply = card.dmg * (ambush ? 2 : 1);
+  const { dmg, deathmarked, shielded } = applyDamage(targetLane, dmgToApply, card.cls);
+  if (dmg > 0) state.firstHitDone = true;
+  if (card.effect === 'bleed') applyBleed(targetLane);
+  if (card.effect === 'deathmark') targetLane.status.deathmark = true;
+
+  Object.assign(result, { targetIndex, dmg, ambush, deathmarked, shielded });
+
+  if (card.effect === 'multi' && targetLane.alive){
+    const bonus = Math.round(card.dmg * 0.5);
+    targetLane.hp = Math.max(0, targetLane.hp - bonus);
+    if (targetLane.hp <= 0) targetLane.alive = false;
+    result.comboBonus = bonus;
+  }
+
+  checkGameOver(state);
+  return result;
+}
+
+export function playerPlayCard(state, card){
+  const casterIndex = state.youLanes.findIndex(l => l.classId === card.cls);
   state.energyYou -= card.cost;
   if (card.effect !== 'retain'){
     state.hand = state.hand.filter(c => c !== card);
     state.discard.push(card);
     drawCard(state);
   }
-  state.selectedCard = null;
-  state.turn = 'resolving';
-
-  const vx = -Math.cos(angle) * power;
-  const vy = -Math.sin(angle) * power;
-  fireProjectile(state, state.positions.you, vx, vy, card, 'you');
-  state.pendingResolve = { side:'you', card, hitsRegistered:0, resolved:false };
-}
-
-export function playDefenseCard(state, card){
-  state.energyYou -= card.cost;
-  state.statusYou.shield = true;
-  if (card.effect === 'shield_cleanse'){
-    ['bleed','deathmark'].forEach(k => { if (state.statusYou[k]) delete state.statusYou[k]; });
-  }
-  state.hand = state.hand.filter(c => c !== card);
-  state.discard.push(card);
-  drawCard(state);
-  ui.renderStatus(state);
-  ui.setHint(`Você usou ${card.name}!`);
-  state.turn = 'rival';
+  return resolveCard(state, 'you', card, casterIndex);
 }
 
 export function startYourTurn(state){
-  tickBleed(state, 'you');
+  const bleedResults = state.youLanes.filter(l => l.alive).map(l => ({ lane: l, dmg: tickBleed(l) })).filter(r => r.dmg > 0);
   checkGameOver(state);
-  if (state.gameOver) return;
+  if (state.gameOver) return bleedResults;
   state.energyYou = Math.min(MAX_ENERGY, state.energyYou + 2);
   state.turn = 'you';
-  ui.setHint('Escolha uma carta de ataque e arraste no campo pra mirar.');
+  cullDeadHand(state);
+  return bleedResults;
 }
 
-export function onProjectileHit(state, p, targetSide){
-  const sourceCls = p.card.cls;
-  const ambushBonus = (!state.firstHitDone && p.card.effect==='ambush');
-  let dmgToApply = p.card.dmg;
-  if (ambushBonus) dmgToApply *= 2;
-  const dealt = applyDamage(state, targetSide, dmgToApply, sourceCls, p.x, p.y);
-  if (ambushBonus) spawnFloatingText(p.x, p.y-64, 'AMBUSH! x2', '#ffd23f', 15);
-  if (dealt>0) state.firstHitDone = true;
-  if (p.card.effect === 'bleed') applyBleed(state, targetSide);
-  if (p.card.effect === 'deathmark'){
-    const st = targetSide==='you' ? state.statusYou : state.statusRival;
-    st.deathmark = true;
-    ui.renderStatus(state);
-  }
-  if (state.pendingResolve && state.pendingResolve.side===p.from){
-    state.pendingResolve.hitsRegistered += 1;
-  }
+export function startRivalPrep(state){
+  const bleedResults = state.rivalLanes.filter(l => l.alive).map(l => ({ lane: l, dmg: tickBleed(l) })).filter(r => r.dmg > 0);
   checkGameOver(state);
-}
-
-export function finishResolution(state, { onYourTurnEnds, onRivalTurnEnds }){
-  const pr = state.pendingResolve;
-  if (!pr || pr.resolved) return;
-  pr.resolved = true;
-  const side = pr.side;
-
-  if (pr.card.effect === 'multi' && pr.hitsRegistered >= 2 && !state.gameOver){
-    const bonus = Math.round(pr.card.dmg * 0.5);
-    const targetSide = side === 'you' ? 'rival' : 'you';
-    applyComboBonus(state, targetSide, bonus);
-  }
-
-  if (side === 'you'){
-    if (pr.hitsRegistered === 0 && pr.card.effect === 'retain'){
-      ui.setHint('Errou — a Raiz nunca sai da sua mão (Retain).');
-    } else if (pr.hitsRegistered === 0){
-      ui.setHint('Errou o alvo!');
-    }
-    onYourTurnEnds();
-  } else {
-    onRivalTurnEnds();
-  }
+  if (!state.gameOver) state.energyRival = Math.min(MAX_ENERGY, state.energyRival + 2);
+  return bleedResults;
 }
 
 export function checkGameOver(state){
-  if (state.hpYou <= 0 || state.hpRival <= 0){
+  const youDead = state.youLanes.every(l => !l.alive);
+  const rivalDead = state.rivalLanes.every(l => !l.alive);
+  if (youDead || rivalDead){
     state.gameOver = true;
     state.turn = 'over';
-    if (state.hpYou <=0 && state.hpRival<=0){
-      ui.showBanner('Empate!', '');
-    } else if (state.hpRival <= 0){
-      ui.showBanner('Você venceu o duelo!', 'O rival Aqua foi derrotado.');
-    } else {
-      ui.showBanner('Você perdeu o duelo.', 'O rival Aqua levou a melhor dessa vez.');
-    }
+    state.winner = (youDead && rivalDead) ? 'draw' : (rivalDead ? 'you' : 'rival');
   }
 }

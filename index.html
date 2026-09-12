@@ -10,41 +10,27 @@
 <body>
 <div class="stage">
   <h1>Axie Duel</h1>
-  <p class="subtitle">Duelo 1v1 com mira física + deck de cartas do core Axie (energia, classes, status)</p>
+  <p class="subtitle">Tabuleiro 3 linhas — combine ataques curtos/longos, defesa e cura pra vencer</p>
 
-  <!-- ===================== DECK BUILDER SCREEN ===================== -->
+  <!-- ===================== TEAM PICKER SCREEN ===================== -->
   <div id="deckScreen" class="deck-panel">
     <div class="deck-header">
-      <div class="deck-title">Monte seu Axie</div>
-      <div class="deck-count" id="deckCount">0 / 6 partes escolhidas</div>
+      <div class="deck-title">Monte seu time</div>
+      <div class="deck-count" id="deckCount">0 / 3 Axies escolhidos</div>
     </div>
-    <p class="deck-hint">Escolha 6 cartas (partes) pro seu deck. Cada parte é uma classe com um custo de energia e um efeito. No duelo você compra 3 por vez.</p>
-    <div class="pool-grid" id="poolGrid"></div>
-    <button class="start-duel-btn" id="startDuelBtn" disabled>Escolha 6 partes pra começar</button>
+    <p class="deck-hint">Escolha 3 Axies pro seu tabuleiro. A ordem que você clica define a linha (1, 2 e 3) — o rival fica com os outros 3.</p>
+    <div class="pool-grid roster-grid" id="rosterGrid"></div>
+    <button class="start-duel-btn" id="startDuelBtn" disabled>Escolha 3 Axies pra começar</button>
   </div>
 
-  <!-- ===================== DUEL SCREEN ===================== -->
+  <!-- ===================== BOARD DUEL SCREEN ===================== -->
   <div id="duelScreen" class="hidden">
-    <div class="matchup">
-      <div class="fighter-tag you">🐾 Seu Axie — Beast</div>
-      <div class="vs-label">Beast vence Plant · perde p/ Aqua</div>
-      <div class="fighter-tag rival">🌊 Rival — Aqua</div>
-    </div>
-
-    <div class="arena-wrap">
-      <div class="hud">
-        <div class="hp-block you">
-          <div class="hp-name">VOCÊ</div>
-          <div class="hp-bar-bg"><div class="hp-bar-fill" id="hpYou" style="width:100%"></div></div>
-          <div class="status-icons" id="statusYou"></div>
-        </div>
-        <div class="hp-block right rival">
-          <div class="hp-name">RIVAL</div>
-          <div class="hp-bar-bg"><div class="hp-bar-fill" id="hpRival" style="width:100%"></div></div>
-          <div class="status-icons" id="statusRival"></div>
-        </div>
+    <div class="board-wrap">
+      <div class="board-header">
+        <span class="you-label">VOCÊ</span>
+        <span class="rival-label">RIVAL</span>
       </div>
-      <canvas id="arena" width="760" height="360"></canvas>
+      <div class="board" id="board"></div>
       <div class="banner" id="banner">Fim de jogo<span class="sub" id="bannerSub"></span></div>
     </div>
 
@@ -60,16 +46,16 @@
         </div>
       </div>
       <div class="hand" id="hand"></div>
-      <div class="hint" id="hint">Escolha uma carta de ataque e arraste no campo pra mirar.</div>
+      <div class="hint" id="hint">Escolha uma carta pra jogar.</div>
     </div>
 
     <div class="btn-row">
-      <button class="reset-btn" id="resetBtn">Revanche (mesmo deck)</button>
-      <button class="switch-deck-btn" id="switchDeckBtn">Trocar deck</button>
+      <button class="reset-btn" id="resetBtn">Revanche (mesmo time)</button>
+      <button class="switch-deck-btn" id="switchDeckBtn">Trocar time</button>
     </div>
   </div>
 
-  <p class="note">Protótipo de conceito para o Vibeathon — energia recarrega por rodada, cartas vêm de um baralho de 6 (suas partes), e a mira é sempre manual, como um estilingue.</p>
+  <p class="note">Protótipo de conceito para o Vibeathon — curto acerta a linha espelhada, longo mira a linha inimiga mais fraca, defesa/cura agem na própria linha.</p>
 </div>
 
 <script type="module" src="/src/main.js"></script>
