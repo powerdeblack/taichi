@@ -1,54 +1,77 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Taichi</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Axie Duel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- Header -->
-    <header>
-        <nav>
-            <h1>Taichi</h1>
-            <ul>
-                <li><a href="#" id="homeLink">Home</a></li>
-                <li><a href="#" id="portfolioLink">Portfolio</a></li>
-                <li><a href="#">Chat</a></li>
-                <li><a href="#">Soon</a></li>
-                <li><a href="#">Bundles</a></li>
-                <li><a href="#">Contests</a></li>
-            </ul>
-        </nav>
-    </header>
+<div class="stage">
+  <h1>Axie Duel</h1>
+  <p class="subtitle">Duelo 1v1 com mira física + deck de cartas do core Axie (energia, classes, status)</p>
 
-    <!-- Main Content -->
-    <main>
-        <section id="portfolioSection" class="hidden">
-            <!-- Connect MetaMask Button -->
-            <button id="connectButton">Connect MetaMask</button>
+  <!-- ===================== DECK BUILDER SCREEN ===================== -->
+  <div id="deckScreen" class="deck-panel">
+    <div class="deck-header">
+      <div class="deck-title">Monte seu Axie</div>
+      <div class="deck-count" id="deckCount">0 / 6 partes escolhidas</div>
+    </div>
+    <p class="deck-hint">Escolha 6 cartas (partes) pro seu deck. Cada parte é uma classe com um custo de energia e um efeito. No duelo você compra 3 por vez.</p>
+    <div class="pool-grid" id="poolGrid"></div>
+    <button class="start-duel-btn" id="startDuelBtn" disabled>Escolha 6 partes pra começar</button>
+  </div>
 
-            <!-- Wallet Balance -->
-            <div id="walletInfo">
-                <h2>Saldo da Carteira</h2>
-                <p id="balance">0 ETH</p>
-            </div>
+  <!-- ===================== DUEL SCREEN ===================== -->
+  <div id="duelScreen" class="hidden">
+    <div class="matchup">
+      <div class="fighter-tag you">🐾 Seu Axie — Beast</div>
+      <div class="vs-label">Beast vence Plant · perde p/ Aqua</div>
+      <div class="fighter-tag rival">🌊 Rival — Aqua</div>
+    </div>
 
-            <!-- Crypto Prices -->
-            <div id="cryptoPrices">
-                <h2>Preços das Criptomoedas</h2>
-                <p id="btcValue">BTC: Carregando...</p>
-                <p id="ethValue">ETH: Carregando...</p>
-                <p id="astarValue">Astar: Carregando...</p>
-            </div>
-        </section>
-    </main>
+    <div class="arena-wrap">
+      <div class="hud">
+        <div class="hp-block you">
+          <div class="hp-name">VOCÊ</div>
+          <div class="hp-bar-bg"><div class="hp-bar-fill" id="hpYou" style="width:100%"></div></div>
+          <div class="status-icons" id="statusYou"></div>
+        </div>
+        <div class="hp-block right rival">
+          <div class="hp-name">RIVAL</div>
+          <div class="hp-bar-bg"><div class="hp-bar-fill" id="hpRival" style="width:100%"></div></div>
+          <div class="status-icons" id="statusRival"></div>
+        </div>
+      </div>
+      <canvas id="arena" width="760" height="360"></canvas>
+      <div class="banner" id="banner">Fim de jogo<span class="sub" id="bannerSub"></span></div>
+    </div>
 
-    <!-- Footer -->
-    <footer>
-        <p>&copy; 2024 Taichi. Todos os direitos reservados.</p>
-    </footer>
+    <div class="controls">
+      <div class="deck-status-row">
+        <div class="energy-row">
+          <div class="energy-label">ENERGIA</div>
+          <div class="pips" id="pips"></div>
+        </div>
+        <div class="pile-counts">
+          <span id="deckPileCount">Baralho: 3</span>
+          <span id="discardPileCount">Descarte: 0</span>
+        </div>
+      </div>
+      <div class="hand" id="hand"></div>
+      <div class="hint" id="hint">Escolha uma carta de ataque e arraste no campo pra mirar.</div>
+    </div>
 
-    <script src="script.js"></script>
+    <div class="btn-row">
+      <button class="reset-btn" id="resetBtn">Revanche (mesmo deck)</button>
+      <button class="switch-deck-btn" id="switchDeckBtn">Trocar deck</button>
+    </div>
+  </div>
+
+  <p class="note">Protótipo de conceito para o Vibeathon — energia recarrega por rodada, cartas vêm de um baralho de 6 (suas partes), e a mira é sempre manual, como um estilingue.</p>
+</div>
+
+<script type="module" src="/src/main.js"></script>
 </body>
 </html>

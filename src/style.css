@@ -1,0 +1,197 @@
+:root{
+  --bg-deep:#241a12;
+  --bg-panel:#2f2318;
+  --sand:#e8c690;
+  --clay:#c97b3d;
+  --jungle:#3f6b4a;
+  --aqua:#4c8fb0;
+  --gold:#d9b44a;
+  --purple:#7a5c9e;
+  --olive:#8a8f5c;
+  --danger:#b8452f;
+  --text-light:#f5ead6;
+  --text-dim:#c9b696;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:radial-gradient(ellipse at 50% -10%, #4a3521 0%, var(--bg-deep) 60%);
+  font-family:'Nunito',sans-serif;
+  color:var(--text-light);
+  display:flex;
+  justify-content:center;
+  padding:18px 10px 30px;
+  min-height:100vh;
+}
+.stage{width:100%; max-width:760px;}
+h1{
+  font-family:'Baloo 2',sans-serif;
+  font-weight:800;
+  font-size:1.5rem;
+  margin:0 0 2px;
+  color:var(--sand);
+}
+.subtitle{font-size:.85rem; color:var(--text-dim); margin:0 0 14px;}
+.hidden{display:none !important;}
+
+/* ---------- Deck builder screen ---------- */
+.deck-panel{
+  background:var(--bg-panel);
+  border-radius:16px;
+  padding:16px;
+  border:1px solid #4a382470;
+}
+.deck-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  margin-bottom:4px;
+}
+.deck-title{
+  font-family:'Baloo 2',sans-serif;
+  font-weight:700;
+  font-size:1.05rem;
+  color:var(--gold);
+}
+.deck-count{
+  font-family:'Baloo 2',sans-serif;
+  font-size:.85rem;
+  color:var(--text-dim);
+}
+.deck-count.ready{color:#8fd08f;}
+.deck-hint{
+  font-size:.72rem;
+  color:var(--text-dim);
+  margin:0 0 12px;
+}
+.pool-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:8px;
+}
+.start-duel-btn{
+  display:block;
+  width:100%;
+  margin-top:14px;
+  font-family:'Baloo 2',sans-serif;
+  font-weight:700;
+  font-size:.95rem;
+  background:var(--clay);
+  color:#fff;
+  border:none;
+  padding:12px;
+  border-radius:30px;
+  cursor:pointer;
+}
+.start-duel-btn:disabled{
+  background:#5a4a34;
+  color:#9a8a70;
+  cursor:not-allowed;
+}
+
+/* ---------- Shared card styling ---------- */
+.card{
+  background:#251b12;
+  border-radius:12px;
+  padding:10px 9px 8px;
+  border:2px solid #4a382480;
+  cursor:pointer;
+  text-align:left;
+  transition:transform .12s ease, border-color .12s ease;
+  position:relative;
+}
+.card:hover{transform:translateY(-2px);}
+.card.selected{border-color:var(--gold); box-shadow:0 0 0 2px #d9b44a40;}
+.card.disabled{opacity:.4; cursor:not-allowed; transform:none;}
+.card-top{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px;}
+.card-name{font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.82rem; line-height:1.05;}
+.card-cost{
+  font-family:'Baloo 2',sans-serif; font-weight:800; font-size:.72rem;
+  background:#00000050; border-radius:50%; width:20px; height:20px;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--gold);
+}
+.card-class{font-size:.6rem; font-weight:700; letter-spacing:.3px; text-transform:uppercase; opacity:.8; margin-bottom:3px;}
+.card-desc{font-size:.66rem; line-height:1.25; color:var(--text-dim);}
+.card-pick-badge{
+  position:absolute; top:-6px; right:-6px;
+  width:20px; height:20px; border-radius:50%;
+  background:var(--gold); color:#241a12;
+  font-family:'Baloo 2',sans-serif; font-weight:800; font-size:.7rem;
+  display:none; align-items:center; justify-content:center;
+}
+.card.selected .card-pick-badge{display:flex;}
+
+/* ---------- Duel screen ---------- */
+.matchup{
+  display:flex; justify-content:space-between; align-items:center; gap:10px;
+  background:var(--bg-panel); border-radius:14px; padding:10px 14px; margin-bottom:10px;
+  border:1px solid #4a382470;
+}
+.fighter-tag{display:flex; align-items:center; gap:8px; font-weight:700; font-size:.9rem;}
+.fighter-tag.you{color:var(--clay);}
+.fighter-tag.rival{color:var(--aqua);}
+.vs-label{
+  font-family:'Baloo 2',sans-serif; font-size:.75rem; color:var(--text-dim);
+  background:#00000030; padding:2px 10px; border-radius:20px;
+}
+.arena-wrap{
+  position:relative; border-radius:18px; overflow:hidden;
+  border:2px solid #5c452870; box-shadow:0 10px 30px -12px #00000090;
+}
+.hud{
+  position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between;
+  padding:12px 14px; z-index:5; pointer-events:none;
+}
+.hp-block{width:44%;}
+.hp-block.right{text-align:right;}
+.hp-name{font-family:'Baloo 2',sans-serif; font-size:.8rem; font-weight:700; margin-bottom:4px;}
+.hp-bar-bg{height:12px; background:#00000060; border-radius:8px; overflow:hidden; border:1px solid #ffffff20;}
+.hp-block.right .hp-bar-bg{margin-left:auto;}
+.hp-bar-fill{height:100%; border-radius:8px; transition:width .35s ease;}
+.you .hp-bar-fill{background:linear-gradient(90deg,var(--clay),#e39a5f);}
+.rival .hp-bar-fill{background:linear-gradient(90deg,var(--aqua),#7bb9d6);}
+.status-icons{display:flex; gap:4px; margin-top:5px;}
+.hp-block.right .status-icons{justify-content:flex-end;}
+.status-pill{
+  font-size:.62rem; font-weight:700; padding:2px 6px; border-radius:20px;
+  background:#00000055; border:1px solid #ffffff25;
+}
+canvas{
+  display:block; width:100%;
+  background:linear-gradient(180deg, #f0d29a 0%, #e8c184 38%, #cf9f5e 60%, #a97b45 100%);
+  touch-action:none; cursor:crosshair;
+}
+.banner{
+  position:absolute; top:44%; left:50%; transform:translate(-50%,-50%);
+  font-family:'Baloo 2',sans-serif; font-size:1.1rem; font-weight:700;
+  background:#1c130ccc; padding:10px 22px; border-radius:14px; text-align:center;
+  z-index:8; display:none; border:1px solid #ffffff30;
+}
+.banner.show{display:block;}
+.banner .sub{
+  display:block; font-family:'Nunito',sans-serif; font-size:.75rem; font-weight:600;
+  color:var(--text-dim); margin-top:4px;
+}
+.controls{margin-top:14px;}
+.deck-status-row{
+  display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;
+}
+.energy-row{display:flex; align-items:center; gap:8px;}
+.energy-label{font-family:'Baloo 2',sans-serif; font-size:.78rem; font-weight:700; color:var(--gold); min-width:74px;}
+.pip{width:16px; height:16px; border-radius:4px; background:#3a2c1a; border:1px solid #00000050;}
+.pip.filled{background:linear-gradient(160deg,var(--gold),#a9791f); box-shadow:0 0 6px #d9b44a80;}
+.pips{display:flex; gap:4px;}
+.pile-counts{
+  font-size:.68rem; color:var(--text-dim); display:flex; gap:10px; font-weight:700;
+}
+.hand{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+.hint{text-align:center; font-size:.72rem; color:var(--text-dim); margin-top:10px; min-height:16px;}
+.btn-row{display:flex; gap:10px; margin-top:14px; justify-content:center;}
+.reset-btn, .switch-deck-btn{
+  font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.85rem;
+  color:#fff; border:none; padding:9px 20px; border-radius:30px; cursor:pointer;
+}
+.reset-btn{background:var(--clay);}
+.switch-deck-btn{background:#4a382480; color:var(--text-light);}
+.reset-btn:active, .switch-deck-btn:active{transform:scale(.97);}
+.note{font-size:.66rem; color:var(--text-dim); text-align:center; margin-top:16px; line-height:1.5; opacity:.7;}

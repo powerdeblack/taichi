@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Axie Duel — Protótipo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#241a12;
+    --bg-panel:#2f2318;
+    --sand:#e8c690;
+    --clay:#c97b3d;
+    --jungle:#3f6b4a;
+    --aqua:#4c8fb0;
+    --gold:#d9b44a;
+    --purple:#7a5c9e;
+    --olive:#8a8f5c;
+    --danger:#b8452f;
+    --text-light:#f5ead6;
+    --text-dim:#c9b696;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:radial-gradient(ellipse at 50% -10%, #4a3521 0%, var(--bg-deep) 60%);
+    font-family:'Nunito',sans-serif;
+    color:var(--text-light);
+    display:flex;
+    justify-content:center;
+    padding:18px 10px 30px;
+    min-height:100vh;
+  }
+  .stage{width:100%; max-width:760px;}
+  h1{
+    font-family:'Baloo 2',sans-serif;
+    font-weight:800;
+    font-size:1.5rem;
+    margin:0 0 2px;
+    color:var(--sand);
+  }
+  .subtitle{font-size:.85rem; color:var(--text-dim); margin:0 0 14px;}
+  .hidden{display:none !important;}
+
+  /* ---------- Deck builder screen ---------- */
+  .deck-panel{
+    background:var(--bg-panel);
+    border-radius:16px;
+    padding:16px;
+    border:1px solid #4a382470;
+  }
+  .deck-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:4px;
+  }
+  .deck-title{
+    font-family:'Baloo 2',sans-serif;
+    font-weight:700;
+    font-size:1.05rem;
+    color:var(--gold);
+  }
+  .deck-count{
+    font-family:'Baloo 2',sans-serif;
+    font-size:.85rem;
+    color:var(--text-dim);
+  }
+  .deck-count.ready{color:#8fd08f;}
+  .deck-hint{
+    font-size:.72rem;
+    color:var(--text-dim);
+    margin:0 0 12px;
+  }
+  .pool-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:8px;
+  }
+  .start-duel-btn{
+    display:block;
+    width:100%;
+    margin-top:14px;
+    font-family:'Baloo 2',sans-serif;
+    font-weight:700;
+    font-size:.95rem;
+    background:var(--clay);
+    color:#fff;
+    border:none;
+    padding:12px;
+    border-radius:30px;
+    cursor:pointer;
+  }
+  .start-duel-btn:disabled{
+    background:#5a4a34;
+    color:#9a8a70;
+    cursor:not-allowed;
+  }
+
+  /* ---------- Shared card styling ---------- */
+  .card{
+    background:#251b12;
+    border-radius:12px;
+    padding:10px 9px 8px;
+    border:2px solid #4a382480;
+    cursor:pointer;
+    text-align:left;
+    transition:transform .12s ease, border-color .12s ease;
+    position:relative;
+  }
+  .card:hover{transform:translateY(-2px);}
+  .card.selected{border-color:var(--gold); box-shadow:0 0 0 2px #d9b44a40;}
+  .card.disabled{opacity:.4; cursor:not-allowed; transform:none;}
+  .card-top{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px;}
+  .card-name{font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.82rem; line-height:1.05;}
+  .card-cost{
+    font-family:'Baloo 2',sans-serif; font-weight:800; font-size:.72rem;
+    background:#00000050; border-radius:50%; width:20px; height:20px;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--gold);
+  }
+  .card-class{font-size:.6rem; font-weight:700; letter-spacing:.3px; text-transform:uppercase; opacity:.8; margin-bottom:3px;}
+  .card-desc{font-size:.66rem; line-height:1.25; color:var(--text-dim);}
+  .card-pick-badge{
+    position:absolute; top:-6px; right:-6px;
+    width:20px; height:20px; border-radius:50%;
+    background:var(--gold); color:#241a12;
+    font-family:'Baloo 2',sans-serif; font-weight:800; font-size:.7rem;
+    display:none; align-items:center; justify-content:center;
+  }
+  .card.selected .card-pick-badge{display:flex;}
+
+  /* ---------- Duel screen ---------- */
+  .matchup{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    background:var(--bg-panel); border-radius:14px; padding:10px 14px; margin-bottom:10px;
+    border:1px solid #4a382470;
+  }
+  .fighter-tag{display:flex; align-items:center; gap:8px; font-weight:700; font-size:.9rem;}
+  .fighter-tag.you{color:var(--clay);}
+  .fighter-tag.rival{color:var(--aqua);}
+  .vs-label{
+    font-family:'Baloo 2',sans-serif; font-size:.75rem; color:var(--text-dim);
+    background:#00000030; padding:2px 10px; border-radius:20px;
+  }
+  .arena-wrap{
+    position:relative; border-radius:18px; overflow:hidden;
+    border:2px solid #5c452870; box-shadow:0 10px 30px -12px #00000090;
+  }
+  .hud{
+    position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between;
+    padding:12px 14px; z-index:5; pointer-events:none;
+  }
+  .hp-block{width:44%;}
+  .hp-block.right{text-align:right;}
+  .hp-name{font-family:'Baloo 2',sans-serif; font-size:.8rem; font-weight:700; margin-bottom:4px;}
+  .hp-bar-bg{height:12px; background:#00000060; border-radius:8px; overflow:hidden; border:1px solid #ffffff20;}
+  .hp-block.right .hp-bar-bg{margin-left:auto;}
+  .hp-bar-fill{height:100%; border-radius:8px; transition:width .35s ease;}
+  .you .hp-bar-fill{background:linear-gradient(90deg,var(--clay),#e39a5f);}
+  .rival .hp-bar-fill{background:linear-gradient(90deg,var(--aqua),#7bb9d6);}
+  .status-icons{display:flex; gap:4px; margin-top:5px;}
+  .hp-block.right .status-icons{justify-content:flex-end;}
+  .status-pill{
+    font-size:.62rem; font-weight:700; padding:2px 6px; border-radius:20px;
+    background:#00000055; border:1px solid #ffffff25;
+  }
+  canvas{
+    display:block; width:100%;
+    background:linear-gradient(180deg, #f0d29a 0%, #e8c184 38%, #cf9f5e 60%, #a97b45 100%);
+    touch-action:none; cursor:crosshair;
+  }
+  .banner{
+    position:absolute; top:44%; left:50%; transform:translate(-50%,-50%);
+    font-family:'Baloo 2',sans-serif; font-size:1.1rem; font-weight:700;
+    background:#1c130ccc; padding:10px 22px; border-radius:14px; text-align:center;
+    z-index:8; display:none; border:1px solid #ffffff30;
+  }
+  .banner.show{display:block;}
+  .banner .sub{
+    display:block; font-family:'Nunito',sans-serif; font-size:.75rem; font-weight:600;
+    color:var(--text-dim); margin-top:4px;
+  }
+  .controls{margin-top:14px;}
+  .deck-status-row{
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;
+  }
+  .energy-row{display:flex; align-items:center; gap:8px;}
+  .energy-label{font-family:'Baloo 2',sans-serif; font-size:.78rem; font-weight:700; color:var(--gold); min-width:74px;}
+  .pip{width:16px; height:16px; border-radius:4px; background:#3a2c1a; border:1px solid #00000050;}
+  .pip.filled{background:linear-gradient(160deg,var(--gold),#a9791f); box-shadow:0 0 6px #d9b44a80;}
+  .pips{display:flex; gap:4px;}
+  .pile-counts{
+    font-size:.68rem; color:var(--text-dim); display:flex; gap:10px; font-weight:700;
+  }
+  .hand{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+  .hint{text-align:center; font-size:.72rem; color:var(--text-dim); margin-top:10px; min-height:16px;}
+  .btn-row{display:flex; gap:10px; margin-top:14px; justify-content:center;}
+  .reset-btn, .switch-deck-btn{
+    font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.85rem;
+    color:#fff; border:none; padding:9px 20px; border-radius:30px; cursor:pointer;
+  }
+  .reset-btn{background:var(--clay);}
+  .switch-deck-btn{background:#4a382480; color:var(--text-light);}
+  .reset-btn:active, .switch-deck-btn:active{transform:scale(.97);}
+  .note{font-size:.66rem; color:var(--text-dim); text-align:center; margin-top:16px; line-height:1.5; opacity:.7;}
+</style>
+</head>
+<body>
+<div class="stage">
+  <h1>Axie Duel</h1>
+  <p class="subtitle">Protótipo — mira física + deck de cartas do core Axie (energia, classes, status)</p>
+
+  <!-- ===================== DECK BUILDER SCREEN ===================== -->
+  <div id="deckScreen" class="deck-panel">
+    <div class="deck-header">
+      <div class="deck-title">Monte seu Axie</div>
+      <div class="deck-count" id="deckCount">0 / 6 partes escolhidas</div>
+    </div>
+    <p class="deck-hint">Escolha 6 cartas (partes) pro seu deck. Cada parte é uma classe com um custo de energia e um efeito. No duelo você compra 3 por vez.</p>
+    <div class="pool-grid" id="poolGrid"></div>
+    <button class="start-duel-btn" id="startDuelBtn" disabled>Escolha 6 partes pra começar</button>
+  </div>
+
+  <!-- ===================== DUEL SCREEN ===================== -->
+  <div id="duelScreen" class="hidden">
+    <div class="matchup">
+      <div class="fighter-tag you">🐾 Seu Axie — Beast</div>
+      <div class="vs-label">Beast vence Plant · perde p/ Aqua</div>
+      <div class="fighter-tag rival">🌊 Rival — Aqua</div>
+    </div>
+
+    <div class="arena-wrap">
+      <div class="hud">
+        <div class="hp-block you">
+          <div class="hp-name">VOCÊ</div>
+          <div class="hp-bar-bg"><div class="hp-bar-fill" id="hpYou" style="width:100%"></div></div>
+          <div class="status-icons" id="statusYou"></div>
+        </div>
+        <div class="hp-block right rival">
+          <div class="hp-name">RIVAL</div>
+          <div class="hp-bar-bg"><div class="hp-bar-fill" id="hpRival" style="width:100%"></div></div>
+          <div class="status-icons" id="statusRival"></div>
+        </div>
+      </div>
+      <canvas id="arena" width="760" height="360"></canvas>
+      <div class="banner" id="banner">Fim de jogo<span class="sub" id="bannerSub"></span></div>
+    </div>
+
+    <div class="controls">
+      <div class="deck-status-row">
+        <div class="energy-row">
+          <div class="energy-label">ENERGIA</div>
+          <div class="pips" id="pips"></div>
+        </div>
+        <div class="pile-counts">
+          <span id="deckPileCount">Baralho: 3</span>
+          <span id="discardPileCount">Descarte: 0</span>
+        </div>
+      </div>
+      <div class="hand" id="hand"></div>
+      <div class="hint" id="hint">Escolha uma carta de ataque e arraste no campo pra mirar.</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="reset-btn" id="resetBtn">Revanche (mesmo deck)</button>
+      <button class="switch-deck-btn" id="switchDeckBtn">Trocar deck</button>
+    </div>
+  </div>
+
+  <p class="note">Protótipo de conceito para o Vibeathon — energia recarrega por rodada, cartas vêm de um baralho de 6 (suas partes), e a mira é sempre manual, como um estilingue.</p>
+</div>
+
+<script>
+(function(){
+
+  // ---------- Card pool (adapted from Axie Origin core: energy, class triangle, status effects) ----------
+  // 12 cards total, 2 per class, so deck-building means real trade-offs.
+  const POOL = [
+    { id:'horn',      name:'Investida',        cls:'Beast',   cost:1, dmg:14, color:'#c97b3d', type:'attack',  effect:'ambush',
+      desc:'Reto e veloz. Ambush: dobra de dano no 1º acerto da partida.' },
+    { id:'horn2',     name:'Investida Pesada', cls:'Beast',   cost:2, dmg:22, color:'#c97b3d', type:'attack',  effect:'none',
+      desc:'Mais lento, mas um golpe bem mais forte. Sem efeito extra.' },
+    { id:'tail',      name:'Maré',             cls:'Aqua',    cost:2, dmg:8,  color:'#4c8fb0', type:'attack',  effect:'bleed',
+      desc:'Arco longo. Aplica Sangramento: dano ao longo de 2 rodadas.' },
+    { id:'tail_alt',  name:'Respingo',         cls:'Aqua',    cost:1, dmg:6,  color:'#4c8fb0', type:'attack',  effect:'none',
+      desc:'Barato e rápido de reciclar. Dano baixo, sem efeito.' },
+    { id:'mouth',     name:'Raiz',             cls:'Plant',   cost:1, dmg:10, color:'#3f6b4a', type:'attack',  effect:'retain',
+      desc:'Curto alcance. Retain: nunca sai da sua mão, acerte ou erre.' },
+    { id:'mouth_alt', name:'Espinho',          cls:'Plant',   cost:2, dmg:16, color:'#3f6b4a', type:'attack',  effect:'none',
+      desc:'Mais dano que a Raiz, mas some da mão como as outras cartas.' },
+    { id:'back',      name:'Pena',             cls:'Bird',    cost:1, dmg:6,  color:'#d9b44a', type:'attack',  effect:'multi',
+      desc:'3 projéteis em leque. +50% de dano bônus se 2+ acertarem.' },
+    { id:'back_alt',  name:'Mergulho',         cls:'Bird',    cost:2, dmg:18, color:'#d9b44a', type:'attack',  effect:'none',
+      desc:'Um golpe único e forte, sem dividir em vários projéteis.' },
+    { id:'sting',     name:'Veneno',           cls:'Bug',     cost:2, dmg:9,  color:'#7a5c9e', type:'attack',  effect:'deathmark',
+      desc:'Lento. Aplica Marca da Morte: próximo golpe recebido tem +10 de dano puro.' },
+    { id:'sting_alt', name:'Picada',           cls:'Bug',     cost:1, dmg:7,  color:'#7a5c9e', type:'attack',  effect:'none',
+      desc:'Barata e direta. Sem efeito de status.' },
+    { id:'shell',     name:'Escudo',           cls:'Reptile', cost:2, dmg:0,  color:'#8a8f5c', type:'defense', effect:'shield_cleanse',
+      desc:'Não ataca. Bloqueia 50% do próximo dano e remove 1 status negativo seu.' },
+    { id:'shell_alt', name:'Casca',            cls:'Reptile', cost:1, dmg:0,  color:'#8a8f5c', type:'defense', effect:'shield',
+      desc:'Defesa mais barata: bloqueia 50% do próximo dano, sem remover status.' },
+  ];
+  const TRI_A = ['Beast','Plant','Aqua'];   // Beast > Plant > Aqua > Beast
+  const TRI_B = ['Bird','Bug','Reptile'];   // Bird > Bug > Reptile > Bird
+
+  function classMultiplier(attackerCls, defenderCls){
+    for (const tri of [TRI_A, TRI_B]){
+      const ai = tri.indexOf(attackerCls), di = tri.indexOf(defenderCls);
+      if (ai !== -1 && di !== -1){
+        if ((ai+1)%3 === di) return 1.2;
+        if ((di+1)%3 === ai) return 0.85;
+      }
+    }
+    return 1;
+  }
+  function shuffle(arr){
+    const a = arr.slice();
+    for (let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]] = [a[j],a[i]];
+    }
+    return a;
+  }
+
+  // ================= DECK BUILDER =================
+  let selectedDeck = [];
+  const poolGrid = document.getElementById('poolGrid');
+  const deckCountEl = document.getElementById('deckCount');
+  const startDuelBtn = document.getElementById('startDuelBtn');
+
+  function renderPool(){
+    poolGrid.innerHTML = '';
+    POOL.forEach(card => {
+      const div = document.createElement('div');
+      const isSelected = selectedDeck.includes(card);
+      div.className = 'card' + (isSelected ? ' selected' : '');
+      div.style.borderColor = isSelected ? '#d9b44a' : (card.color+'55');
+      div.innerHTML = `
+        <div class="card-pick-badge">✓</div>
+        <div class="card-top">
+          <div class="card-name">${card.name}</div>
+          <div class="card-cost">${card.cost}</div>
+        </div>
+        <div class="card-class" style="color:${card.color}">${card.cls}</div>
+        <div class="card-desc">${card.desc}</div>
+      `;
+      div.addEventListener('click', () => {
+        if (isSelected){
+          selectedDeck = selectedDeck.filter(c => c !== card);
+        } else if (selectedDeck.length < 6){
+          selectedDeck.push(card);
+        }
+        renderPool();
+      });
+      poolGrid.appendChild(div);
+    });
+    deckCountEl.textContent = `${selectedDeck.length} / 6 partes escolhidas`;
+    deckCountEl.className = 'deck-count' + (selectedDeck.length===6 ? ' ready' : '');
+    startDuelBtn.disabled = selectedDeck.length !== 6;
+    startDuelBtn.textContent = selectedDeck.length===6 ? 'Começar Duelo' : `Escolha ${6-selectedDeck.length} parte(s) a mais`;
+  }
+  renderPool();
+
+  startDuelBtn.addEventListener('click', () => {
+    document.getElementById('deckScreen').classList.add('hidden');
+    document.getElementById('duelScreen').classList.remove('hidden');
+    startNewMatch(selectedDeck);
+  });
+  document.getElementById('switchDeckBtn').addEventListener('click', () => {
+    document.getElementById('duelScreen').classList.add('hidden');
+    document.getElementById('deckScreen').classList.remove('hidden');
+  });
+
+  // ================= DUEL STATE =================
+  const PLAYER_CLASS = 'Beast';
+  const RIVAL_CLASS = 'Aqua';
+  const MAX_HP = 100;
+  const MAX_ENERGY = 10;
+  const HAND_SIZE = 3;
+
+  let state;
+  let playerDeckDef = [];
+
+  function freshState(deckDef){
+    const deck = shuffle(deckDef);
+    const hand = deck.splice(0, HAND_SIZE);
+    return {
+      hpYou: MAX_HP, hpRival: MAX_HP,
+      energyYou: 3, energyRival: 3,
+      statusYou: {}, statusRival: {},
+      firstHitDone: false,
+      turn: 'you',
+      deck, discard: [], hand,
+      selectedCard: null,
+      projectiles: [],
+      gameOver:false,
+    };
+  }
+
+  function drawCard(){
+    if (state.deck.length === 0){
+      if (state.discard.length === 0) return null;
+      state.deck = shuffle(state.discard);
+      state.discard = [];
+    }
+    const card = state.deck.pop();
+    state.hand.push(card);
+    return card;
+  }
+
+  function startNewMatch(deckDef){
+    playerDeckDef = deckDef;
+    state = freshState(playerDeckDef);
+    pendingResolve = null;
+    particles = []; floatingTexts = []; shakeTime = 0; shakeMag = 0;
+    document.getElementById('banner').classList.remove('show');
+    updateHPBars();
+    renderStatus();
+    renderHand();
+    renderPips();
+    renderPiles();
+    hintEl.textContent = 'Escolha uma carta de ataque e arraste no campo pra mirar.';
+  }
+
+  // ---------- Canvas + positions ----------
+  const canvas = document.getElementById('arena');
+  const ctx = canvas.getContext('2d');
+  let W = canvas.width, H = canvas.height;
+  const GROUND_Y = H - 46;
+  const youPos = { x: 92, y: GROUND_Y - 34 };
+  const rivalPos = { x: W-92, y: GROUND_Y - 34 };
+  const HIT_RADIUS = 34;
+  const GRAVITY = 1500;
+
+  function resizeCanvas(){
+    const displayWidth = canvas.parentElement.clientWidth;
+    canvas.style.height = (displayWidth * (360/760)) + 'px';
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  // ---------- Drag / aim state ----------
+  let dragging = false;
+  let dragStart = null;
+  let dragCurrent = null;
+  const MAX_DRAG = 130;
+  const POWER_SCALE = 6.5;
+
+  function canvasPoint(evt){
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+    const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+  }
+
+  canvas.addEventListener('mousedown', onDragStart);
+  canvas.addEventListener('touchstart', onDragStart, {passive:true});
+  canvas.addEventListener('mousemove', onDragMove);
+  canvas.addEventListener('touchmove', onDragMove, {passive:true});
+  window.addEventListener('mouseup', onDragEnd);
+  window.addEventListener('touchend', onDragEnd);
+
+  function onDragStart(e){
+    if (!state || state.turn !== 'you' || !state.selectedCard) return;
+    if (state.selectedCard.type !== 'attack') return;
+    dragging = true;
+    dragStart = canvasPoint(e);
+    dragCurrent = dragStart;
+  }
+  function onDragMove(e){
+    if (!dragging) return;
+    dragCurrent = canvasPoint(e);
+  }
+  function onDragEnd(){
+    if (!dragging) return;
+    dragging = false;
+    const card = state.selectedCard;
+    if (!card){ dragStart=null; dragCurrent=null; return; }
+    let dx = dragStart.x - dragCurrent.x;
+    let dy = dragStart.y - dragCurrent.y;
+    let dist = Math.hypot(dx,dy);
+    if (dist < 12){ dragStart=null; dragCurrent=null; return; }
+    dist = Math.min(dist, MAX_DRAG);
+    const angle = Math.atan2(dy,dx);
+    const power = dist * POWER_SCALE;
+    launchCard(card, angle, power);
+    dragStart=null; dragCurrent=null;
+  }
+
+  // ---------- Hand / energy / pile UI ----------
+  const handEl = document.getElementById('hand');
+  const pipsEl = document.getElementById('pips');
+  const hintEl = document.getElementById('hint');
+
+  function renderPips(){
+    pipsEl.innerHTML = '';
+    for (let i=0;i<MAX_ENERGY;i++){
+      const d = document.createElement('div');
+      d.className = 'pip' + (i < state.energyYou ? ' filled' : '');
+      pipsEl.appendChild(d);
+    }
+  }
+
+  function renderPiles(){
+    document.getElementById('deckPileCount').textContent = `Baralho: ${state.deck.length}`;
+    document.getElementById('discardPileCount').textContent = `Descarte: ${state.discard.length}`;
+  }
+
+  function renderHand(){
+    handEl.innerHTML = '';
+    state.hand.forEach((card) => {
+      const div = document.createElement('div');
+      const affordable = state.energyYou >= card.cost;
+      const isTurn = state.turn === 'you';
+      div.className = 'card' + (state.selectedCard===card ? ' selected':'') + ((!affordable||!isTurn) ? ' disabled':'');
+      div.style.borderColor = state.selectedCard===card ? '#d9b44a' : (card.color+'55');
+      div.innerHTML = `
+        <div class="card-top">
+          <div class="card-name">${card.name}</div>
+          <div class="card-cost">${card.cost}</div>
+        </div>
+        <div class="card-class" style="color:${card.color}">${card.cls}</div>
+        <div class="card-desc">${card.desc}</div>
+      `;
+      if (affordable && isTurn){
+        div.addEventListener('click', () => {
+          if (card.type === 'defense'){
+            playDefenseCard(card);
+          } else {
+            state.selectedCard = (state.selectedCard===card) ? null : card;
+            hintEl.textContent = state.selectedCard ? 'Arraste no campo pra mirar e solte pra lançar.' : 'Escolha uma carta de ataque e arraste no campo pra mirar.';
+            renderHand();
+          }
+        });
+      }
+      handEl.appendChild(div);
+    });
+  }
+
+  // ---------- Status helpers ----------
+  function statusLabel(key){
+    return {bleed:'🩸 Sangramento', deathmark:'💀 Marca', shield:'🛡️ Escudo', ambushed:'⚡ 1º golpe'}[key] || key;
+  }
+  function renderStatus(){
+    const yEl = document.getElementById('statusYou');
+    const rEl = document.getElementById('statusRival');
+    yEl.innerHTML = Object.keys(state.statusYou).filter(k=>state.statusYou[k]>0 || state.statusYou[k]===true)
+      .map(k=>`<span class="status-pill">${statusLabel(k)}</span>`).join('');
+    rEl.innerHTML = Object.keys(state.statusRival).filter(k=>state.statusRival[k]>0 || state.statusRival[k]===true)
+      .map(k=>`<span class="status-pill">${statusLabel(k)}</span>`).join('');
+  }
+  function updateHPBars(){
+    document.getElementById('hpYou').style.width = Math.max(0,state.hpYou) + '%';
+    document.getElementById('hpRival').style.width = Math.max(0,state.hpRival) + '%';
+  }
+
+  // ---------- Juice: particles, floating text, screen shake ----------
+  let particles = [];
+  let floatingTexts = [];
+  let shakeTime = 0;
+  let shakeMag = 0;
+
+  function spawnFloatingText(x,y,text,color,size){
+    floatingTexts.push({x,y,text,color,size:size||16,life:1,vy:-42});
+  }
+  function spawnParticles(x,y,color,count){
+    for (let i=0;i<(count||10);i++){
+      const ang = Math.random()*Math.PI*2;
+      const speed = 60+Math.random()*160;
+      particles.push({ x,y, vx:Math.cos(ang)*speed, vy:Math.sin(ang)*speed, life:1, color, size:2+Math.random()*3 });
+    }
+  }
+  function triggerShake(amount, duration){
+    shakeMag = Math.max(shakeMag, amount);
+    shakeTime = Math.max(shakeTime, duration);
+  }
+  function applyComboBonus(targetSide, amount){
+    if (targetSide==='you') state.hpYou = Math.max(0, state.hpYou - amount);
+    else state.hpRival = Math.max(0, state.hpRival - amount);
+    updateHPBars();
+    const pos = targetSide==='you' ? youPos : rivalPos;
+    spawnFloatingText(pos.x, pos.y-70, 'COMBO! -'+amount, '#ffd23f', 17);
+    spawnParticles(pos.x, pos.y-30, '#ffd23f', 16);
+    triggerShake(10, 0.3);
+    checkGameOver();
+  }
+
+  // ---------- Combat resolution ----------
+  function applyDamage(target, amount, sourceCls, hitX, hitY){
+    const isYou = target === 'you';
+    const defCls = isYou ? PLAYER_CLASS : RIVAL_CLASS;
+    let mult = classMultiplier(sourceCls, defCls);
+    let dmg = amount * mult;
+
+    const statusObj = isYou ? state.statusYou : state.statusRival;
+    let deathmarked = false, shielded = false;
+    if (statusObj.deathmark){ dmg += 10; delete statusObj.deathmark; deathmarked = true; }
+    if (statusObj.shield){ dmg *= 0.5; delete statusObj.shield; shielded = true; }
+    dmg = Math.round(dmg);
+    if (isYou) state.hpYou = Math.max(0, state.hpYou - dmg);
+    else state.hpRival = Math.max(0, state.hpRival - dmg);
+    updateHPBars();
+    renderStatus();
+
+    const px = hitX!==undefined ? hitX : (isYou?youPos.x:rivalPos.x);
+    const py = hitY!==undefined ? hitY : (isYou?youPos.y:rivalPos.y)-20;
+    spawnParticles(px, py, isYou ? '#4c8fb0' : '#c97b3d', 12);
+    spawnFloatingText(px, py-10, '-'+dmg, '#ffdca0', 20);
+    if (shielded) spawnFloatingText(px, py-32, 'BLOQUEADO!', '#8fd0ff', 13);
+    if (deathmarked) spawnFloatingText(px, py-46, '+10 MARCA', '#c99bff', 13);
+    triggerShake(Math.min(14, 4 + dmg*0.25), 0.22);
+
+    return dmg;
+  }
+
+  function applyBleed(target){
+    const statusObj = target === 'you' ? state.statusYou : state.statusRival;
+    statusObj.bleed = 2;
+  }
+  function tickBleed(target){
+    const statusObj = target === 'you' ? state.statusYou : state.statusRival;
+    if (statusObj.bleed && statusObj.bleed > 0){
+      const dmg = 5;
+      if (target==='you') state.hpYou = Math.max(0, state.hpYou - dmg);
+      else state.hpRival = Math.max(0, state.hpRival - dmg);
+      statusObj.bleed -= 1;
+      if (statusObj.bleed<=0) delete statusObj.bleed;
+      updateHPBars();
+      renderStatus();
+      const pos = target==='you' ? youPos : rivalPos;
+      spawnFloatingText(pos.x, pos.y-40, '-'+dmg+' 🩸', '#e0685a', 15);
+      spawnParticles(pos.x, pos.y-20, '#b8452f', 6);
+      return dmg;
+    }
+    return 0;
+  }
+
+  // ---------- Card play: player ----------
+  function launchCard(card, angle, power){
+    state.energyYou -= card.cost;
+    if (card.effect !== 'retain'){
+      state.hand = state.hand.filter(c => c !== card);
+      state.discard.push(card);
+      drawCard();
+    }
+    state.selectedCard = null;
+    state.turn = 'resolving';
+    renderHand(); renderPips(); renderPiles();
+    hintEl.textContent = 'Voando...';
+
+    const spread = card.effect === 'multi' ? [-0.14, 0, 0.14] : [0];
+    spread.forEach((offset, i) => {
+      setTimeout(() => {
+        const vx = -Math.cos(angle) * power;
+        const vy = -Math.sin(angle) * power + offset*260;
+        state.projectiles.push({
+          x: youPos.x, y: youPos.y,
+          vx: vx, vy: vy,
+          color: card.color, from:'you', card, alive:true, trail:[], id: Math.random()
+        });
+      }, i*70);
+    });
+    pendingResolve = { side:'you', card, hitsRegistered:0, resolved:false };
+  }
+
+  function playDefenseCard(card){
+    state.energyYou -= card.cost;
+    state.statusYou.shield = true;
+    if (card.effect === 'shield_cleanse'){
+      ['bleed','deathmark'].forEach(k => { if (state.statusYou[k]) delete state.statusYou[k]; });
+    }
+    state.hand = state.hand.filter(c => c !== card);
+    state.discard.push(card);
+    drawCard();
+    renderStatus();
+    hintEl.textContent = `Você usou ${card.name}!`;
+    state.turn = 'rival';
+    renderHand(); renderPips(); renderPiles();
+    setTimeout(aiTakeTurn, 500);
+  }
+
+  // ---------- Card play: AI (uses the full pool for prototype simplicity) ----------
+  function aiTakeTurn(){
+    state.energyRival = Math.min(MAX_ENERGY, state.energyRival + 2);
+    const affordable = POOL.filter(c => c.cost <= state.energyRival);
+    const card = affordable[Math.floor(Math.random()*affordable.length)] || POOL[0];
+    hintEl.textContent = 'O rival está mirando...';
+    setTimeout(() => {
+      if (card.type === 'defense'){
+        state.statusRival.shield = true;
+        if (card.effect === 'shield_cleanse'){
+          ['bleed','deathmark'].forEach(k => { if (state.statusRival[k]) delete state.statusRival[k]; });
+        }
+        state.energyRival -= card.cost;
+        renderStatus();
+        hintEl.textContent = `O rival usou ${card.name}!`;
+        endAiTurn();
+        return;
+      }
+      state.energyRival -= card.cost;
+      const dx = youPos.x - rivalPos.x;
+      const dy = (youPos.y - 40) - rivalPos.y;
+      let angle = Math.atan2(dy, dx) + (Math.random()-0.5)*0.22;
+      const power = 480 + Math.random()*90;
+      const spread = card.effect === 'multi' ? [-0.14,0,0.14] : [0];
+      spread.forEach((offset,i)=>{
+        setTimeout(()=>{
+          const vx = Math.cos(angle) * power;
+          const vy = Math.sin(angle) * power + offset*260;
+          state.projectiles.push({
+            x: rivalPos.x, y: rivalPos.y, vx: vx, vy: vy,
+            color: card.color, from:'rival', card, alive:true, trail:[], id: Math.random()
+          });
+        }, i*70);
+      });
+      pendingResolve = { side:'rival', card, hitsRegistered:0, resolved:false };
+    }, 900);
+  }
+
+  function endAiTurn(){
+    setTimeout(() => { if (!state.gameOver) startYourTurn(); }, 700);
+  }
+
+  function startYourTurn(){
+    tickBleed('you');
+    checkGameOver();
+    if (state.gameOver) return;
+    state.energyYou = Math.min(MAX_ENERGY, state.energyYou + 2);
+    state.turn = 'you';
+    hintEl.textContent = 'Escolha uma carta de ataque e arraste no campo pra mirar.';
+    renderHand(); renderPips(); renderPiles();
+  }
+
+  let pendingResolve = null;
+
+  function finishResolution(){
+    const pr = pendingResolve;
+    if (!pr || pr.resolved) return;
+    pr.resolved = true;
+    const side = pr.side;
+
+    if (pr.card.effect === 'multi' && pr.hitsRegistered >= 2 && !state.gameOver){
+      const bonus = Math.round(pr.card.dmg * 0.5);
+      const targetSide = side === 'you' ? 'rival' : 'you';
+      applyComboBonus(targetSide, bonus);
+    }
+
+    if (side === 'you'){
+      if (pr.hitsRegistered === 0 && pr.card.effect === 'retain'){
+        hintEl.textContent = 'Errou — a Raiz nunca sai da sua mão (Retain).';
+      } else if (pr.hitsRegistered === 0){
+        hintEl.textContent = 'Errou o alvo!';
+      }
+      setTimeout(() => {
+        if (state.gameOver) return;
+        state.turn = 'rival';
+        aiTakeTurn();
+      }, 500);
+    } else {
+      endAiTurn();
+    }
+  }
+
+  function checkGameOver(){
+    if (state.hpYou <= 0 || state.hpRival <= 0){
+      state.gameOver = true;
+      state.turn = 'over';
+      const banner = document.getElementById('banner');
+      const sub = document.getElementById('bannerSub');
+      banner.classList.add('show');
+      if (state.hpYou <=0 && state.hpRival<=0){
+        banner.textContent = 'Empate!'; sub.textContent='';
+      } else if (state.hpRival <= 0){
+        banner.textContent = 'Você venceu o duelo!';
+        sub.textContent = 'O rival Aqua foi derrotado.';
+      } else {
+        banner.textContent = 'Você perdeu o duelo.';
+        sub.textContent = 'O rival Aqua levou a melhor dessa vez.';
+      }
+      banner.appendChild(sub);
+    }
+  }
+
+  // ---------- Main render/update loop ----------
+  function update(dt){
+    if (!state) return;
+    for (const p of state.projectiles){
+      if (!p.alive) continue;
+      p.trail.push({x:p.x,y:p.y});
+      if (p.trail.length>14) p.trail.shift();
+      p.vy += GRAVITY*dt;
+      p.x += p.vx*dt;
+      p.y += p.vy*dt;
+
+      const targetPos = p.from==='you' ? rivalPos : youPos;
+      const targetSide = p.from==='you' ? 'rival' : 'you';
+      const distToTarget = Math.hypot(p.x-targetPos.x, p.y-(targetPos.y-10));
+
+      if (distToTarget < HIT_RADIUS && p.alive){
+        p.alive = false;
+        const sourceCls = p.card.cls;
+        let baseDmg = p.card.dmg;
+        const ambushBonus = (!state.firstHitDone && p.card.effect==='ambush');
+        let dmgToApply = baseDmg;
+        if (ambushBonus) dmgToApply *= 2;
+        const dealt = applyDamage(targetSide, dmgToApply, sourceCls, p.x, p.y);
+        if (ambushBonus) spawnFloatingText(p.x, p.y-64, 'AMBUSH! x2', '#ffd23f', 15);
+        if (dealt>0) state.firstHitDone = true;
+        if (p.card.effect === 'bleed') applyBleed(targetSide);
+        if (p.card.effect === 'deathmark'){
+          const st = targetSide==='you' ? state.statusYou : state.statusRival;
+          st.deathmark = true;
+          renderStatus();
+        }
+        if (pendingResolve && pendingResolve.side===p.from){
+          pendingResolve.hitsRegistered += 1;
+        }
+        checkGameOver();
+      }
+      if (p.y > GROUND_Y+20 || p.x < -30 || p.x > W+30){
+        p.alive = false;
+      }
+    }
+    state.projectiles = state.projectiles.filter(p=>p.alive || p.trail.length>0);
+
+    for (const pt of particles){
+      pt.x += pt.vx*dt; pt.y += pt.vy*dt; pt.vy += 500*dt; pt.life -= dt*1.6;
+    }
+    particles = particles.filter(pt => pt.life > 0);
+
+    for (const ft of floatingTexts){
+      ft.y += ft.vy*dt; ft.life -= dt*1.1;
+    }
+    floatingTexts = floatingTexts.filter(ft => ft.life > 0);
+
+    if (shakeTime > 0){
+      shakeTime -= dt;
+      if (shakeTime <= 0){ shakeTime = 0; shakeMag = 0; }
+    }
+
+    if (pendingResolve && !pendingResolve.resolved){
+      const stillFlying = state.projectiles.some(p => p.from===pendingResolve.side);
+      if (!stillFlying){ finishResolution(); }
+    }
+  }
+
+  function drawAxieSprite(pos, isYou){
+    // Placeholder blob sprite (no external image) -- swap for a real
+    // Three.js Axie Mixer render or sprite sheet later.
+    ctx.save();
+    const topColor = isYou ? '#e39a5f' : '#7bb9d6';
+    const baseColor = isYou ? '#c97b3d' : '#4c8fb0';
+    const outline = isYou ? '#8a5222' : '#2e5f78';
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y-4, 34, 0, Math.PI*2);
+    const grad = ctx.createRadialGradient(pos.x-10,pos.y-16,4,pos.x,pos.y-4,36);
+    grad.addColorStop(0, topColor);
+    grad.addColorStop(1, baseColor);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = outline;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    // simple face
+    ctx.fillStyle = '#1c1710';
+    ctx.beginPath(); ctx.arc(pos.x-9,pos.y-8,3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(pos.x+9,pos.y-8,3,0,Math.PI*2); ctx.fill();
+    // tiny horns to read as "axie-like"
+    ctx.strokeStyle = outline;
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(pos.x-14,pos.y-30); ctx.lineTo(pos.x-20,pos.y-44); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(pos.x+14,pos.y-30); ctx.lineTo(pos.x+20,pos.y-44); ctx.stroke();
+    ctx.restore();
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    ctx.save();
+    if (shakeTime > 0){
+      const dx = (Math.random()-0.5)*shakeMag;
+      const dy = (Math.random()-0.5)*shakeMag;
+      ctx.translate(dx, dy);
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.08)';
+    ctx.fillRect(0, GROUND_Y, W, H-GROUND_Y);
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+    ctx.beginPath(); ctx.moveTo(0,GROUND_Y); ctx.lineTo(W,GROUND_Y); ctx.stroke();
+
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.beginPath(); ctx.ellipse(youPos.x, GROUND_Y, 30,7,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(rivalPos.x, GROUND_Y, 30,7,0,0,Math.PI*2); ctx.fill();
+
+    drawAxieSprite(youPos, true);
+    drawAxieSprite(rivalPos, false);
+
+    if (dragging && dragStart && dragCurrent){
+      let dx = dragStart.x - dragCurrent.x;
+      let dy = dragStart.y - dragCurrent.y;
+      let dist = Math.hypot(dx,dy);
+      dist = Math.min(dist, MAX_DRAG);
+      const angle = Math.atan2(dy,dx);
+      const power = dist * POWER_SCALE;
+      const vx = -Math.cos(angle)*power;
+      const vy = -Math.sin(angle)*power;
+      ctx.setLineDash([6,6]);
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      let sx=youPos.x, sy=youPos.y, svx=vx, svy=vy;
+      ctx.moveTo(sx,sy);
+      for (let t=0;t<1.2;t+=0.05){
+        svy += GRAVITY*0.05; sx += svx*0.05; sy += svy*0.05;
+        if (sy>GROUND_Y) break;
+        ctx.lineTo(sx,sy);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = '#c97b3d';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(youPos.x,youPos.y);
+      ctx.lineTo(dragCurrent.x, dragCurrent.y);
+      ctx.stroke();
+    }
+
+    for (const p of state.projectiles){
+      ctx.save();
+      p.trail.forEach((t,i)=>{
+        ctx.globalAlpha = (i/p.trail.length)*0.35;
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(t.x,t.y,5,0,Math.PI*2); ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,7,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    for (const pt of particles){
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, pt.life);
+      ctx.fillStyle = pt.color;
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+
+    for (const ft of floatingTexts){
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, ft.life);
+      ctx.font = `800 ${ft.size}px 'Baloo 2', sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = ft.color;
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+      ctx.lineWidth = 3;
+      ctx.strokeText(ft.text, ft.x, ft.y);
+      ctx.fillText(ft.text, ft.x, ft.y);
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  let lastTime = null;
+  function loop(ts){
+    if (!lastTime) lastTime = ts;
+    const dt = Math.min(0.032, (ts-lastTime)/1000);
+    lastTime = ts;
+    if (state){ update(dt); draw(); }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  // ---------- Reset / rematch ----------
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    startNewMatch(playerDeckDef);
+  });
+})();
+</script>
+</body>
+</html>
