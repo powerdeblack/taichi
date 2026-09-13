@@ -1,4 +1,4 @@
-// Entry point: DOM wiring for the team picker and the 3-lane board duel.
+// Entry point: DOM wiring for the team builder and the lane board duel.
 import './style.css';
 import { AXIES } from './cards.js';
 import * as game from './game.js';
@@ -14,24 +14,33 @@ const switchDeckBtn = document.getElementById('switchDeckBtn');
 const resetBtn = document.getElementById('resetBtn');
 const boardEl = document.getElementById('board');
 
-let selectedClassIds = [];
+let squad = []; // [{ classId, role }] -- up to SQUAD_SIZE, first pick defaults to Tank
 let state = null;
-let lastYouClassIds = [];
-let lastRivalClassIds = [];
+let lastYouSquad = [];
+let lastRivalSquad = [];
 
-// ================= Team picker =================
-function renderRosterScreen(){
-  ui.renderRoster(AXIES, selectedClassIds, toggleClass);
-  ui.renderRosterHeader(selectedClassIds.length, game.LANES);
+// ================= Team builder =================
+function renderTeamScreen(){
+  ui.renderRoster(AXIES, squad, addToSquad);
+  ui.renderSquad(squad, AXIES, { onSetRole: setRole, onRemove: removeFromSquad });
+  ui.renderSquadHeader(squad, game.SQUAD_SIZE);
 }
-function toggleClass(classId){
-  const idx = selectedClassIds.indexOf(classId);
-  if (idx !== -1) selectedClassIds.splice(idx, 1);
-  else if (selectedClassIds.length < game.LANES) selectedClassIds.push(classId);
-  renderRosterScreen();
+function addToSquad(classId){
+  if (squad.length >= game.SQUAD_SIZE) return;
+  const role = squad.some(p => p.role === 'Tank') ? 'Attacker' : 'Tank';
+  squad.push({ classId, role });
+  renderTeamScreen();
   previewClass(classId);
 }
-renderRosterScreen();
+function setRole(idx, role){
+  squad[idx].role = role;
+  renderTeamScreen();
+}
+function removeFromSquad(idx){
+  squad.splice(idx, 1);
+  renderTeamScreen();
+}
+renderTeamScreen();
 
 // ================= 3D preview (team picker only) =================
 const preview3dCanvas = document.getElementById('preview3dCanvas');
@@ -52,20 +61,19 @@ function previewClass(classId){
 startDuelBtn.addEventListener('click', () => {
   deckScreen.classList.add('hidden');
   duelScreen.classList.remove('hidden');
-  const rivalClassIds = game.pickRivalClasses(selectedClassIds);
-  beginMatch(selectedClassIds.slice(), rivalClassIds);
+  beginMatch(squad.slice(), game.randomSquad());
 });
 switchDeckBtn.addEventListener('click', () => {
   duelScreen.classList.add('hidden');
   deckScreen.classList.remove('hidden');
 });
-resetBtn.addEventListener('click', () => beginMatch(lastYouClassIds, lastRivalClassIds));
+resetBtn.addEventListener('click', () => beginMatch(lastYouSquad, lastRivalSquad));
 
 // ================= Match lifecycle =================
-function beginMatch(youClassIds, rivalClassIds){
-  lastYouClassIds = youClassIds;
-  lastRivalClassIds = rivalClassIds;
-  state = game.freshState(youClassIds, rivalClassIds);
+function beginMatch(youSquad, rivalSquad){
+  lastYouSquad = youSquad;
+  lastRivalSquad = rivalSquad;
+  state = game.freshState(youSquad, rivalSquad);
   ui.hideBanner();
   ui.buildBoard(state);
   syncUI();
@@ -81,18 +89,35 @@ function syncUI(){
 
 function applyResultFx(result){
   if (!result) return;
-  const { side, card, casterIndex, targetIndex } = result;
+  const { side, card, casterIndex, targetIndex, targetIndices } = result;
+  const enemySide = side === 'you' ? 'rival' : 'you';
 
   if (card.role === 'defense'){
-    const el = ui.getLaneSideEl(side, casterIndex);
-    render.flashHeal(el);
-    render.spawnFloatingText(el, 'ESCUDO!', 'text-shield');
+    if (card.range === 'own_all'){
+      for (const i of targetIndices){
+        const el = ui.getLaneSideEl(side, i);
+        render.flashHeal(el);
+        render.spawnFloatingText(el, 'ESCUDO!', 'text-shield');
+      }
+    } else {
+      const el = ui.getLaneSideEl(side, casterIndex);
+      render.flashHeal(el);
+      render.spawnFloatingText(el, 'ESCUDO!', 'text-shield');
+    }
     return;
   }
   if (card.role === 'heal'){
-    const el = ui.getLaneSideEl(side, casterIndex);
-    render.flashHeal(el);
-    render.spawnFloatingText(el, '+'+result.healed, 'text-heal');
+    if (card.range === 'own_all'){
+      for (const i of targetIndices){
+        const el = ui.getLaneSideEl(side, i);
+        render.flashHeal(el);
+        render.spawnFloatingText(el, '+cura', 'text-heal');
+      }
+    } else {
+      const el = ui.getLaneSideEl(side, casterIndex);
+      render.flashHeal(el);
+      render.spawnFloatingText(el, '+'+result.healed, 'text-heal');
+    }
     return;
   }
   if (targetIndex === -1){
@@ -100,7 +125,6 @@ function applyResultFx(result){
     render.spawnFloatingText(el, 'Sem alvo!', 'text-dmg');
     return;
   }
-  const enemySide = side === 'you' ? 'rival' : 'you';
   const el = ui.getLaneSideEl(enemySide, targetIndex);
   render.flashHit(el);
   render.shakeBoard(boardEl);
@@ -125,15 +149,15 @@ function setHintForResult(side, result){
   const who = side === 'you' ? 'Você' : 'O rival';
   if (!result){ ui.setHint(`${who} não teve carta jogável e passou o turno.`); return; }
   if (result.card.role === 'defense'){ ui.setHint(`${who} ativou ${result.card.name}!`); return; }
-  if (result.card.role === 'heal'){ ui.setHint(`${who} curou ${result.healed} com ${result.card.name}!`); return; }
+  if (result.card.role === 'heal'){ ui.setHint(`${who} curou com ${result.card.name}!`); return; }
   if (result.targetIndex === -1){ ui.setHint('Sem alvo disponível!'); return; }
   ui.setHint(`${result.card.name} causou ${result.dmg} de dano!`);
 }
 
 function finishMatch(){
-  if (state.winner === 'draw') ui.showBanner('Empate!', '');
-  else if (state.winner === 'you') ui.showBanner('Você venceu o duelo!', 'Todas as linhas rivais foram derrotadas.');
-  else ui.showBanner('Você perdeu o duelo.', 'Suas linhas foram derrotadas.');
+  if (state.winner === 'draw') ui.showBanner('Empate!', 'Os dois Tanques caíram juntos.');
+  else if (state.winner === 'you') ui.showBanner('Você venceu o duelo!', 'O Tanque rival foi derrotado.');
+  else ui.showBanner('Você perdeu o duelo.', 'Seu Tanque foi derrotado.');
 }
 
 function onPlayerCardClick(card){

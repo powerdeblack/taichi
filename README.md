@@ -1,10 +1,11 @@
 # Axie Duel
 
 Protótipo de duelo em tabuleiro pro Axie Vibeathon (Sky Mavis / Axie Infinity):
-3 linhas por lado, cartas resolvem automaticamente (ataque curto/longo, defesa,
-cura), tudo baseado no core do Axie Origin (energia, classes, status effects).
-No team picker, cada Axie aparece como um modelo 3D real (Axie Mixer 3D
-oficial), não placeholder.
+esquadrão livre de 5 Axies com papéis (Tanque/Atacante/Curandeiro), cartas
+resolvem automaticamente (ataque curto/longo, defesa, cura, habilidade), tudo
+baseado no core do Axie Origin (energia, classes, status effects). Vence quem
+matar o Tanque do adversário primeiro. No team picker, cada Axie aparece como
+um modelo 3D real (Axie Mixer 3D oficial), não placeholder.
 
 ## Rodando localmente
 
@@ -36,24 +37,40 @@ npm run preview
 
 ## Como o tabuleiro funciona
 
-- Você escolhe 3 dos 6 Axies (um por classe) pro seu time; a ordem escolhida
-  define a linha (1, 2, 3). O rival fica com os 3 restantes.
-- Cada Axie tem 2 cartas próprias: um ataque de **curto alcance** (só acerta a
-  linha espelhada) e um de **longo alcance** (mira a linha inimiga com menos
-  HP) — exceto Plant (cura a própria linha) e Reptile (2 cartas de defesa).
-- Energia por turno, triângulo de classes (Beast > Plant > Aqua > Beast, Bird
-  > Bug > Reptile > Bird), status effects: Bleed, Deathmark, Retain,
-  Shield/Cleanse, Ambush (2x dano no 1º acerto) e o combo da Pena.
+- Você escolhe **5 Axies livremente** entre as 6 classes (pode repetir
+  classe) e atribui um **papel** a cada um: **Tanque**, **Atacante** ou
+  **Curandeiro** — exatamente 1 Tanque por time. O rival monta um time
+  aleatório com a mesma regra. **Vencer = derrubar o Tanque inimigo**
+  (as outras linhas não precisam morrer).
+- Papel muda os stats da linha (HP máximo, MP, e bônus de combate):
+  - **Tanque**: HP ×1.6, MP ×0.5, reduz todo dano recebido em 25%.
+  - **Atacante**: HP/MP normais, dano de ataque ×1.3.
+  - **Curandeiro**: HP ×0.6, MP ×1.6, cura ×1.5. MP escala a força de cura e
+    de escudo daquela linha (`mp/100 × bônus do papel`) — jogar cura fora do
+    papel de Curandeiro rende bem menos.
+- Cada Axie tem 3 cartas próprias: um ataque de **curto alcance** (só acerta
+  a linha espelhada) e um de **longo alcance** (mira a linha inimiga com
+  menos HP) — exceto Plant (cura) e Reptile (2 cartas de defesa) — mais uma
+  3ª carta de **Habilidade** (mais cara, mais forte; Floração e Muralha
+  afetam todas as suas linhas vivas de uma vez).
+- Cartas de **ataque não gastam energia** (custo 0); defesa/cura/habilidade
+  seguem custando energia normalmente, regenerando por turno.
+- Triângulo de classes (Beast > Plant > Aqua > Beast, Bird > Bug > Reptile >
+  Bird), status effects: Bleed, Deathmark, Retain, Shield/Cleanse, Ambush (2x
+  dano no 1º acerto) e o combo da Pena/Voo Rasante.
 - Clicar numa carta jogável resolve a ação na hora — sem mira manual.
 
 ## Estrutura
 
-- `index.html` — telas de escolha de time e tabuleiro
-- `src/cards.js` — roster de 6 Axies (2 cartas cada), triângulo de classes
-- `src/game.js` — estado do duelo, 3 linhas por lado, dano, cura, status effects
+- `index.html` — telas de montagem de esquadrão e tabuleiro
+- `src/cards.js` — roster de 6 Axies (3 cartas cada), triângulo de classes,
+  papéis (Tanque/Atacante/Curandeiro) e seus multiplicadores de stats
+- `src/game.js` — estado do duelo, N linhas por lado, dano, cura, status
+  effects, condição de vitória (Tanque)
 - `src/ai.js` — turno do rival
 - `src/render.js` — feedback visual via DOM (números flutuantes, flash, shake)
-- `src/ui.js` — HUD/DOM (tabuleiro, mão, energia, status, banner)
+- `src/ui.js` — HUD/DOM (montagem de esquadrão, tabuleiro, mão, energia,
+  status, banner)
 - `src/axieArt.js` — arte SVG original por classe (fallback quando o 3D não
   carrega) + convenção pra imagem 2D real
 - `src/axie3d.js` — preview 3D real (Axie Mixer 3D) no team picker

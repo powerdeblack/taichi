@@ -1,9 +1,11 @@
-// All DOM rendering: team-picker roster, the 3-lane board, hand, energy
+// All DOM rendering: team-builder roster/squad, the lane board, hand, energy
 // pips, pile counts, and the win/lose banner. No game rules live here.
 import { MAX_ENERGY } from './game.js';
 import { portraitHTML } from './axieArt.js';
+import { ROLES, ROLE_IDS, BASE_MP } from './cards.js';
 
 const rosterGrid = document.getElementById('rosterGrid');
+const squadListEl = document.getElementById('squadList');
 const deckCountEl = document.getElementById('deckCount');
 const startDuelBtn = document.getElementById('startDuelBtn');
 const boardEl = document.getElementById('board');
@@ -13,34 +15,61 @@ const hintEl = document.getElementById('hint');
 const bannerEl = document.getElementById('banner');
 const bannerSubEl = document.getElementById('bannerSub');
 
-// ================= Team picker (roster) =================
-export function renderRoster(axies, selectedClassIds, onToggle){
+// ================= Team builder =================
+export function renderRoster(axies, squad, onAdd){
   rosterGrid.innerHTML = '';
   axies.forEach(axie => {
-    const laneNum = selectedClassIds.indexOf(axie.classId) + 1;
-    const isSelected = laneNum > 0;
+    const count = squad.filter(p => p.classId === axie.classId).length;
     const div = document.createElement('div');
-    div.className = 'card roster-card' + (isSelected ? ' selected' : '');
-    div.style.borderColor = isSelected ? '#d9b44a' : (axie.color+'55');
+    div.className = 'card roster-card' + (count > 0 ? ' selected' : '');
+    div.style.borderColor = count > 0 ? '#d9b44a' : (axie.color+'55');
     div.innerHTML = `
-      <div class="card-pick-badge">${isSelected ? laneNum : ''}</div>
+      <div class="card-pick-badge">${count > 0 ? '×'+count : ''}</div>
       ${portraitHTML(axie.classId, axie.color, 'roster-portrait')}
-      <div class="card-top">
-        <div class="card-name">${axie.name}</div>
-      </div>
+      <div class="card-top"><div class="card-name">${axie.name}</div></div>
       <div class="card-class" style="color:${axie.color}">${axie.classId}</div>
-      <div class="card-desc">${axie.cards.map(c => `<b>${c.name}</b> (${c.range==='short'?'curto':c.range==='long'?'longo':c.role==='heal'?'cura':'defesa'}): ${c.desc}`).join('<br>')}</div>
+      <div class="card-desc">${axie.cards.map(c => `<b>${c.name}</b>${c.ability?' ⭐':''}: ${c.desc}`).join('<br>')}</div>
     `;
-    div.addEventListener('click', () => onToggle(axie.classId));
+    div.addEventListener('click', () => onAdd(axie.classId));
     rosterGrid.appendChild(div);
   });
 }
 
-export function renderRosterHeader(selectedCount, maxCount){
-  deckCountEl.textContent = `${selectedCount} / ${maxCount} Axies escolhidos`;
-  deckCountEl.className = 'deck-count' + (selectedCount===maxCount ? ' ready' : '');
-  startDuelBtn.disabled = selectedCount !== maxCount;
-  startDuelBtn.textContent = selectedCount===maxCount ? 'Começar Duelo' : `Escolha ${maxCount-selectedCount} Axie(s) a mais`;
+export function renderSquad(squad, axies, { onSetRole, onRemove }){
+  squadListEl.innerHTML = '';
+  squad.forEach((pick, idx) => {
+    const axie = axies.find(a => a.classId === pick.classId);
+    const row = document.createElement('div');
+    row.className = 'squad-slot';
+    row.innerHTML = `
+      ${portraitHTML(pick.classId, axie.color, 'squad-portrait')}
+      <div class="squad-slot-info">
+        <div class="squad-slot-name">${axie.name}</div>
+        <div class="role-pills">
+          ${ROLE_IDS.map(r => `<button type="button" class="role-pill role-${r}${pick.role===r?' active':''}" data-role="${r}">${ROLES[r].label}</button>`).join('')}
+        </div>
+      </div>
+      <button type="button" class="squad-remove" aria-label="Remover">×</button>
+    `;
+    row.querySelectorAll('.role-pill').forEach(btn => {
+      btn.addEventListener('click', () => onSetRole(idx, btn.dataset.role));
+    });
+    row.querySelector('.squad-remove').addEventListener('click', () => onRemove(idx));
+    squadListEl.appendChild(row);
+  });
+}
+
+export function renderSquadHeader(squad, maxCount){
+  const tankCount = squad.filter(p => p.role === 'Tank').length;
+  const full = squad.length === maxCount;
+  const valid = full && tankCount === 1;
+  deckCountEl.textContent = `${squad.length} / ${maxCount} Axies · ${tankCount} Tanque${tankCount===1?'':'s'}`;
+  deckCountEl.className = 'deck-count' + (valid ? ' ready' : '');
+  startDuelBtn.disabled = !valid;
+  if (valid) startDuelBtn.textContent = 'Começar Duelo';
+  else if (!full) startDuelBtn.textContent = `Escolha ${maxCount-squad.length} Axie(s) a mais`;
+  else if (tankCount === 0) startDuelBtn.textContent = 'Marque 1 Axie como Tanque';
+  else startDuelBtn.textContent = 'Precisa de exatamente 1 Tanque';
 }
 
 // ================= Board =================
@@ -54,8 +83,9 @@ function laneSideHTML(lane){
   return `
     ${portraitHTML(lane.classId, lane.color, 'board-portrait')}
     <div class="lane-info">
-      <div class="lane-name">${lane.name}</div>
-      <div class="hp-bar-bg"><div class="hp-bar-fill" style="width:${Math.max(0,lane.hp)}%"></div></div>
+      <div class="lane-name">${lane.name} <span class="role-badge role-${lane.role}">${ROLES[lane.role].label}</span></div>
+      <div class="hp-bar-bg"><div class="hp-bar-fill" style="width:${Math.max(0,lane.hp/lane.maxHp*100)}%"></div></div>
+      <div class="mp-label">MP ${lane.mp}</div>
       <div class="status-icons"></div>
     </div>
   `;
@@ -68,13 +98,13 @@ export function buildBoard(state){
     const row = document.createElement('div');
     row.className = 'lane-row';
     const youSide = document.createElement('div');
-    youSide.className = 'lane-side you';
+    youSide.className = 'lane-side you role-' + state.youLanes[i].role;
     youSide.innerHTML = laneSideHTML(state.youLanes[i]);
     const mid = document.createElement('div');
     mid.className = 'lane-mid';
     mid.textContent = 'VS';
     const rivalSide = document.createElement('div');
-    rivalSide.className = 'lane-side rival';
+    rivalSide.className = 'lane-side rival role-' + state.rivalLanes[i].role;
     rivalSide.innerHTML = laneSideHTML(state.rivalLanes[i]);
 
     row.appendChild(youSide);
@@ -83,7 +113,6 @@ export function buildBoard(state){
     boardEl.appendChild(row);
 
     laneRefs.push({
-      row,
       you: { side: youSide, hpFill: youSide.querySelector('.hp-bar-fill'), status: youSide.querySelector('.status-icons') },
       rival: { side: rivalSide, hpFill: rivalSide.querySelector('.hp-bar-fill'), status: rivalSide.querySelector('.status-icons') },
     });
@@ -97,7 +126,7 @@ export function updateBoard(state){
 }
 
 function updateLaneSide(ref, lane){
-  ref.hpFill.style.width = Math.max(0, lane.hp) + '%';
+  ref.hpFill.style.width = Math.max(0, lane.hp/lane.maxHp*100) + '%';
   ref.status.innerHTML = Object.keys(lane.status).filter(k => lane.status[k]>0 || lane.status[k]===true)
     .map(k => `<span class="status-pill">${statusLabel(k)}</span>`).join('');
   ref.side.classList.toggle('dead', !lane.alive);
@@ -114,17 +143,18 @@ export function renderHand(state, { onPlay }){
   handEl.innerHTML = '';
   state.hand.forEach((card) => {
     const div = document.createElement('div');
-    const casterLane = state.youLanes.find(l => l.classId === card.cls);
+    const casterLane = state.youLanes[card.laneIndex];
     const laneAlive = casterLane && casterLane.alive;
     const affordable = state.energyYou >= card.cost;
     const isTurn = state.turn === 'you';
     const playable = affordable && isTurn && laneAlive;
-    div.className = 'card' + (!playable ? ' disabled' : '');
+    div.className = 'card' + (!playable ? ' disabled' : '') + (card.ability ? ' ability-card' : '');
     div.style.borderColor = card.color + '55';
-    const rangeLabel = card.range==='short' ? 'Curto' : card.range==='long' ? 'Longo' : card.role==='heal' ? 'Cura' : 'Defesa';
+    const rangeLabel = card.range==='short' ? 'Curto' : card.range==='long' ? 'Longo'
+      : card.range==='own_all' ? 'Time todo' : card.role==='heal' ? 'Cura' : 'Defesa';
     div.innerHTML = `
       <div class="card-top">
-        <div class="card-name">${card.name}</div>
+        <div class="card-name">${card.ability ? '⭐ ' : ''}${card.name}</div>
         <div class="card-cost">${card.cost}</div>
       </div>
       <div class="card-class" style="color:${card.color}">${card.cls} · ${rangeLabel}</div>

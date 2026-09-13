@@ -132,6 +132,41 @@ h1{
 .roster-card .card-pick-badge{ display:none; }
 .roster-card.selected .card-pick-badge{ display:flex; }
 .roster-portrait{ width:56px; height:56px; margin:0 auto 6px; }
+.ability-card{ border-style:dashed; }
+
+/* ---------- Squad builder ---------- */
+.squad-list{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+.squad-slot{
+  display:flex; align-items:center; gap:8px;
+  background:#251b12; border-radius:12px; padding:6px 8px;
+  border:2px solid #4a382480;
+}
+.squad-portrait{ width:38px; height:38px; flex-shrink:0; }
+.squad-slot-info{ flex:1; min-width:0; }
+.squad-slot-name{ font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.78rem; margin-bottom:3px; }
+.role-pills{ display:flex; gap:4px; flex-wrap:wrap; }
+.role-pill{
+  font-family:'Baloo 2',sans-serif; font-size:.62rem; font-weight:700;
+  border:1px solid #4a382480; background:#1c130c; color:var(--text-dim);
+  border-radius:20px; padding:3px 8px; cursor:pointer;
+}
+.role-pill.active.role-Tank{ background:var(--danger); color:#fff; border-color:var(--danger); }
+.role-pill.active.role-Attacker{ background:var(--clay); color:#fff; border-color:var(--clay); }
+.role-pill.active.role-Healer{ background:var(--jungle); color:#fff; border-color:var(--jungle); }
+.squad-remove{
+  background:none; border:none; color:var(--text-dim); font-size:1.1rem;
+  cursor:pointer; padding:4px 6px; line-height:1;
+}
+.squad-remove:hover{ color:#fff; }
+
+.role-badge{
+  font-size:.58rem; font-weight:700; padding:1px 6px; border-radius:10px;
+  vertical-align:middle; margin-left:2px;
+}
+.role-Tank .role-badge{ background:var(--danger); color:#fff; }
+.role-Attacker .role-badge{ background:var(--clay); color:#fff; }
+.role-Healer .role-badge{ background:var(--jungle); color:#fff; }
+.mp-label{ font-size:.6rem; color:#8fd0ff; font-weight:700; margin-top:1px; }
 
 /* ---------- Portraits (SVG placeholder + real-asset fallback) ---------- */
 .portrait{ position:relative; }
@@ -177,6 +212,7 @@ h1{
   transition:background .15s ease, opacity .3s ease;
 }
 .lane-side.rival{ flex-direction:row-reverse; text-align:right; }
+.lane-side.role-Tank{ box-shadow:inset 0 0 0 1px #b8452f70; }
 .lane-side.dead{ opacity:.35; filter:grayscale(1); }
 .lane-side.lane-hit{ background:#b8452f33; }
 .lane-side.lane-heal{ background:#3f6b4a33; }
