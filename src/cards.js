@@ -5,73 +5,73 @@
 // you gave that Axie in its 5-card loadout (see computeLaneStats below).
 export const AXIES = [
   {
-    classId: 'Beast', name: 'Fera', color: '#c97b3d',
+    classId: 'Beast', name: 'Beast', color: '#c97b3d',
     attackCards: [
-      { id:'investida', name:'Investida', range:'short', role:'attack', cost:0, dmg:14, effect:'ambush',
-        desc:'Curto alcance. Ambush: dobra de dano no 1º acerto da partida.' },
-      { id:'investida_pesada', name:'Investida Pesada', range:'long', role:'attack', cost:0, dmg:20, effect:'none',
-        desc:'Longo alcance. Golpe pesado, mira a linha inimiga mais fraca.' },
+      { id:'charge', name:'Charge', range:'short', role:'attack', cost:0, dmg:14, effect:'ambush',
+        desc:'Short range. Ambush: doubles damage on the match’s first hit.' },
+      { id:'heavy_charge', name:'Heavy Charge', range:'long', role:'attack', cost:0, dmg:20, effect:'none',
+        desc:'Long range. Heavy hit, targets the weakest enemy lane.' },
     ],
   },
   {
-    classId: 'Aqua', name: 'Maré', color: '#4c8fb0',
+    classId: 'Aqua', name: 'Tide', color: '#4c8fb0',
     attackCards: [
-      { id:'respingo', name:'Respingo', range:'short', role:'attack', cost:0, dmg:8, effect:'none',
-        desc:'Curto alcance. Barato e direto, sem efeito extra.' },
-      { id:'mare', name:'Maré Alta', range:'long', role:'attack', cost:0, dmg:9, effect:'bleed',
-        desc:'Longo alcance. Aplica Sangramento: dano ao longo de 2 rodadas.' },
+      { id:'splash', name:'Splash', range:'short', role:'attack', cost:0, dmg:8, effect:'none',
+        desc:'Short range. Cheap and direct, no extra effect.' },
+      { id:'high_tide', name:'High Tide', range:'long', role:'attack', cost:0, dmg:9, effect:'bleed',
+        desc:'Long range. Applies Bleed: damage over 2 rounds.' },
     ],
   },
   {
-    classId: 'Plant', name: 'Broto', color: '#3f6b4a',
+    classId: 'Plant', name: 'Sprout', color: '#3f6b4a',
     attackCards: [
-      { id:'raiz', name:'Raiz', range:'short', role:'attack', cost:0, dmg:10, effect:'retain',
-        desc:'Curto alcance. Retain: nunca sai da sua mão, acerte ou erre.' },
-      { id:'espinho', name:'Espinho', range:'long', role:'attack', cost:0, dmg:16, effect:'none',
-        desc:'Longo alcance. Investida de espinhos, mira a linha mais fraca.' },
+      { id:'root', name:'Root', range:'short', role:'attack', cost:0, dmg:10, effect:'retain',
+        desc:'Short range. Retain: never leaves your hand, hit or miss.' },
+      { id:'thorn', name:'Thorn', range:'long', role:'attack', cost:0, dmg:16, effect:'none',
+        desc:'Long range. Thorn strike, targets the weakest enemy lane.' },
     ],
   },
   {
-    classId: 'Bird', name: 'Pluma', color: '#d9b44a',
+    classId: 'Bird', name: 'Plume', color: '#d9b44a',
     attackCards: [
-      { id:'mergulho', name:'Mergulho', range:'short', role:'attack', cost:0, dmg:18, effect:'none',
-        desc:'Curto alcance. Um golpe único e forte.' },
-      { id:'pena', name:'Pena', range:'long', role:'attack', cost:0, dmg:6, effect:'multi',
-        desc:'Longo alcance. 3 projéteis: +50% de dano bônus se 2+ acertarem.' },
+      { id:'dive', name:'Dive', range:'short', role:'attack', cost:0, dmg:18, effect:'none',
+        desc:'Short range. A single strong hit.' },
+      { id:'feather', name:'Feather', range:'long', role:'attack', cost:0, dmg:6, effect:'multi',
+        desc:'Long range. 3 projectiles: +50% bonus damage if 2+ land.' },
     ],
   },
   {
     classId: 'Bug', name:'Larva', color: '#7a5c9e',
     attackCards: [
-      { id:'picada', name:'Picada', range:'short', role:'attack', cost:0, dmg:7, effect:'none',
-        desc:'Curto alcance. Barata e direta.' },
-      { id:'veneno', name:'Veneno', range:'long', role:'attack', cost:0, dmg:9, effect:'deathmark',
-        desc:'Longo alcance. Aplica Marca da Morte: próximo golpe recebido tem +10 de dano puro.' },
+      { id:'sting', name:'Sting', range:'short', role:'attack', cost:0, dmg:7, effect:'none',
+        desc:'Short range. Cheap and direct.' },
+      { id:'venom', name:'Venom', range:'long', role:'attack', cost:0, dmg:9, effect:'deathmark',
+        desc:'Long range. Applies Deathmark: the next hit it takes deals +10 pure damage.' },
     ],
   },
   {
-    classId: 'Reptile', name:'Casco', color: '#8a8f5c',
+    classId: 'Reptile', name:'Shell', color: '#8a8f5c',
     attackCards: [
-      { id:'investida_casco', name:'Investida de Casco', range:'short', role:'attack', cost:0, dmg:9, effect:'none',
-        desc:'Curto alcance. Investida direta com o casco.' },
-      { id:'cauda_aco', name:'Cauda de Aço', range:'long', role:'attack', cost:0, dmg:13, effect:'none',
-        desc:'Longo alcance. Chicotada de cauda, mira a linha mais fraca.' },
+      { id:'shell_charge', name:'Shell Charge', range:'short', role:'attack', cost:0, dmg:9, effect:'none',
+        desc:'Short range. A direct shell-first charge.' },
+      { id:'steel_tail', name:'Steel Tail', range:'long', role:'attack', cost:0, dmg:13, effect:'none',
+        desc:'Long range. Tail whip, targets the weakest enemy lane.' },
     ],
   },
 ];
 
 // Universal support cards -- any class's Axie can be loaded with these.
 export const DEFENSE_CARDS = [
-  { id:'postura_defensiva', name:'Postura Defensiva', range:'own', role:'defense', cost:1, effect:'shield',
-    desc:'Bloqueia 50% do próximo dano da própria linha.' },
-  { id:'bastiao', name:'Bastião', range:'own', role:'defense', cost:2, effect:'shield_cleanse',
-    desc:'Bloqueia 50% do próximo dano e remove 1 status negativo da própria linha.' },
+  { id:'defensive_stance', name:'Defensive Stance', range:'own', role:'defense', cost:1, effect:'shield',
+    desc:'Blocks 50% of the next hit taken by this lane.' },
+  { id:'bastion', name:'Bastion', range:'own', role:'defense', cost:2, effect:'shield_cleanse',
+    desc:'Blocks 50% of the next hit and removes 1 negative status from this lane.' },
 ];
 export const HEAL_CARDS = [
-  { id:'cura_leve', name:'Cura Leve', range:'own', role:'heal', cost:1, heal:15,
-    desc:'Cura 15 de HP (escalado por MP) da própria linha.' },
-  { id:'cura_profunda', name:'Cura Profunda', range:'own', role:'heal', cost:2, heal:25,
-    desc:'Cura 25 de HP (escalado por MP) da própria linha.' },
+  { id:'light_heal', name:'Light Heal', range:'own', role:'heal', cost:1, heal:15,
+    desc:'Heals 15 HP (scaled by MP) on this lane.' },
+  { id:'deep_heal', name:'Deep Heal', range:'own', role:'heal', cost:2, heal:25,
+    desc:'Heals 25 HP (scaled by MP) on this lane.' },
 ];
 
 // Beast > Plant > Aqua > Beast

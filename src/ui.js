@@ -35,9 +35,9 @@ export function renderRoster(axies, squad, onAdd){
 }
 
 const CATS = [
-  { key:'attack', label:'⚔️ Ataque' },
-  { key:'defense', label:'🛡️ Defesa' },
-  { key:'heal', label:'💚 Cura' },
+  { key:'attack', label:'⚔️ Attack' },
+  { key:'defense', label:'🛡️ Defense' },
+  { key:'heal', label:'💚 Heal' },
 ];
 
 export function renderSquad(squad, axies, { onAdjust, onToggleTank, onRemove }){
@@ -52,7 +52,7 @@ export function renderSquad(squad, axies, { onAdjust, onToggleTank, onRemove }){
       <div class="squad-slot-info">
         <div class="squad-slot-name">
           ${axie.name}
-          <button type="button" class="tank-toggle${pick.isTank?' active':''}" title="Marcar como Tanque">${pick.isTank ? '🎯 TANQUE' : 'marcar Tanque'}</button>
+          <button type="button" class="tank-toggle${pick.isTank?' active':''}" title="Mark as Tank">${pick.isTank ? '🎯 TANK' : 'mark as Tank'}</button>
         </div>
         <div class="stat-steppers">
           ${CATS.map(c => `
@@ -64,9 +64,9 @@ export function renderSquad(squad, axies, { onAdjust, onToggleTank, onRemove }){
             </div>
           `).join('')}
         </div>
-        <div class="loadout-total${total===LOADOUT_SIZE?' ok':''}">${total} / ${LOADOUT_SIZE} cartas</div>
+        <div class="loadout-total${total===LOADOUT_SIZE?' ok':''}">${total} / ${LOADOUT_SIZE} cards</div>
       </div>
-      <button type="button" class="squad-remove" aria-label="Remover">×</button>
+      <button type="button" class="squad-remove" aria-label="Remove">×</button>
     `;
     row.querySelectorAll('.stepper-btn').forEach(btn => {
       btn.addEventListener('click', () => onAdjust(idx, btn.dataset.cat, Number(btn.dataset.delta)));
@@ -82,21 +82,21 @@ export function renderSquadHeader(squad, maxCount){
   const full = squad.length === maxCount;
   const loadoutsOk = squad.every(p => p.counts.attack + p.counts.defense + p.counts.heal === LOADOUT_SIZE);
   const valid = full && tankCount === 1 && loadoutsOk;
-  deckCountEl.textContent = `${squad.length} / ${maxCount} Axies · ${tankCount} Tanque${tankCount===1?'':'s'}`;
+  deckCountEl.textContent = `${squad.length} / ${maxCount} Axies · ${tankCount} Tank${tankCount===1?'':'s'}`;
   deckCountEl.className = 'deck-count' + (valid ? ' ready' : '');
   startDuelBtn.disabled = !valid;
-  if (valid) startDuelBtn.textContent = 'Começar Duelo';
-  else if (!full) startDuelBtn.textContent = `Escolha ${maxCount-squad.length} Axie(s) a mais`;
-  else if (!loadoutsOk) startDuelBtn.textContent = `Cada Axie precisa de ${LOADOUT_SIZE} cartas no total`;
-  else if (tankCount === 0) startDuelBtn.textContent = 'Marque 1 Axie como Tanque';
-  else startDuelBtn.textContent = 'Precisa de exatamente 1 Tanque';
+  if (valid) startDuelBtn.textContent = 'Start Duel';
+  else if (!full) startDuelBtn.textContent = `Pick ${maxCount-squad.length} more Axie(s)`;
+  else if (!loadoutsOk) startDuelBtn.textContent = `Each Axie needs ${LOADOUT_SIZE} cards total`;
+  else if (tankCount === 0) startDuelBtn.textContent = 'Mark 1 Axie as Tank';
+  else startDuelBtn.textContent = 'Needs exactly 1 Tank';
 }
 
 // ================= Board =================
 let laneRefs = [];
 
 function statusLabel(key){
-  return {bleed:'🩸 Sangramento', deathmark:'💀 Marca', shield:'🛡️ Escudo'}[key] || key;
+  return {bleed:'🩸 Bleed', deathmark:'💀 Mark', shield:'🛡️ Shield'}[key] || key;
 }
 
 function laneSideHTML(lane){
@@ -104,7 +104,7 @@ function laneSideHTML(lane){
   return `
     ${portraitHTML(lane.classId, lane.color, 'board-portrait')}
     <div class="lane-info">
-      <div class="lane-name">${lane.name} ${lane.isTank ? '<span class="role-badge tank">🎯 TANQUE</span>' : ''}</div>
+      <div class="lane-name">${lane.name} ${lane.isTank ? '<span class="role-badge tank">🎯 TANK</span>' : ''}</div>
       <div class="hp-bar-bg"><div class="hp-bar-fill" style="width:${Math.max(0,lane.hp/lane.maxHp*100)}%"></div></div>
       <div class="mp-label">MP ${lane.mp} · ⚔️${attack} 🛡️${defense} 💚${heal}</div>
       <div class="status-icons"></div>
@@ -171,15 +171,15 @@ export function renderHand(state, { onPlay }){
     const playable = affordable && isTurn && laneAlive;
     div.className = 'card' + (!playable ? ' disabled' : '');
     div.style.borderColor = card.color + '55';
-    const rangeLabel = card.range==='short' ? 'Curto' : card.range==='long' ? 'Longo'
-      : card.role==='heal' ? 'Cura' : 'Defesa';
+    const rangeLabel = card.range==='short' ? 'Short' : card.range==='long' ? 'Long'
+      : card.role==='heal' ? 'Heal' : 'Defense';
     div.innerHTML = `
       <div class="card-top">
         <div class="card-name">${card.name}</div>
         <div class="card-cost">${card.cost}</div>
       </div>
       <div class="card-class" style="color:${card.color}">${card.cls} · ${rangeLabel}</div>
-      <div class="card-desc">${card.desc}${!laneAlive ? ' <b>(linha destruída)</b>' : ''}</div>
+      <div class="card-desc">${card.desc}${!laneAlive ? ' <b>(lane destroyed)</b>' : ''}</div>
     `;
     if (playable) div.addEventListener('click', () => onPlay(card));
     handEl.appendChild(div);
@@ -196,8 +196,8 @@ export function renderPips(state){
 }
 
 export function renderPiles(state){
-  document.getElementById('deckPileCount').textContent = `Baralho: ${state.deck.length}`;
-  document.getElementById('discardPileCount').textContent = `Descarte: ${state.discard.length}`;
+  document.getElementById('deckPileCount').textContent = `Deck: ${state.deck.length}`;
+  document.getElementById('discardPileCount').textContent = `Discard: ${state.discard.length}`;
 }
 
 export function setHint(text){

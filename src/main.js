@@ -61,14 +61,14 @@ const preview3dCanvas = document.getElementById('preview3dCanvas');
 const preview3dLabel = document.getElementById('preview3dLabel');
 let preview3dReady = null;
 function previewClass(classId){
-  preview3dLabel.textContent = `Carregando ${classId} em 3D...`;
+  preview3dLabel.textContent = `Loading ${classId} in 3D...`;
   if (!preview3dReady) preview3dReady = initPreview(preview3dCanvas);
   preview3dReady
     .then(() => showAxie(classId))
     .then(() => { preview3dLabel.textContent = classId; })
     .catch((err) => {
       console.error('3D preview failed:', err);
-      preview3dLabel.textContent = 'Prévia 3D indisponível';
+      preview3dLabel.textContent = '3D preview unavailable';
     });
 }
 
@@ -91,7 +91,7 @@ function beginMatch(youSquad, rivalSquad){
   ui.hideBanner();
   ui.buildBoard(state);
   syncUI();
-  ui.setHint('Escolha uma carta pra jogar.');
+  ui.setHint('Choose a card to play.');
 }
 
 function syncUI(){
@@ -109,7 +109,7 @@ function applyResultFx(result){
   if (card.role === 'defense'){
     const el = ui.getLaneSideEl(side, casterIndex);
     render.flashHeal(el);
-    render.spawnFloatingText(el, 'ESCUDO!', 'text-shield');
+    render.spawnFloatingText(el, 'SHIELD!', 'text-shield');
     return;
   }
   if (card.role === 'heal'){
@@ -120,7 +120,7 @@ function applyResultFx(result){
   }
   if (targetIndex === -1){
     const el = ui.getLaneSideEl(side, casterIndex);
-    render.spawnFloatingText(el, 'Sem alvo!', 'text-dmg');
+    render.spawnFloatingText(el, 'No target!', 'text-dmg');
     return;
   }
   const el = ui.getLaneSideEl(enemySide, targetIndex);
@@ -128,8 +128,8 @@ function applyResultFx(result){
   render.shakeBoard(boardEl);
   render.spawnFloatingText(el, '-'+result.dmg, 'text-dmg');
   if (result.ambush) render.spawnFloatingText(el, 'AMBUSH! x2', 'text-ambush');
-  if (result.shielded) render.spawnFloatingText(el, 'BLOQUEADO!', 'text-block');
-  if (result.deathmarked) render.spawnFloatingText(el, '+10 MARCA', 'text-mark');
+  if (result.shielded) render.spawnFloatingText(el, 'BLOCKED!', 'text-block');
+  if (result.deathmarked) render.spawnFloatingText(el, '+10 MARK', 'text-mark');
   if (result.comboBonus) render.spawnFloatingText(el, 'COMBO! -'+result.comboBonus, 'text-combo');
 }
 
@@ -144,18 +144,18 @@ function applyBleedFx(side, bleedResults){
 }
 
 function setHintForResult(side, result){
-  const who = side === 'you' ? 'Você' : 'O rival';
-  if (!result){ ui.setHint(`${who} não teve carta jogável e passou o turno.`); return; }
-  if (result.card.role === 'defense'){ ui.setHint(`${who} ativou ${result.card.name}!`); return; }
-  if (result.card.role === 'heal'){ ui.setHint(`${who} curou com ${result.card.name}!`); return; }
-  if (result.targetIndex === -1){ ui.setHint('Sem alvo disponível!'); return; }
-  ui.setHint(`${result.card.name} causou ${result.dmg} de dano!`);
+  const who = side === 'you' ? 'You' : 'The rival';
+  if (!result){ ui.setHint(`${who} had no playable card and passed the turn.`); return; }
+  if (result.card.role === 'defense'){ ui.setHint(`${who} activated ${result.card.name}!`); return; }
+  if (result.card.role === 'heal'){ ui.setHint(`${who} healed with ${result.card.name}!`); return; }
+  if (result.targetIndex === -1){ ui.setHint('No target available!'); return; }
+  ui.setHint(`${result.card.name} dealt ${result.dmg} damage!`);
 }
 
 function finishMatch(){
-  if (state.winner === 'draw') ui.showBanner('Empate!', 'Os dois Tanques caíram juntos.');
-  else if (state.winner === 'you') ui.showBanner('Você venceu o duelo!', 'O Tanque rival foi derrotado.');
-  else ui.showBanner('Você perdeu o duelo.', 'Seu Tanque foi derrotado.');
+  if (state.winner === 'draw') ui.showBanner('Draw!', 'Both Tanks fell together.');
+  else if (state.winner === 'you') ui.showBanner('You won the duel!', 'The rival Tank was defeated.');
+  else ui.showBanner('You lost the duel.', 'Your Tank was defeated.');
 }
 
 function onPlayerCardClick(card){
@@ -166,7 +166,7 @@ function onPlayerCardClick(card){
   if (state.gameOver){ finishMatch(); return; }
   setTimeout(() => {
     state.turn = 'rival';
-    ui.setHint('O rival está pensando...');
+    ui.setHint('The rival is thinking...');
     runAiTurn();
   }, 500);
 }
@@ -184,7 +184,7 @@ function runAiTurn(){
         applyBleedFx('you', bleedYou);
         syncUI();
         if (state.gameOver){ finishMatch(); return; }
-        ui.setHint('Escolha uma carta pra jogar.');
+        ui.setHint('Choose a card to play.');
       }, 700);
     },
   });

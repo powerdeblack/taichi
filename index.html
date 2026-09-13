@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,57 +10,57 @@
 <body>
 <div class="stage">
   <h1>Axie Duel</h1>
-  <p class="subtitle">Monte seu esquadrão de 5 — mate o Tanque inimigo pra vencer</p>
+  <p class="subtitle">Build your squad of 5 — kill the enemy Tank to win</p>
 
   <!-- ===================== TEAM PICKER SCREEN ===================== -->
   <div id="deckScreen" class="deck-panel">
     <div class="deck-header">
-      <div class="deck-title">Monte seu time</div>
-      <div class="deck-count" id="deckCount">0 / 5 Axies escolhidos</div>
+      <div class="deck-title">Build your team</div>
+      <div class="deck-count" id="deckCount">0 / 5 Axies picked</div>
     </div>
-    <p class="deck-hint">Escolha livremente 5 Axies (pode repetir classe) e defina o papel de cada um — exatamente 1 deve ser Tanque. O objetivo do duelo é matar o Tanque do rival.</p>
+    <p class="deck-hint">Freely pick 5 Axies (classes can repeat) and give each one a 5-card loadout of Attack/Defense/Heal — exactly 1 must be marked as Tank. The duel's goal is to kill the rival's Tank.</p>
     <div class="preview3d-wrap">
       <canvas id="preview3dCanvas"></canvas>
-      <div class="preview3d-label" id="preview3dLabel">Clique num Axie pra ver em 3D</div>
+      <div class="preview3d-label" id="preview3dLabel">Click an Axie to see it in 3D</div>
     </div>
     <div class="squad-list" id="squadList"></div>
     <div class="pool-grid roster-grid" id="rosterGrid"></div>
-    <button class="start-duel-btn" id="startDuelBtn" disabled>Escolha 5 Axies pra começar</button>
+    <button class="start-duel-btn" id="startDuelBtn" disabled>Pick 5 Axies to start</button>
   </div>
 
   <!-- ===================== BOARD DUEL SCREEN ===================== -->
   <div id="duelScreen" class="hidden">
     <div class="board-wrap">
       <div class="board-header">
-        <span class="you-label">VOCÊ</span>
+        <span class="you-label">YOU</span>
         <span class="rival-label">RIVAL</span>
       </div>
       <div class="board" id="board"></div>
-      <div class="banner" id="banner">Fim de jogo<span class="sub" id="bannerSub"></span></div>
+      <div class="banner" id="banner">Game over<span class="sub" id="bannerSub"></span></div>
     </div>
 
     <div class="controls">
       <div class="deck-status-row">
         <div class="energy-row">
-          <div class="energy-label">ENERGIA</div>
+          <div class="energy-label">ENERGY</div>
           <div class="pips" id="pips"></div>
         </div>
         <div class="pile-counts">
-          <span id="deckPileCount">Baralho: 3</span>
-          <span id="discardPileCount">Descarte: 0</span>
+          <span id="deckPileCount">Deck: 3</span>
+          <span id="discardPileCount">Discard: 0</span>
         </div>
       </div>
       <div class="hand" id="hand"></div>
-      <div class="hint" id="hint">Escolha uma carta pra jogar.</div>
+      <div class="hint" id="hint">Choose a card to play.</div>
     </div>
 
     <div class="btn-row">
-      <button class="reset-btn" id="resetBtn">Revanche (mesmo time)</button>
-      <button class="switch-deck-btn" id="switchDeckBtn">Trocar time</button>
+      <button class="reset-btn" id="resetBtn">Rematch (same team)</button>
+      <button class="switch-deck-btn" id="switchDeckBtn">Change team</button>
     </div>
   </div>
 
-  <p class="note">Protótipo de conceito para o Vibeathon — curto acerta a linha espelhada, longo mira a linha inimiga mais fraca, defesa/cura agem na própria linha.</p>
+  <p class="note">Concept prototype for the Vibeathon — short range hits the mirrored lane, long range targets the weakest enemy lane, defense/heal act on the caster's own lane.</p>
 </div>
 
 <script type="module" src="/src/main.js"></script>
