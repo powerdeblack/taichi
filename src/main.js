@@ -5,6 +5,7 @@ import * as game from './game.js';
 import * as ui from './ui.js';
 import * as render from './render.js';
 import { aiTakeTurn } from './ai.js';
+import { initPreview, showAxie } from './axie3d.js';
 
 const deckScreen = document.getElementById('deckScreen');
 const duelScreen = document.getElementById('duelScreen');
@@ -28,8 +29,25 @@ function toggleClass(classId){
   if (idx !== -1) selectedClassIds.splice(idx, 1);
   else if (selectedClassIds.length < game.LANES) selectedClassIds.push(classId);
   renderRosterScreen();
+  previewClass(classId);
 }
 renderRosterScreen();
+
+// ================= 3D preview (team picker only) =================
+const preview3dCanvas = document.getElementById('preview3dCanvas');
+const preview3dLabel = document.getElementById('preview3dLabel');
+let preview3dReady = null;
+function previewClass(classId){
+  preview3dLabel.textContent = `Carregando ${classId} em 3D...`;
+  if (!preview3dReady) preview3dReady = initPreview(preview3dCanvas);
+  preview3dReady
+    .then(() => showAxie(classId))
+    .then(() => { preview3dLabel.textContent = classId; })
+    .catch((err) => {
+      console.error('3D preview failed:', err);
+      preview3dLabel.textContent = 'Prévia 3D indisponível';
+    });
+}
 
 startDuelBtn.addEventListener('click', () => {
   deckScreen.classList.add('hidden');

@@ -70,6 +70,15 @@ h1{
   gap:8px;
 }
 .roster-grid{ grid-template-columns:repeat(2,1fr); }
+.preview3d-wrap{
+  background:#1c130c; border-radius:14px; border:1px solid #4a382470;
+  margin-bottom:10px; overflow:hidden;
+}
+#preview3dCanvas{ display:block; width:100%; aspect-ratio:1/1; max-height:220px; }
+.preview3d-label{
+  text-align:center; font-family:'Baloo 2',sans-serif; font-size:.75rem; font-weight:700;
+  color:var(--text-dim); padding:6px 8px 8px;
+}
 .start-duel-btn{
   display:block;
   width:100%;
