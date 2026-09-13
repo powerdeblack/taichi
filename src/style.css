@@ -153,6 +153,12 @@ h1{
   border-radius:20px; padding:2px 8px; cursor:pointer;
 }
 .tank-toggle.active{ background:var(--danger); color:#fff; border-color:var(--danger); }
+.evolve-toggle{
+  font-family:'Baloo 2',sans-serif; font-size:.6rem; font-weight:700;
+  border:1px solid #4a382480; background:#1c130c; color:var(--text-dim);
+  border-radius:20px; padding:2px 8px; cursor:pointer;
+}
+.evolve-toggle.active{ background:#d9b44a; color:#241a0c; border-color:#d9b44a; }
 .stat-steppers{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:3px; }
 .stat-stepper{ display:flex; align-items:center; gap:4px; }
 .stat-stepper-label{ font-size:.64rem; color:var(--text-dim); }
@@ -174,6 +180,10 @@ h1{
 .role-badge.tank{
   font-size:.58rem; font-weight:700; padding:1px 6px; border-radius:10px;
   vertical-align:middle; margin-left:2px; background:var(--danger); color:#fff;
+}
+.role-badge.evolved{
+  font-size:.62rem; font-weight:800; padding:0 5px; border-radius:8px;
+  vertical-align:middle; margin-left:2px; background:#d9b44a; color:#241a0c;
 }
 .mp-label{ font-size:.6rem; color:#8fd0ff; font-weight:700; margin-top:1px; }
 

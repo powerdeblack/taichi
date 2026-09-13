@@ -24,6 +24,7 @@ export function randomSquad(){
     picks.push({
       classId: ALL_CLASSES[Math.floor(Math.random()*ALL_CLASSES.length)],
       isTank: false,
+      evolved: Math.random() < 0.3,
       counts: { attack: a, defense: d, heal: h },
     });
   }
@@ -32,11 +33,11 @@ export function randomSquad(){
 }
 
 function createLanes(picks){
-  return picks.map(({ classId, isTank, counts }) => {
+  return picks.map(({ classId, isTank, evolved, counts }) => {
     const axie = axieById(classId);
-    const stats = computeLaneStats(counts);
+    const stats = computeLaneStats(counts, evolved);
     return {
-      classId, isTank, counts, name: axie.name, color: axie.color,
+      classId, isTank, evolved: !!evolved, counts, name: axie.name, color: axie.color,
       maxHp: stats.maxHp, hp: stats.maxHp, mp: stats.mp,
       powerMult: stats.powerMult, damageReduction: stats.damageReduction,
       status: {}, alive: true,
@@ -137,6 +138,27 @@ function tickBleed(lane){
   return 0;
 }
 
+// Poison: stacks (capped) on repeat application, hits for 2x its current
+// stack count each tick, then fades by 1 stack -- distinct from Bleed's
+// fixed-length DOT, it front-loads damage and tapers off.
+const POISON_STACK = 3;
+const POISON_CAP = 9;
+function applyPoison(lane){
+  lane.status.poison = Math.min(POISON_CAP, (lane.status.poison || 0) + POISON_STACK);
+}
+
+function tickPoison(lane){
+  if (lane.status.poison && lane.status.poison > 0){
+    const dmg = lane.status.poison * 2;
+    lane.hp = Math.max(0, lane.hp - dmg);
+    lane.status.poison -= 1;
+    if (lane.status.poison <= 0) delete lane.status.poison;
+    if (lane.hp <= 0) lane.alive = false;
+    return dmg;
+  }
+  return 0;
+}
+
 // Heal/shield strength scales with the caster's MP stat -- an Axie built
 // with heal cards is genuinely a better healer than one that just happens
 // to carry a single borrowed heal card.
@@ -183,6 +205,7 @@ export function resolveCard(state, side, card, casterIndex){
   const { dmg, deathmarked, shielded } = applyDamage(targetLane, dmgToApply, card.cls, casterLane);
   if (dmg > 0) state.firstHitDone = true;
   if (card.effect === 'bleed') applyBleed(targetLane);
+  if (card.effect === 'poison') applyPoison(targetLane);
   if (card.effect === 'deathmark') targetLane.status.deathmark = true;
 
   Object.assign(result, { targetIndex, dmg, ambush, deathmarked, shielded });
@@ -209,8 +232,19 @@ export function playerPlayCard(state, card){
   return resolveCard(state, 'you', card, casterIndex);
 }
 
+function tickStatuses(lanes){
+  const results = [];
+  lanes.filter(l => l.alive).forEach(l => {
+    const bleedDmg = tickBleed(l);
+    if (bleedDmg > 0) results.push({ lane: l, dmg: bleedDmg, kind: 'bleed' });
+    const poisonDmg = tickPoison(l);
+    if (poisonDmg > 0) results.push({ lane: l, dmg: poisonDmg, kind: 'poison' });
+  });
+  return results;
+}
+
 export function startYourTurn(state){
-  const bleedResults = state.youLanes.filter(l => l.alive).map(l => ({ lane: l, dmg: tickBleed(l) })).filter(r => r.dmg > 0);
+  const bleedResults = tickStatuses(state.youLanes);
   checkGameOver(state);
   if (state.gameOver) return bleedResults;
   state.energyYou = Math.min(MAX_ENERGY, state.energyYou + 2);
@@ -220,7 +254,7 @@ export function startYourTurn(state){
 }
 
 export function startRivalPrep(state){
-  const bleedResults = state.rivalLanes.filter(l => l.alive).map(l => ({ lane: l, dmg: tickBleed(l) })).filter(r => r.dmg > 0);
+  const bleedResults = tickStatuses(state.rivalLanes);
   checkGameOver(state);
   if (!state.gameOver) state.energyRival = Math.min(MAX_ENERGY, state.energyRival + 2);
   return bleedResults;

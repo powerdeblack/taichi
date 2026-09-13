@@ -61,9 +61,25 @@ npm run preview
   equipar.
 - Cartas de **ataque não gastam energia** (custo 0); defesa/cura seguem
   custando energia normalmente, regenerando por turno.
-- Status effects: Bleed, Deathmark, Retain, Shield/Cleanse, Ambush (2x dano
-  no 1º acerto) e o combo da Pena.
+- Status effects: Bleed, **Poison** (empilha, bate 2x a stack atual e decai 1
+  stack por turno — mais forte no início, some sozinho), Deathmark, Retain,
+  Shield/Cleanse, Ambush (2x dano no 1º acerto) e o combo da Pena.
+- Cada Axie pode ser marcado como **Evoluído (+)** no montador de esquadrão:
+  dá +15% flat em poder/HP/MP daquele loadout inteiro — nossa versão do
+  padrão de evolução de carta do Origin (α → base → **+**), sem reintroduzir
+  o sistema de breeding (a Sky Mavis já resolve isso).
 - Clicar numa carta jogável resolve a ação na hora — sem mira manual.
+
+### Cartas reskinadas com nomes reais do Axie Origin
+
+Os nomes e o flavor das cartas de ataque e das cartas universais de
+defesa/cura vêm de cartas reais do Axie Origin (Beast: Besta Perigosa /
+Quebra-Nozes; Aqua: Koi / Ranchu; Plant: Cenoura / Melancia; Bird: Corvo /
+Melodia das Penas; Bug: Broca de Nariz / Cupins; Reptile: Dinossaurinho /
+Garra Venenosa; suporte universal: Ornitorrinco, Guardião Tropical,
+Cachorrinho, Trevo). Os **números** (dano, HP, custo) são calibrados pra
+escala própria deste jogo, não são um port 1:1 do Origin — lá as cartas são
+calibradas pra pools de HP de centenas de pontos, aqui pra ~100-150.
 
 ## Estrutura
 

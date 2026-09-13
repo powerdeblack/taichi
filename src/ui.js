@@ -40,7 +40,7 @@ const CATS = [
   { key:'heal', label:'💚 Heal' },
 ];
 
-export function renderSquad(squad, axies, { onAdjust, onToggleTank, onRemove }){
+export function renderSquad(squad, axies, { onAdjust, onToggleTank, onToggleEvolve, onRemove }){
   squadListEl.innerHTML = '';
   squad.forEach((pick, idx) => {
     const axie = axies.find(a => a.classId === pick.classId);
@@ -51,8 +51,9 @@ export function renderSquad(squad, axies, { onAdjust, onToggleTank, onRemove }){
       ${portraitHTML(pick.classId, axie.color, 'squad-portrait')}
       <div class="squad-slot-info">
         <div class="squad-slot-name">
-          ${axie.name}
+          ${axie.name}${pick.evolved ? '<span class="role-badge evolved">+</span>' : ''}
           <button type="button" class="tank-toggle${pick.isTank?' active':''}" title="Mark as Tank">${pick.isTank ? '🎯 TANK' : 'mark as Tank'}</button>
+          <button type="button" class="evolve-toggle${pick.evolved?' active':''}" title="Evolve this Axie's loadout (+15% power/HP/MP)">${pick.evolved ? '✦ Evolved' : 'evolve (+)'}</button>
         </div>
         <div class="stat-steppers">
           ${CATS.map(c => `
@@ -72,6 +73,7 @@ export function renderSquad(squad, axies, { onAdjust, onToggleTank, onRemove }){
       btn.addEventListener('click', () => onAdjust(idx, btn.dataset.cat, Number(btn.dataset.delta)));
     });
     row.querySelector('.tank-toggle').addEventListener('click', () => onToggleTank(idx));
+    row.querySelector('.evolve-toggle').addEventListener('click', () => onToggleEvolve(idx));
     row.querySelector('.squad-remove').addEventListener('click', () => onRemove(idx));
     squadListEl.appendChild(row);
   });
@@ -96,7 +98,7 @@ export function renderSquadHeader(squad, maxCount){
 let laneRefs = [];
 
 function statusLabel(key){
-  return {bleed:'🩸 Bleed', deathmark:'💀 Mark', shield:'🛡️ Shield'}[key] || key;
+  return {bleed:'🩸 Bleed', poison:'☠️ Poison', deathmark:'💀 Mark', shield:'🛡️ Shield'}[key] || key;
 }
 
 function laneSideHTML(lane){
@@ -104,7 +106,7 @@ function laneSideHTML(lane){
   return `
     ${portraitHTML(lane.classId, lane.color, 'board-portrait')}
     <div class="lane-info">
-      <div class="lane-name">${lane.name} ${lane.isTank ? '<span class="role-badge tank">🎯 TANK</span>' : ''}</div>
+      <div class="lane-name">${lane.name}${lane.evolved ? '<span class="role-badge evolved">+</span>' : ''} ${lane.isTank ? '<span class="role-badge tank">🎯 TANK</span>' : ''}</div>
       <div class="hp-bar-bg"><div class="hp-bar-fill" style="width:${Math.max(0,lane.hp/lane.maxHp*100)}%"></div></div>
       <div class="mp-label">MP ${lane.mp} · ⚔️${attack} 🛡️${defense} 💚${heal}</div>
       <div class="status-icons"></div>

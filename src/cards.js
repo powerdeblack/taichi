@@ -3,74 +3,81 @@
 // Axie can equip them. A lane's actual power/toughness/heal-strength isn't a
 // fixed role anymore: it's computed from how many attack/defense/heal cards
 // you gave that Axie in its 5-card loadout (see computeLaneStats below).
+//
+// Card names and flavor are reskinned from real Axie Origin cards (Beast:
+// Besta Perigosa/Quebra-Nozes, Aqua: Koi/Ranchu, Plant: Cenoura/Melancia,
+// Bird: Corvo/Melodia das Penas, Bug: Broca de Nariz/Cupins, Reptile:
+// Dinossaurinho/Garra Venenosa) and the universal support cards below
+// (Ornitorrinco, Guardião Tropical, Cachorrinho, Trevo). Numbers are tuned
+// for this game's own HP/energy scale, not ported 1:1 from Origin.
 export const AXIES = [
   {
     classId: 'Beast', name: 'Beast', color: '#c97b3d',
     attackCards: [
-      { id:'charge', name:'Charge', range:'short', role:'attack', cost:0, dmg:14, effect:'ambush',
+      { id:'besta_perigosa', name:'Besta Perigosa', range:'short', role:'attack', cost:0, dmg:14, effect:'ambush',
         desc:'Short range. Ambush: doubles damage on the match’s first hit.' },
-      { id:'heavy_charge', name:'Heavy Charge', range:'long', role:'attack', cost:0, dmg:20, effect:'none',
+      { id:'quebra_nozes', name:'Quebra-Nozes', range:'long', role:'attack', cost:0, dmg:20, effect:'none',
         desc:'Long range. Heavy hit, targets the weakest enemy lane.' },
     ],
   },
   {
     classId: 'Aqua', name: 'Tide', color: '#4c8fb0',
     attackCards: [
-      { id:'splash', name:'Splash', range:'short', role:'attack', cost:0, dmg:8, effect:'none',
+      { id:'koi', name:'Koi', range:'short', role:'attack', cost:0, dmg:8, effect:'none',
         desc:'Short range. Cheap and direct, no extra effect.' },
-      { id:'high_tide', name:'High Tide', range:'long', role:'attack', cost:0, dmg:9, effect:'bleed',
+      { id:'ranchu', name:'Ranchu', range:'long', role:'attack', cost:0, dmg:9, effect:'bleed',
         desc:'Long range. Applies Bleed: damage over 2 rounds.' },
     ],
   },
   {
     classId: 'Plant', name: 'Sprout', color: '#3f6b4a',
     attackCards: [
-      { id:'root', name:'Root', range:'short', role:'attack', cost:0, dmg:10, effect:'retain',
+      { id:'cenoura', name:'Cenoura', range:'short', role:'attack', cost:0, dmg:10, effect:'retain',
         desc:'Short range. Retain: never leaves your hand, hit or miss.' },
-      { id:'thorn', name:'Thorn', range:'long', role:'attack', cost:0, dmg:16, effect:'none',
-        desc:'Long range. Thorn strike, targets the weakest enemy lane.' },
+      { id:'melancia', name:'Melancia', range:'long', role:'attack', cost:0, dmg:16, effect:'none',
+        desc:'Long range. Heavy strike, targets the weakest enemy lane.' },
     ],
   },
   {
     classId: 'Bird', name: 'Plume', color: '#d9b44a',
     attackCards: [
-      { id:'dive', name:'Dive', range:'short', role:'attack', cost:0, dmg:18, effect:'none',
+      { id:'corvo', name:'Corvo', range:'short', role:'attack', cost:0, dmg:18, effect:'none',
         desc:'Short range. A single strong hit.' },
-      { id:'feather', name:'Feather', range:'long', role:'attack', cost:0, dmg:6, effect:'multi',
+      { id:'melodia_das_penas', name:'Melodia das Penas', range:'long', role:'attack', cost:0, dmg:6, effect:'multi',
         desc:'Long range. 3 projectiles: +50% bonus damage if 2+ land.' },
     ],
   },
   {
     classId: 'Bug', name:'Larva', color: '#7a5c9e',
     attackCards: [
-      { id:'sting', name:'Sting', range:'short', role:'attack', cost:0, dmg:7, effect:'none',
+      { id:'broca_de_nariz', name:'Broca de Nariz', range:'short', role:'attack', cost:0, dmg:7, effect:'none',
         desc:'Short range. Cheap and direct.' },
-      { id:'venom', name:'Venom', range:'long', role:'attack', cost:0, dmg:9, effect:'deathmark',
+      { id:'cupins', name:'Cupins', range:'long', role:'attack', cost:0, dmg:9, effect:'deathmark',
         desc:'Long range. Applies Deathmark: the next hit it takes deals +10 pure damage.' },
     ],
   },
   {
     classId: 'Reptile', name:'Shell', color: '#8a8f5c',
     attackCards: [
-      { id:'shell_charge', name:'Shell Charge', range:'short', role:'attack', cost:0, dmg:9, effect:'none',
-        desc:'Short range. A direct shell-first charge.' },
-      { id:'steel_tail', name:'Steel Tail', range:'long', role:'attack', cost:0, dmg:13, effect:'none',
-        desc:'Long range. Tail whip, targets the weakest enemy lane.' },
+      { id:'dinossaurinho', name:'Dinossaurinho', range:'short', role:'attack', cost:0, dmg:9, effect:'none',
+        desc:'Short range. A direct charge.' },
+      { id:'garra_venenosa', name:'Garra Venenosa', range:'long', role:'attack', cost:0, dmg:11, effect:'poison',
+        desc:'Long range. Applies Poison: fading damage that stacks with itself.' },
     ],
   },
 ];
 
 // Universal support cards -- any class's Axie can be loaded with these.
 export const DEFENSE_CARDS = [
-  { id:'defensive_stance', name:'Defensive Stance', range:'own', role:'defense', cost:1, effect:'shield',
+  { id:'ornitorrinco', name:'Ornitorrinco', range:'own', role:'defense', cost:1, effect:'shield',
     desc:'Blocks 50% of the next hit taken by this lane.' },
-  { id:'bastion', name:'Bastion', range:'own', role:'defense', cost:2, effect:'shield_cleanse',
+  { id:'guardiao_tropical', name:'Guardião Tropical', range:'own', role:'defense', cost:2, effect:'shield_cleanse',
     desc:'Blocks 50% of the next hit and removes 1 negative status from this lane.' },
 ];
 export const HEAL_CARDS = [
-  { id:'light_heal', name:'Light Heal', range:'own', role:'heal', cost:1, heal:15,
+  { id:'cachorrinho', name:'Cachorrinho', range:'own', role:'heal', cost:1, heal:15,
     desc:'Heals 15 HP (scaled by MP) on this lane.' },
-  { id:'deep_heal', name:'Deep Heal', range:'own', role:'heal', cost:2, heal:25,
+  { id:'trevo', name:'Trevo', range:'own', role:'heal', cost:2, heal:25,
     desc:'Heals 25 HP (scaled by MP) on this lane.' },
 ];
 
@@ -127,10 +134,17 @@ export function buildLoadout(classId, counts){
 // MP (which scales heal/shield strength -- see game.js). Orthogonal by
 // design: 5 defense cards doesn't stop you from also carrying 1 attack card,
 // it just means your build only invested in toughness, not power.
-export function computeLaneStats(counts){
-  const powerMult = 1 + counts.attack * 0.15;
+//
+// `evolved` is this game's take on Origin's card-evolution tiers (α / base /
+// "+"): mark an Axie as evolved in the squad builder and its whole build
+// gets a flat +15% to power, HP and MP -- a levelled-up version of the same
+// loadout, not a different one.
+export const EVOLVE_BONUS = 0.15;
+export function computeLaneStats(counts, evolved){
+  const mult = evolved ? (1 + EVOLVE_BONUS) : 1;
+  const powerMult = (1 + counts.attack * 0.15) * mult;
   const damageReduction = Math.min(0.5, counts.defense * 0.06);
-  const maxHp = BASE_HP + counts.defense * 10;
-  const mp = BASE_MP + counts.heal * 20;
+  const maxHp = Math.round((BASE_HP + counts.defense * 10) * mult);
+  const mp = Math.round((BASE_MP + counts.heal * 20) * mult);
   return { powerMult, damageReduction, maxHp, mp };
 }

@@ -22,7 +22,7 @@ let lastRivalSquad = [];
 // ================= Team builder =================
 function renderTeamScreen(){
   ui.renderRoster(AXIES, squad, addToSquad);
-  ui.renderSquad(squad, AXIES, { onAdjust: adjustCount, onToggleTank: toggleTank, onRemove: removeFromSquad });
+  ui.renderSquad(squad, AXIES, { onAdjust: adjustCount, onToggleTank: toggleTank, onToggleEvolve: toggleEvolve, onRemove: removeFromSquad });
   ui.renderSquadHeader(squad, game.SQUAD_SIZE);
 }
 function addToSquad(classId){
@@ -30,6 +30,7 @@ function addToSquad(classId){
   squad.push({
     classId,
     isTank: !squad.some(p => p.isTank),
+    evolved: false,
     counts: { attack: game.LOADOUT_SIZE, defense: 0, heal: 0 },
   });
   renderTeamScreen();
@@ -46,6 +47,10 @@ function adjustCount(idx, cat, delta){
 }
 function toggleTank(idx){
   squad.forEach((p, i) => { p.isTank = (i === idx); });
+  renderTeamScreen();
+}
+function toggleEvolve(idx){
+  squad[idx].evolved = !squad[idx].evolved;
   renderTeamScreen();
 }
 function removeFromSquad(idx){
@@ -133,13 +138,14 @@ function applyResultFx(result){
   if (result.comboBonus) render.spawnFloatingText(el, 'COMBO! -'+result.comboBonus, 'text-combo');
 }
 
-function applyBleedFx(side, bleedResults){
+function applyBleedFx(side, statusResults){
   const lanesArr = side === 'you' ? state.youLanes : state.rivalLanes;
-  bleedResults.forEach(({ lane, dmg }) => {
+  statusResults.forEach(({ lane, dmg, kind }) => {
     const laneIndex = lanesArr.indexOf(lane);
     const el = ui.getLaneSideEl(side, laneIndex);
     render.flashHit(el);
-    render.spawnFloatingText(el, '-'+dmg+' 🩸', 'text-bleed');
+    const icon = kind === 'poison' ? '☠️' : '🩸';
+    render.spawnFloatingText(el, '-'+dmg+' '+icon, 'text-bleed');
   });
 }
 
