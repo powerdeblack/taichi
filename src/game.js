@@ -1,50 +1,55 @@
-// Core board-duel rules: N lanes per side (a squad of picks), energy,
-// class-triangle damage, role stats (Tank/Attacker/Healer), status effects
-// (Bleed, Deathmark, Retain, Shield/Cleanse, Heal), Ambush and the Pena/Voo
-// Rasante combo. Targeting: 'short' cards hit the mirrored enemy lane,
-// 'long' cards hit whichever enemy lane has the least HP, 'own'/'own_all'
-// support cards act on the caster's own lane or every own alive lane.
-// Win condition: a team loses the instant its Tank lane dies.
-import { AXIES, axieById, classMultiplier, shuffle, ROLES, BASE_HP, BASE_MP } from './cards.js';
+// Core board-duel rules: a 5-Axie squad per side, each Axie's power/
+// toughness/heal-strength computed from its own 5-card loadout (attack/
+// defense/heal counts -- see cards.js computeLaneStats), the classic class
+// triangle, and status effects (Bleed, Deathmark, Retain, Shield/Cleanse,
+// Ambush, the Pena combo). Targeting: 'short' cards hit the mirrored enemy
+// lane, 'long' cards hit whichever enemy lane has the least HP, 'own'
+// support cards act on the caster's own lane. Win condition: a team loses
+// the instant its designated Tank lane dies.
+import { axieById, classMultiplier, shuffle, buildLoadout, computeLaneStats, ALL_CLASSES, LOADOUT_SIZE, BASE_HP, BASE_MP } from './cards.js';
 
 export const MAX_ENERGY = 10;
 export const HAND_SIZE = 3;
 export const SQUAD_SIZE = 5;
-export const ALL_CLASSES = AXIES.map(a => a.classId);
+export { LOADOUT_SIZE };
 
-// Auto-builds a valid rival squad: one Tank plus SQUAD_SIZE-1 random
-// Attacker/Healer picks, classes allowed to repeat.
+// Auto-builds a valid rival squad: random classes, random attack/defense/
+// heal split per Axie (summing to LOADOUT_SIZE), one random Tank.
 export function randomSquad(){
-  const picks = [{ classId: ALL_CLASSES[Math.floor(Math.random()*ALL_CLASSES.length)], role: 'Tank' }];
-  for (let i=1; i<SQUAD_SIZE; i++){
-    const classId = ALL_CLASSES[Math.floor(Math.random()*ALL_CLASSES.length)];
-    const role = Math.random() < 0.5 ? 'Attacker' : 'Healer';
-    picks.push({ classId, role });
+  const picks = [];
+  for (let i=0; i<SQUAD_SIZE; i++){
+    let a = Math.floor(Math.random()*(LOADOUT_SIZE+1));
+    let d = Math.floor(Math.random()*(LOADOUT_SIZE-a+1));
+    let h = LOADOUT_SIZE - a - d;
+    picks.push({
+      classId: ALL_CLASSES[Math.floor(Math.random()*ALL_CLASSES.length)],
+      isTank: false,
+      counts: { attack: a, defense: d, heal: h },
+    });
   }
+  picks[Math.floor(Math.random()*picks.length)].isTank = true;
   return picks;
 }
 
 function createLanes(picks){
-  return picks.map(({ classId, role }) => {
+  return picks.map(({ classId, isTank, counts }) => {
     const axie = axieById(classId);
-    const roleStats = ROLES[role];
+    const stats = computeLaneStats(counts);
     return {
-      classId, role, name: axie.name, color: axie.color,
-      maxHp: Math.round(BASE_HP * roleStats.hpMult),
-      hp: Math.round(BASE_HP * roleStats.hpMult),
-      mp: Math.round(BASE_MP * roleStats.mpMult),
+      classId, isTank, counts, name: axie.name, color: axie.color,
+      maxHp: stats.maxHp, hp: stats.maxHp, mp: stats.mp,
+      powerMult: stats.powerMult, damageReduction: stats.damageReduction,
       status: {}, alive: true,
+      cardPool: buildLoadout(classId, counts),
     };
   });
 }
 
-// Cards carry laneIndex, not just classId, because a squad can repeat
-// classes: classId alone can't tell two same-class lanes apart.
 function buildDeck(picks){
-  return picks.flatMap(({ classId }, laneIndex) => {
-    const axie = axieById(classId);
-    return axie.cards.map(c => ({ ...c, cls: classId, laneIndex, color: axie.color, uid: `${classId}:${c.id}:${laneIndex}` }));
-  });
+  const lanes = createLanes(picks);
+  return lanes.flatMap((lane, laneIndex) =>
+    lane.cardPool.map(c => ({ ...c, cls: lane.classId, laneIndex, color: lane.color, uid: `${lane.classId}:${c.id}:${laneIndex}:${Math.random()}` }))
+  );
 }
 
 export function freshState(youPicks, rivalPicks){
@@ -105,13 +110,13 @@ function resolveTargetLane(enemyLanes, casterIndex, range){
   return -1;
 }
 
-function applyDamage(lane, amount, attackerClassId, attackerRole){
+function applyDamage(lane, amount, attackerClassId, casterLane){
   const mult = classMultiplier(attackerClassId, lane.classId);
-  let dmg = amount * mult * ROLES[attackerRole].powerMult;
+  let dmg = amount * mult * casterLane.powerMult;
   let deathmarked = false, shielded = false;
   if (lane.status.deathmark){ dmg += 10; delete lane.status.deathmark; deathmarked = true; }
   if (lane.status.shield){ dmg *= 0.5; delete lane.status.shield; shielded = true; }
-  dmg *= (1 - ROLES[lane.role].damageReduction);
+  dmg *= (1 - lane.damageReduction);
   dmg = Math.max(0, Math.round(dmg));
   lane.hp = Math.max(0, lane.hp - dmg);
   if (lane.hp <= 0) lane.alive = false;
@@ -132,14 +137,11 @@ function tickBleed(lane){
   return 0;
 }
 
-// Heal/shield strength scales with the caster's MP stat (Healers are much
-// stronger at this; Tanks are weak at it even if they carry a support card).
-function mpScale(lane, roleHealMult){
-  return (lane.mp / BASE_MP) * roleHealMult;
-}
-
+// Heal/shield strength scales with the caster's MP stat -- an Axie built
+// with heal cards is genuinely a better healer than one that just happens
+// to carry a single borrowed heal card.
 function applyHeal(lane, amount, casterLane){
-  const scaled = Math.round(amount * mpScale(casterLane, ROLES[casterLane.role].healMult));
+  const scaled = Math.round(amount * (casterLane.mp / BASE_MP));
   const before = lane.hp;
   lane.hp = Math.min(lane.maxHp, lane.hp + scaled);
   return lane.hp - before;
@@ -157,28 +159,18 @@ export function resolveCard(state, side, card, casterIndex){
   const enemyLanes = side === 'you' ? state.rivalLanes : state.youLanes;
   const casterLane = ownLanes[casterIndex];
   const result = {
-    side, card, casterIndex, targetIndex: -1, targetIndices: [], dmg: 0, healed: 0,
+    side, card, casterIndex, targetIndex: -1, dmg: 0, healed: 0,
     ambush: false, shielded: false, deathmarked: false, comboBonus: 0,
   };
 
   if (card.role === 'defense'){
-    if (card.range === 'own_all'){
-      result.targetIndices = aliveIndices(ownLanes);
-      for (const i of result.targetIndices) applyShield(ownLanes[i], card.effect === 'shield_cleanse');
-    } else {
-      applyShield(casterLane, card.effect === 'shield_cleanse');
-      result.targetIndex = casterIndex;
-    }
+    applyShield(casterLane, card.effect === 'shield_cleanse');
+    result.targetIndex = casterIndex;
     return result;
   }
   if (card.role === 'heal'){
-    if (card.range === 'own_all'){
-      result.targetIndices = aliveIndices(ownLanes);
-      result.healed = result.targetIndices.reduce((sum,i) => sum + applyHeal(ownLanes[i], card.heal, casterLane), 0);
-    } else {
-      result.healed = applyHeal(casterLane, card.heal, casterLane);
-      result.targetIndex = casterIndex;
-    }
+    result.healed = applyHeal(casterLane, card.heal, casterLane);
+    result.targetIndex = casterIndex;
     return result;
   }
 
@@ -188,7 +180,7 @@ export function resolveCard(state, side, card, casterIndex){
 
   const ambush = !state.firstHitDone && card.effect === 'ambush';
   const dmgToApply = card.dmg * (ambush ? 2 : 1);
-  const { dmg, deathmarked, shielded } = applyDamage(targetLane, dmgToApply, card.cls, casterLane.role);
+  const { dmg, deathmarked, shielded } = applyDamage(targetLane, dmgToApply, card.cls, casterLane);
   if (dmg > 0) state.firstHitDone = true;
   if (card.effect === 'bleed') applyBleed(targetLane);
   if (card.effect === 'deathmark') targetLane.status.deathmark = true;
@@ -196,7 +188,7 @@ export function resolveCard(state, side, card, casterIndex){
   Object.assign(result, { targetIndex, dmg, ambush, deathmarked, shielded });
 
   if (card.effect === 'multi' && targetLane.alive){
-    const bonus = Math.round(card.dmg * 0.5 * ROLES[casterLane.role].powerMult);
+    const bonus = Math.round(card.dmg * 0.5 * casterLane.powerMult);
     targetLane.hp = Math.max(0, targetLane.hp - bonus);
     if (targetLane.hp <= 0) targetLane.alive = false;
     result.comboBonus = bonus;
@@ -235,8 +227,8 @@ export function startRivalPrep(state){
 }
 
 export function checkGameOver(state){
-  const youTank = state.youLanes.find(l => l.role === 'Tank');
-  const rivalTank = state.rivalLanes.find(l => l.role === 'Tank');
+  const youTank = state.youLanes.find(l => l.isTank);
+  const rivalTank = state.rivalLanes.find(l => l.isTank);
   const youDead = !youTank || !youTank.alive;
   const rivalDead = !rivalTank || !rivalTank.alive;
   if (youDead || rivalDead){

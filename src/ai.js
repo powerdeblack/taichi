@@ -1,6 +1,6 @@
 // Rival AI: after its energy/bleed tick, gathers every card its alive lanes
-// can currently afford and plays one at random. Simple on purpose.
-import { axieById } from './cards.js';
+// can currently afford (from each lane's own loadout) and plays one at
+// random. Simple on purpose.
 import { startRivalPrep, resolveCard } from './game.js';
 
 export function aiTakeTurn(state, { onResolved }){
@@ -10,8 +10,7 @@ export function aiTakeTurn(state, { onResolved }){
   const candidates = [];
   state.rivalLanes.forEach((lane, laneIndex) => {
     if (!lane.alive) return;
-    const axie = axieById(lane.classId);
-    axie.cards.forEach(c => {
+    lane.cardPool.forEach(c => {
       if (c.cost <= state.energyRival) candidates.push({ ...c, cls: lane.classId, laneIndex, color: lane.color });
     });
   });

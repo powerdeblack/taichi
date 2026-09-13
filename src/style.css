@@ -132,40 +132,49 @@ h1{
 .roster-card .card-pick-badge{ display:none; }
 .roster-card.selected .card-pick-badge{ display:flex; }
 .roster-portrait{ width:56px; height:56px; margin:0 auto 6px; }
-.ability-card{ border-style:dashed; }
 
 /* ---------- Squad builder ---------- */
 .squad-list{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
 .squad-slot{
   display:flex; align-items:center; gap:8px;
-  background:#251b12; border-radius:12px; padding:6px 8px;
+  background:#251b12; border-radius:12px; padding:8px;
   border:2px solid #4a382480;
 }
+.squad-slot.is-tank{ border-color:var(--danger); }
 .squad-portrait{ width:38px; height:38px; flex-shrink:0; }
 .squad-slot-info{ flex:1; min-width:0; }
-.squad-slot-name{ font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.78rem; margin-bottom:3px; }
-.role-pills{ display:flex; gap:4px; flex-wrap:wrap; }
-.role-pill{
-  font-family:'Baloo 2',sans-serif; font-size:.62rem; font-weight:700;
-  border:1px solid #4a382480; background:#1c130c; color:var(--text-dim);
-  border-radius:20px; padding:3px 8px; cursor:pointer;
+.squad-slot-name{
+  font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.78rem; margin-bottom:5px;
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap;
 }
-.role-pill.active.role-Tank{ background:var(--danger); color:#fff; border-color:var(--danger); }
-.role-pill.active.role-Attacker{ background:var(--clay); color:#fff; border-color:var(--clay); }
-.role-pill.active.role-Healer{ background:var(--jungle); color:#fff; border-color:var(--jungle); }
+.tank-toggle{
+  font-family:'Baloo 2',sans-serif; font-size:.6rem; font-weight:700;
+  border:1px solid #4a382480; background:#1c130c; color:var(--text-dim);
+  border-radius:20px; padding:2px 8px; cursor:pointer;
+}
+.tank-toggle.active{ background:var(--danger); color:#fff; border-color:var(--danger); }
+.stat-steppers{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:3px; }
+.stat-stepper{ display:flex; align-items:center; gap:4px; }
+.stat-stepper-label{ font-size:.64rem; color:var(--text-dim); }
+.stat-stepper-value{ font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.72rem; min-width:12px; text-align:center; }
+.stepper-btn{
+  width:18px; height:18px; border-radius:5px; border:1px solid #4a382480;
+  background:#1c130c; color:var(--text-light); font-weight:700; font-size:.7rem;
+  line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center;
+}
+.stepper-btn:active{ transform:scale(.92); }
+.loadout-total{ font-size:.62rem; color:var(--danger); font-weight:700; }
+.loadout-total.ok{ color:#8fd08f; }
 .squad-remove{
   background:none; border:none; color:var(--text-dim); font-size:1.1rem;
-  cursor:pointer; padding:4px 6px; line-height:1;
+  cursor:pointer; padding:4px 6px; line-height:1; align-self:flex-start;
 }
 .squad-remove:hover{ color:#fff; }
 
-.role-badge{
+.role-badge.tank{
   font-size:.58rem; font-weight:700; padding:1px 6px; border-radius:10px;
-  vertical-align:middle; margin-left:2px;
+  vertical-align:middle; margin-left:2px; background:var(--danger); color:#fff;
 }
-.role-Tank .role-badge{ background:var(--danger); color:#fff; }
-.role-Attacker .role-badge{ background:var(--clay); color:#fff; }
-.role-Healer .role-badge{ background:var(--jungle); color:#fff; }
 .mp-label{ font-size:.6rem; color:#8fd0ff; font-weight:700; margin-top:1px; }
 
 /* ---------- Portraits (SVG placeholder + real-asset fallback) ---------- */
@@ -212,7 +221,7 @@ h1{
   transition:background .15s ease, opacity .3s ease;
 }
 .lane-side.rival{ flex-direction:row-reverse; text-align:right; }
-.lane-side.role-Tank{ box-shadow:inset 0 0 0 1px #b8452f70; }
+.lane-side.is-tank{ box-shadow:inset 0 0 0 1px #b8452f70; }
 .lane-side.dead{ opacity:.35; filter:grayscale(1); }
 .lane-side.lane-hit{ background:#b8452f33; }
 .lane-side.lane-heal{ background:#3f6b4a33; }

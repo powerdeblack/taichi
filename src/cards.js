@@ -1,76 +1,77 @@
-// Axie roster: one Axie per class, each with 3 cards -- the original 2
-// signature moves (short/long attack, or heal/defense) plus a stronger
-// "ability" card usable regardless of assigned role. `role` on a card means
-// how it resolves (attack/defense/heal); a lane's assigned ROLE (Tank/
-// Attacker/Healer, chosen at team-build time) is independent of class and
-// scales that lane's stats -- see ROLES below.
+// Axie roster: one Axie per class, each with 2 class-flavored attack cards
+// (short + long range). Defense and heal cards are universal -- any class's
+// Axie can equip them. A lane's actual power/toughness/heal-strength isn't a
+// fixed role anymore: it's computed from how many attack/defense/heal cards
+// you gave that Axie in its 5-card loadout (see computeLaneStats below).
 export const AXIES = [
   {
     classId: 'Beast', name: 'Fera', color: '#c97b3d',
-    cards: [
+    attackCards: [
       { id:'investida', name:'Investida', range:'short', role:'attack', cost:0, dmg:14, effect:'ambush',
         desc:'Curto alcance. Ambush: dobra de dano no 1º acerto da partida.' },
       { id:'investida_pesada', name:'Investida Pesada', range:'long', role:'attack', cost:0, dmg:20, effect:'none',
         desc:'Longo alcance. Golpe pesado, mira a linha inimiga mais fraca.' },
-      { id:'furia_selvagem', name:'Fúria Selvagem', range:'short', role:'attack', cost:3, dmg:22, effect:'none', ability:true,
-        desc:'HABILIDADE. Curto alcance. Golpe bruto de altíssimo dano.' },
     ],
   },
   {
     classId: 'Aqua', name: 'Maré', color: '#4c8fb0',
-    cards: [
+    attackCards: [
       { id:'respingo', name:'Respingo', range:'short', role:'attack', cost:0, dmg:8, effect:'none',
         desc:'Curto alcance. Barato e direto, sem efeito extra.' },
       { id:'mare', name:'Maré Alta', range:'long', role:'attack', cost:0, dmg:9, effect:'bleed',
         desc:'Longo alcance. Aplica Sangramento: dano ao longo de 2 rodadas.' },
-      { id:'mare_brava', name:'Maré Brava', range:'long', role:'attack', cost:3, dmg:12, effect:'bleed', ability:true,
-        desc:'HABILIDADE. Longo alcance. Dano maior + Sangramento garantido.' },
     ],
   },
   {
     classId: 'Plant', name: 'Broto', color: '#3f6b4a',
-    cards: [
+    attackCards: [
       { id:'raiz', name:'Raiz', range:'short', role:'attack', cost:0, dmg:10, effect:'retain',
         desc:'Curto alcance. Retain: nunca sai da sua mão, acerte ou erre.' },
-      { id:'brotamento', name:'Brotamento', range:'own', role:'heal', cost:2, heal:20, effect:'none',
-        desc:'Cura 20 de HP (escalado por MP) da própria linha.' },
-      { id:'floracao', name:'Floração', range:'own_all', role:'heal', cost:3, heal:12, effect:'none', ability:true,
-        desc:'HABILIDADE. Cura 12 de HP (escalado por MP) em TODAS as suas linhas vivas.' },
+      { id:'espinho', name:'Espinho', range:'long', role:'attack', cost:0, dmg:16, effect:'none',
+        desc:'Longo alcance. Investida de espinhos, mira a linha mais fraca.' },
     ],
   },
   {
     classId: 'Bird', name: 'Pluma', color: '#d9b44a',
-    cards: [
+    attackCards: [
       { id:'mergulho', name:'Mergulho', range:'short', role:'attack', cost:0, dmg:18, effect:'none',
         desc:'Curto alcance. Um golpe único e forte.' },
       { id:'pena', name:'Pena', range:'long', role:'attack', cost:0, dmg:6, effect:'multi',
         desc:'Longo alcance. 3 projéteis: +50% de dano bônus se 2+ acertarem.' },
-      { id:'voo_rasante', name:'Voo Rasante', range:'long', role:'attack', cost:3, dmg:9, effect:'multi', ability:true,
-        desc:'HABILIDADE. Longo alcance. Versão mais forte da Pena.' },
     ],
   },
   {
     classId: 'Bug', name:'Larva', color: '#7a5c9e',
-    cards: [
+    attackCards: [
       { id:'picada', name:'Picada', range:'short', role:'attack', cost:0, dmg:7, effect:'none',
         desc:'Curto alcance. Barata e direta.' },
       { id:'veneno', name:'Veneno', range:'long', role:'attack', cost:0, dmg:9, effect:'deathmark',
         desc:'Longo alcance. Aplica Marca da Morte: próximo golpe recebido tem +10 de dano puro.' },
-      { id:'enxame', name:'Enxame', range:'short', role:'attack', cost:3, dmg:12, effect:'deathmark', ability:true,
-        desc:'HABILIDADE. Curto alcance. Dano maior + Marca da Morte garantida.' },
     ],
   },
   {
     classId: 'Reptile', name:'Casco', color: '#8a8f5c',
-    cards: [
-      { id:'casca', name:'Casca', range:'own', role:'defense', cost:1, effect:'shield',
-        desc:'Bloqueia 50% do próximo dano da própria linha.' },
-      { id:'escudo', name:'Escudo', range:'own', role:'defense', cost:2, effect:'shield_cleanse',
-        desc:'Bloqueia 50% do próximo dano e remove 1 status negativo da própria linha.' },
-      { id:'muralha', name:'Muralha', range:'own_all', role:'defense', cost:3, effect:'shield', ability:true,
-        desc:'HABILIDADE. Bloqueia 50% do próximo dano em TODAS as suas linhas vivas.' },
+    attackCards: [
+      { id:'investida_casco', name:'Investida de Casco', range:'short', role:'attack', cost:0, dmg:9, effect:'none',
+        desc:'Curto alcance. Investida direta com o casco.' },
+      { id:'cauda_aco', name:'Cauda de Aço', range:'long', role:'attack', cost:0, dmg:13, effect:'none',
+        desc:'Longo alcance. Chicotada de cauda, mira a linha mais fraca.' },
     ],
   },
+];
+
+// Universal support cards -- any class's Axie can be loaded with these.
+export const DEFENSE_CARDS = [
+  { id:'postura_defensiva', name:'Postura Defensiva', range:'own', role:'defense', cost:1, effect:'shield',
+    desc:'Bloqueia 50% do próximo dano da própria linha.' },
+  { id:'bastiao', name:'Bastião', range:'own', role:'defense', cost:2, effect:'shield_cleanse',
+    desc:'Bloqueia 50% do próximo dano e remove 1 status negativo da própria linha.' },
+];
+export const HEAL_CARDS = [
+  { id:'cura_leve', name:'Cura Leve', range:'own', role:'heal', cost:1, heal:15,
+    desc:'Cura 15 de HP (escalado por MP) da própria linha.' },
+  { id:'cura_profunda', name:'Cura Profunda', range:'own', role:'heal', cost:2, heal:25,
+    desc:'Cura 25 de HP (escalado por MP) da própria linha.' },
 ];
 
 // Beast > Plant > Aqua > Beast
@@ -102,14 +103,34 @@ export function axieById(classId){
   return AXIES.find(a => a.classId === classId);
 }
 
-// Roles are chosen per-lane at team-build time, independent of class. They
-// set that lane's HP/MP (MP scales heal and shield strength) and combat
-// bonuses. Exactly one Tank is required per team; losing it ends the match.
-export const ROLES = {
-  Tank:     { label:'Tanque',      hpMult:1.6, mpMult:0.5, powerMult:1.0, healMult:1.0, damageReduction:0.25 },
-  Attacker: { label:'Atacante',    hpMult:1.0, mpMult:1.0, powerMult:1.3, healMult:1.0, damageReduction:0 },
-  Healer:   { label:'Curandeiro',  hpMult:0.6, mpMult:1.6, powerMult:1.0, healMult:1.5, damageReduction:0 },
-};
-export const ROLE_IDS = Object.keys(ROLES);
+export const ALL_CLASSES = AXIES.map(a => a.classId);
+export const LOADOUT_SIZE = 5;
 export const BASE_HP = 100;
 export const BASE_MP = 100;
+
+// Builds the actual card pool for one Axie's loadout: attackCount cards
+// cycling through its class's 2 attack cards, defenseCount cycling through
+// the universal defense cards, healCount cycling through the universal heal
+// cards. Card type COUNTS -- not a fixed role -- are what drive that Axie's
+// stats (see computeLaneStats).
+export function buildLoadout(classId, counts){
+  const axie = axieById(classId);
+  const pool = [];
+  for (let i=0; i<counts.attack; i++) pool.push({ ...axie.attackCards[i % axie.attackCards.length] });
+  for (let i=0; i<counts.defense; i++) pool.push({ ...DEFENSE_CARDS[i % DEFENSE_CARDS.length] });
+  for (let i=0; i<counts.heal; i++) pool.push({ ...HEAL_CARDS[i % HEAL_CARDS.length] });
+  return pool;
+}
+
+// Count-based stats: every attack card adds outgoing power, every defense
+// card adds HP and passive damage reduction (capped), every heal card adds
+// MP (which scales heal/shield strength -- see game.js). Orthogonal by
+// design: 5 defense cards doesn't stop you from also carrying 1 attack card,
+// it just means your build only invested in toughness, not power.
+export function computeLaneStats(counts){
+  const powerMult = 1 + counts.attack * 0.15;
+  const damageReduction = Math.min(0.5, counts.defense * 0.06);
+  const maxHp = BASE_HP + counts.defense * 10;
+  const mp = BASE_MP + counts.heal * 20;
+  return { powerMult, damageReduction, maxHp, mp };
+}

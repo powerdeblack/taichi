@@ -14,7 +14,7 @@ const switchDeckBtn = document.getElementById('switchDeckBtn');
 const resetBtn = document.getElementById('resetBtn');
 const boardEl = document.getElementById('board');
 
-let squad = []; // [{ classId, role }] -- up to SQUAD_SIZE, first pick defaults to Tank
+let squad = []; // [{ classId, isTank, counts:{attack,defense,heal} }] -- up to SQUAD_SIZE
 let state = null;
 let lastYouSquad = [];
 let lastRivalSquad = [];
@@ -22,22 +22,36 @@ let lastRivalSquad = [];
 // ================= Team builder =================
 function renderTeamScreen(){
   ui.renderRoster(AXIES, squad, addToSquad);
-  ui.renderSquad(squad, AXIES, { onSetRole: setRole, onRemove: removeFromSquad });
+  ui.renderSquad(squad, AXIES, { onAdjust: adjustCount, onToggleTank: toggleTank, onRemove: removeFromSquad });
   ui.renderSquadHeader(squad, game.SQUAD_SIZE);
 }
 function addToSquad(classId){
   if (squad.length >= game.SQUAD_SIZE) return;
-  const role = squad.some(p => p.role === 'Tank') ? 'Attacker' : 'Tank';
-  squad.push({ classId, role });
+  squad.push({
+    classId,
+    isTank: !squad.some(p => p.isTank),
+    counts: { attack: game.LOADOUT_SIZE, defense: 0, heal: 0 },
+  });
   renderTeamScreen();
   previewClass(classId);
 }
-function setRole(idx, role){
-  squad[idx].role = role;
+function adjustCount(idx, cat, delta){
+  const counts = squad[idx].counts;
+  const total = counts.attack + counts.defense + counts.heal;
+  const next = counts[cat] + delta;
+  if (next < 0) return;
+  if (delta > 0 && total >= game.LOADOUT_SIZE) return;
+  counts[cat] = next;
+  renderTeamScreen();
+}
+function toggleTank(idx){
+  squad.forEach((p, i) => { p.isTank = (i === idx); });
   renderTeamScreen();
 }
 function removeFromSquad(idx){
+  const wasTank = squad[idx].isTank;
   squad.splice(idx, 1);
+  if (wasTank && squad.length) squad[0].isTank = true;
   renderTeamScreen();
 }
 renderTeamScreen();
@@ -89,35 +103,19 @@ function syncUI(){
 
 function applyResultFx(result){
   if (!result) return;
-  const { side, card, casterIndex, targetIndex, targetIndices } = result;
+  const { side, card, casterIndex, targetIndex } = result;
   const enemySide = side === 'you' ? 'rival' : 'you';
 
   if (card.role === 'defense'){
-    if (card.range === 'own_all'){
-      for (const i of targetIndices){
-        const el = ui.getLaneSideEl(side, i);
-        render.flashHeal(el);
-        render.spawnFloatingText(el, 'ESCUDO!', 'text-shield');
-      }
-    } else {
-      const el = ui.getLaneSideEl(side, casterIndex);
-      render.flashHeal(el);
-      render.spawnFloatingText(el, 'ESCUDO!', 'text-shield');
-    }
+    const el = ui.getLaneSideEl(side, casterIndex);
+    render.flashHeal(el);
+    render.spawnFloatingText(el, 'ESCUDO!', 'text-shield');
     return;
   }
   if (card.role === 'heal'){
-    if (card.range === 'own_all'){
-      for (const i of targetIndices){
-        const el = ui.getLaneSideEl(side, i);
-        render.flashHeal(el);
-        render.spawnFloatingText(el, '+cura', 'text-heal');
-      }
-    } else {
-      const el = ui.getLaneSideEl(side, casterIndex);
-      render.flashHeal(el);
-      render.spawnFloatingText(el, '+'+result.healed, 'text-heal');
-    }
+    const el = ui.getLaneSideEl(side, casterIndex);
+    render.flashHeal(el);
+    render.spawnFloatingText(el, '+'+result.healed, 'text-heal');
     return;
   }
   if (targetIndex === -1){
