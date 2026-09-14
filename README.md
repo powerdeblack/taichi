@@ -1,13 +1,16 @@
 # Axie Duel
 
-Protótipo de duelo em tabuleiro pro Axie Vibeathon (Sky Mavis / Axie Infinity):
-esquadrão livre de 5 Axies, cada um com um **loadout de 5 cartas** que você
-monta (ataque/defesa/cura, na proporção que quiser) — é essa composição, não
-um papel fixo, que determina o quão forte, tanque ou curador cada Axie fica.
-Cartas resolvem automaticamente, tudo baseado no core do Axie Origin (energia,
-classes, status effects). Vence quem matar o Tanque do adversário primeiro. No
-team picker, cada Axie aparece como um modelo 3D real (Axie Mixer 3D oficial),
-não placeholder.
+Protótipo de duelo em tabuleiro 3D pro Axie Vibeathon (Sky Mavis / Axie
+Infinity): esquadrão livre de 5 Axies, cada um com um **loadout de 5
+cartas** que você monta (ataque/defesa/cura, na proporção que quiser) — é
+essa composição, não um papel fixo, que determina o quão forte, tanque ou
+curador cada Axie fica. O duelo é **em tempo real, sem turnos**: os dois
+lados regeneram energia continuamente e podem jogar cartas a qualquer
+momento, com mira manual (você escolhe o alvo) e um Tanque que provoca
+(taunt) e pode ser movido livremente com um joystick. Tudo baseado no core
+do Axie Origin (energia, classes, status effects). Vence quem matar o
+Tanque do adversário primeiro. No team picker, cada Axie aparece como um
+modelo 3D real (Axie Mixer 3D oficial), não placeholder.
 
 ## Rodando localmente
 
@@ -59,8 +62,12 @@ npm run preview
   Plant > Aqua > Beast, Bird > Bug > Reptile > Bird — ainda influencia o
   dano). Cartas de Defesa e Cura são **universais**: qualquer classe pode
   equipar.
-- Cartas de **ataque não gastam energia** (custo 0); defesa/cura seguem
-  custando energia normalmente, regenerando por turno.
+- **Tempo real, sem turnos**: `energyYou`/`energyRival` regeneram
+  continuamente (~0.6/s cada), e qualquer carta afordável pode ser jogada a
+  qualquer momento, dos dois lados — não existe handoff "sua vez/vez do
+  rival". O rival age sozinho, em intervalos aleatórios (~1.5-2.5s), via
+  `ai.js`'s `aiMaybeAct`. Bleed/Poison tickam num timer fixo (a cada 2s)
+  compartilhado pelos dois lados, não mais "no início do seu turno".
 - **Mira manual**: jogar uma carta de ataque não resolve sozinho — abre um
   modo de mira que destaca (com brilho pulsante) os inimigos legais pra
   aquele alcance, e você toca em qual quer acertar. Curto alcance só pode
@@ -68,25 +75,32 @@ npm run preview
   "qualquer um vivo" se não houver ninguém lá); longo alcance pode acertar
   qualquer inimigo vivo. O rival ainda mira automático (curto = mesma
   coluna, longo = o mais fraco).
-- **Movimento**: uma vez por turno, dá pra trocar a coluna de um dos seus
-  próprios Axies com outra (toca "Mover", toca o Axie, toca o destino). É a
-  ferramenta tática pro sistema de mira acima — tira seu Tanque da coluna
-  de um atacante de curto alcance inimigo, ou reposiciona pra alinhar seu
-  próprio curto alcance num alvo específico. O Tanque também tem um
-  **joystick dedicado** ao lado do botão de mover: arrasta na direção do
-  slot que quer (frente-esquerda/frente-direita/trás-esquerda/trás-direita)
-  pra jogá-lo lá, trocando com quem estiver — mesmo limite de 1x por
-  turno, compartilhado com o botão genérico.
+- **Movimento**: dá pra trocar a coluna de um dos seus próprios Axies com
+  outra (toca "Mover", toca o Axie, toca o destino) — sem turno pra
+  esperar, só um cooldown curto (4s) depois de usar. É a ferramenta tática
+  pro sistema de mira acima — tira um Axie da coluna de um atacante de
+  curto alcance inimigo, ou reposiciona pra alinhar seu próprio curto
+  alcance num alvo específico.
+- **Joystick do Tanque (posição livre, em tempo real)**: ao lado do botão
+  de mover, um joystick dedicado só pro Tanque — **segura e arrasta** pra
+  ele andar continuamente na direção empurrada (sem cooldown, sem
+  encaixar em slot fixo), até um raio máximo ao redor do centro da
+  formação. Solta e ele para onde estiver. "Pra cima" no joystick = rumo
+  ao inimigo (linha de frente, mais perto do próprio raio de Provocação);
+  "pra baixo" = recuar pra linha de trás.
 - **Formação e Provocação (Taunt)**: cada lado forma um losango — o Tanque
-  sempre nasce no **centro** (tile dourado brilhante, com um anel de raio),
-  e os outros 4 Axies ficam 2 na frente/2 atrás ao redor dele. Quem ataca
-  **da linha de frente** (perto do Tanque) é **obrigado** a mirar nele,
-  não importa o alcance da carta — igual à carta real "Provocar" do
-  Origin. A linha de trás fica livre pra mirar em qualquer inimigo vivo.
-  Mover um Axie pra linha de frente/trás muda essa exposição em tempo
-  real — é o motivo tático de usar o movimento.
+  nasce no **centro** (tile dourado brilhante, com um anel de raio), e os
+  outros 4 Axies ficam 2 na frente/2 atrás ao redor dele, fixos nesses
+  slots (só mudam via o botão "Mover"). Quem ataca de perto do Tanque
+  inimigo — agora medido por **distância real** até a posição atual dele,
+  já que ele anda livre — é **obrigado** a mirar nele, não importa o
+  alcance da carta, igual à carta real "Provocar" do Origin. Longe do
+  raio, mira livre. Isso faz o joystick do Tanque ser genuinamente tático:
+  correr pra frente pra proteger a retaguarda puxando os golpes pra si, ou
+  recuar pra fugir da provocação e liberar os aliados pra mirar em
+  qualquer um.
 - Status effects: Bleed, **Poison** (empilha, bate 2x a stack atual e decai 1
-  stack por turno — mais forte no início, some sozinho), Deathmark, Retain,
+  stack por tick — mais forte no início, some sozinho), Deathmark, Retain,
   Shield/Cleanse, Ambush (2x dano no 1º acerto) e o combo da Pena.
 - Cada Axie pode ser marcado como **Evoluído (+)** no montador de esquadrão:
   dá +15% flat em poder/HP/MP daquele loadout inteiro — nossa versão do
@@ -110,17 +124,24 @@ calibradas pra pools de HP de centenas de pontos, aqui pra ~100-150.
 - `src/cards.js` — roster de 6 Axies (2 cartas de ataque cada), cartas de
   defesa/cura universais, triângulo de classes, fórmula de stats por
   contagem de cartas (`computeLaneStats`)
-- `src/game.js` — estado do duelo, N linhas por lado (cada uma com um `col`
-  mutável = slot na formação: 0 é o centro/Tanque, 1-4 são frente/trás),
-  dano, cura, status effects, mira manual + Provocação do Tanque
-  (`getLegalTargets`/`TAUNT_RADIUS`/`pickAutoTarget`), movimento
-  (`moveLane`), condição de vitória (Tanque)
-- `src/ai.js` — turno do rival (mira automática via `pickAutoTarget`, não
-  move lanes)
+- `src/game.js` — estado do duelo (**tempo real, sem `turn`**): N linhas por
+  lado, cada uma com um `col` (slot fixo: 0 é o centro/Tanque, 1-4 são
+  frente/trás) e um `localPos` ({x,z} ao vivo — igual ao slot pra não-
+  Tanque, livre e contínuo só pro Tanque via `moveTankFreely`), dano, cura,
+  status effects, mira manual + Provocação por distância real
+  (`getLegalTargets`/`TAUNT_RADIUS`/`pickAutoTarget`), movimento discreto
+  com cooldown (`moveLane`/`MOVE_COOLDOWN_SEC`), regen de energia e tick de
+  status contínuos (`tickEnergyRealtime`/`tickStatusTimer`), condição de
+  vitória (Tanque)
+- `src/ai.js` — `aiMaybeAct`: chamado periodicamente pelo loop de
+  `main.js` (não mais "turno do rival") — tenta jogar 1 carta afordável,
+  mira automática via `pickAutoTarget`; não move lanes
 - `src/render.js` — feedback visual via DOM (números flutuantes, flash, shake)
 - `src/ui.js` — HUD/DOM (montagem de esquadrão com steppers de loadout,
   overlay de HP/nome/status sobre o tabuleiro 3D, destaque de alvo/movimento
-  clicável (`setSelectable`), mão, energia, banner)
+  clicável (`setSelectable`), posicionamento ao vivo do Tanque durante o
+  joystick (`setLiveLanePosition`/`endLiveLanePosition`), mão, energia,
+  banner)
 - `src/axieArt.js` — arte SVG original por classe, usada só no team picker
   (roster/esquadrão) como fallback quando o 3D não carrega
 - `src/axie3d.js` — preview 3D real (Axie Mixer 3D) no team picker (1 Axie
@@ -131,11 +152,15 @@ calibradas pra pools de HP de centenas de pontos, aqui pra ~100-150.
   **formação centrada no Tanque** (`FORMATION`: centro + frente/trás),
   com um tile maior e anel pulsante no slot do Tanque marcando o raio de
   Provocação. Cada Axie balança sutilmente perto da sua posição quando
-  não é o turno dele ("patrulha"), e desliza suavemente pra nova coluna
-  quando move (`moveLaneVisual`). HP/nome/status ficam em HTML
-  posicionado por cima via projeção de câmera (`projectLane`) — não são
-  modelos 3D
-- `src/main.js` — entrada: wiring de DOM e o loop de turnos
+  ocioso ("patrulha"), desliza suavemente pra novo slot no movimento
+  discreto (`moveLaneVisual`, com lerp), e o Tanque é posicionado
+  diretamente frame a frame enquanto o joystick é segurado
+  (`setLaneLivePosition`/`setLaneRoaming`, sem lerp/patrulha nesse
+  momento). HP/nome/status ficam em HTML posicionado por cima via projeção
+  de câmera (`projectLane`) — não são modelos 3D
+- `src/main.js` — entrada: wiring de DOM e o **loop de tempo real**
+  (`requestAnimationFrame`) que regenera energia, tica status effects,
+  chama a IA periodicamente e atualiza a UI — nada de handoff de turno
 
 `axie-duel-prototype.html` na raiz é o protótipo original (mira física de
 estilingue), mantido como referência histórica — não é mais o jogo atual.

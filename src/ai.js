@@ -1,13 +1,14 @@
-// Rival AI: after its energy/bleed tick, gathers every card its alive lanes
-// can currently afford (from each lane's own loadout) and plays one at
-// random. Targets are picked automatically (pickAutoTarget) -- the rival
-// doesn't get the player's manual targeting UI. Simple on purpose; the AI
-// doesn't move lanes either.
-import { startRivalPrep, resolveCard, pickAutoTarget } from './game.js';
+// Rival AI: called periodically by main.js's real-time loop (not once per
+// "turn" -- there are no turns anymore). Each call, it gathers every card
+// its alive lanes can currently afford and plays one at random, with a
+// target picked automatically via pickAutoTarget (which includes the Tank
+// taunt check, same as the player gets). Returns the resolveCard result,
+// or null if it had nothing affordable to play. Doesn't move lanes --
+// kept simple on purpose.
+import { resolveCard, pickAutoTarget } from './game.js';
 
-export function aiTakeTurn(state, { onResolved }){
-  const bleedResults = startRivalPrep(state);
-  if (state.gameOver){ onResolved({ bleedResults, result: null }); return; }
+export function aiMaybeAct(state){
+  if (state.gameOver) return null;
 
   const candidates = [];
   state.rivalLanes.forEach((lane, laneIndex) => {
@@ -16,15 +17,11 @@ export function aiTakeTurn(state, { onResolved }){
       if (c.cost <= state.energyRival) candidates.push({ ...c, cls: lane.classId, laneIndex, color: lane.color });
     });
   });
-
-  if (!candidates.length){ onResolved({ bleedResults, result: null }); return; }
+  if (!candidates.length) return null;
 
   const card = candidates[Math.floor(Math.random()*candidates.length)];
-  setTimeout(() => {
-    const casterIndex = card.laneIndex;
-    state.energyRival -= card.cost;
-    const targetIndex = card.role === 'attack' ? pickAutoTarget(state, 'rival', card, casterIndex) : -1;
-    const result = resolveCard(state, 'rival', card, casterIndex, targetIndex);
-    onResolved({ bleedResults, result });
-  }, 900);
+  const casterIndex = card.laneIndex;
+  state.energyRival -= card.cost;
+  const targetIndex = card.role === 'attack' ? pickAutoTarget(state, 'rival', card, casterIndex) : -1;
+  return resolveCard(state, 'rival', card, casterIndex, targetIndex);
 }

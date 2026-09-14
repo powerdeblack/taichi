@@ -2,7 +2,7 @@
 // pips, pile counts, and the win/lose banner. No game rules live here.
 import { MAX_ENERGY, LOADOUT_SIZE } from './game.js';
 import { portraitHTML } from './axieArt.js';
-import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive, moveLaneVisual } from './board3d.js';
+import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive, moveLaneVisual, setLaneLivePosition, setLaneRoaming } from './board3d.js';
 
 const rosterGrid = document.getElementById('rosterGrid');
 const squadListEl = document.getElementById('squadList');
@@ -133,8 +133,9 @@ function buildUnitTag(){
   };
 }
 
-// Overlay position tracks each lane's board `col` (mutable via movement),
-// not its array index -- repositionUnits reads it off the live game state.
+// Overlay position tracks each lane's live `localPos` (mutable via the
+// discrete move swap or, for the Tank, continuous free-roam), not its
+// array index -- repositionUnits reads it off the live game state.
 function repositionUnits(){
   if (!currentState) return;
   ['you','rival'].forEach(side => {
@@ -142,12 +143,33 @@ function repositionUnits(){
     unitRefs[side].forEach((ref, i) => {
       const lane = lanes[i];
       if (!ref || !lane) return;
-      const p = projectLane(side, lane.col);
+      const p = projectLane(side, lane.localPos);
       if (!p) return;
       ref.wrap.style.left = (p.x*100) + '%';
       ref.wrap.style.top = (p.y*100) + '%';
     });
   });
+}
+
+// Continuous per-frame repositioning for one lane (the Tank while its
+// joystick is held) -- bypasses the CSS transition used by the discrete
+// move swap so it tracks the drag 1:1 instead of chasing it, and drives
+// the 3D model the same way (no lerp).
+export function setLiveLanePosition(side, laneIndex, localPos){
+  const ref = unitRefs[side] && unitRefs[side][laneIndex];
+  if (ref) ref.wrap.classList.add('no-transition');
+  setLaneLivePosition(side, laneIndex, localPos);
+  const p = projectLane(side, localPos);
+  if (ref && p){
+    ref.wrap.style.left = (p.x*100) + '%';
+    ref.wrap.style.top = (p.y*100) + '%';
+  }
+}
+
+export function endLiveLanePosition(side, laneIndex){
+  const ref = unitRefs[side] && unitRefs[side][laneIndex];
+  if (ref) ref.wrap.classList.remove('no-transition');
+  setLaneRoaming(side, laneIndex, false);
 }
 
 export function buildBoard(state){
@@ -181,11 +203,12 @@ export function updateBoard(state){
   repositionUnits();
 }
 
-// Animates a lane's overlay tag sliding to its new column (in lockstep with
-// the 3D model's slide, see board3d.js moveLaneVisual) and triggers the 3D
-// slide itself.
-export function animateMove(side, laneIndex, newCol){
-  moveLaneVisual(side, laneIndex, newCol);
+// Animates a lane's overlay tag sliding to its new local {x,z} (in
+// lockstep with the 3D model's slide, see board3d.js moveLaneVisual) and
+// triggers the 3D slide itself. Used after the discrete move-swap
+// (moveLane), not for the Tank's continuous roam -- see setLiveLanePosition.
+export function animateMove(side, laneIndex, newLocalPos){
+  moveLaneVisual(side, laneIndex, newLocalPos);
   repositionUnits();
 }
 
@@ -245,8 +268,7 @@ export function renderHand(state, { onPlay }){
     const casterLane = state.youLanes[card.laneIndex];
     const laneAlive = casterLane && casterLane.alive;
     const affordable = state.energyYou >= card.cost;
-    const isTurn = state.turn === 'you';
-    const playable = affordable && isTurn && laneAlive;
+    const playable = affordable && !state.gameOver && laneAlive;
     div.className = 'card' + (!playable ? ' disabled' : '');
     div.style.borderColor = card.color + '55';
     const rangeLabel = card.range==='short' ? 'Short' : card.range==='long' ? 'Long'

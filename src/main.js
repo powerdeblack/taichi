@@ -1,10 +1,10 @@
-// Entry point: DOM wiring for the team builder and the lane board duel.
+// Entry point: DOM wiring for the team builder and the real-time board duel.
 import './style.css';
 import { AXIES } from './cards.js';
 import * as game from './game.js';
 import * as ui from './ui.js';
 import * as render from './render.js';
-import { aiTakeTurn } from './ai.js';
+import { aiMaybeAct } from './ai.js';
 import { initPreview, showAxie } from './axie3d.js';
 
 const deckScreen = document.getElementById('deckScreen');
@@ -25,6 +25,7 @@ let lastRivalSquad = [];
 let pendingAttack = null; // the attack card currently awaiting a manual target, if any
 let moveMode = false;
 let moveSource = null; // laneIndex of the Axie picked up, mid move-selection
+let matchFinished = false;
 
 // ================= Team builder =================
 function renderTeamScreen(){
@@ -103,6 +104,7 @@ function beginMatch(youSquad, rivalSquad){
   pendingAttack = null;
   moveMode = false;
   moveSource = null;
+  matchFinished = false;
   ui.hideBanner();
   ui.buildBoard(state);
   syncUI();
@@ -120,16 +122,17 @@ function syncUI(){
 
 function updateJoystick(){
   const tankIdx = state.youLanes.findIndex(l => l.isTank);
-  const canMove = state.turn === 'you' && !state.gameOver && !state.movedThisTurn
-    && tankIdx !== -1 && state.youLanes[tankIdx].alive;
+  const canMove = !state.gameOver && tankIdx !== -1 && state.youLanes[tankIdx].alive;
   joystickWrap.classList.toggle('disabled', !canMove);
 }
 
 function updateMoveBtn(){
-  const canMove = state.turn === 'you' && !state.gameOver && !state.movedThisTurn;
+  const canMove = !state.gameOver && state.moveCooldown <= 0;
   moveBtn.disabled = !canMove;
   moveBtn.classList.toggle('active', moveMode);
-  moveBtn.textContent = state.movedThisTurn ? '🔀 Already moved this turn' : '🔀 Move an Axie (1 / turn)';
+  moveBtn.textContent = state.moveCooldown > 0
+    ? `🔀 Move (${Math.ceil(state.moveCooldown)}s)`
+    : '🔀 Move an Axie';
 }
 
 function applyResultFx(result){
@@ -165,6 +168,7 @@ function applyResultFx(result){
 }
 
 function applyBleedFx(side, statusResults){
+  if (!statusResults) return;
   const lanesArr = side === 'you' ? state.youLanes : state.rivalLanes;
   statusResults.forEach(({ lane, dmg, kind }) => {
     const laneIndex = lanesArr.indexOf(lane);
@@ -177,14 +181,16 @@ function applyBleedFx(side, statusResults){
 
 function setHintForResult(side, result){
   const who = side === 'you' ? 'You' : 'The rival';
-  if (!result){ ui.setHint(`${who} had no playable card and passed the turn.`); return; }
+  if (!result) return; // no card affordable right now -- not worth a hint, it happens constantly
   if (result.card.role === 'defense'){ ui.setHint(`${who} activated ${result.card.name}!`); return; }
   if (result.card.role === 'heal'){ ui.setHint(`${who} healed with ${result.card.name}!`); return; }
-  if (result.targetIndex === -1){ ui.setHint('No target available!'); return; }
-  ui.setHint(`${result.card.name} dealt ${result.dmg} damage!`);
+  if (result.targetIndex === -1){ ui.setHint(`${who}: no target available!`); return; }
+  ui.setHint(`${who}: ${result.card.name} dealt ${result.dmg} damage!`);
 }
 
 function finishMatch(){
+  if (matchFinished) return;
+  matchFinished = true;
   if (state.winner === 'draw') ui.showBanner('Draw!', 'Both Tanks fell together.');
   else if (state.winner === 'you') ui.showBanner('You won the duel!', 'The rival Tank was defeated.');
   else ui.showBanner('You lost the duel.', 'Your Tank was defeated.');
@@ -195,7 +201,7 @@ function onPlayerCardClick(card){
   pendingAttack = null;
   ui.clearSelectable();
   if (card.role !== 'attack'){
-    playCardAndAdvance(card, -1);
+    playCard(card, -1);
     return;
   }
 
@@ -214,25 +220,19 @@ function onPlayerCardClick(card){
     onClick: () => {
       pendingAttack = null;
       ui.clearSelectable();
-      playCardAndAdvance(card, targetIndex);
+      playCard(card, targetIndex);
     },
   })));
 }
 
-function playCardAndAdvance(card, targetIndex){
+function playCard(card, targetIndex){
   const result = game.playerPlayCard(state, card, targetIndex);
   applyResultFx(result);
   syncUI();
   setHintForResult('you', result);
-  if (state.gameOver){ finishMatch(); return; }
-  setTimeout(() => {
-    state.turn = 'rival';
-    ui.setHint('The rival is thinking...');
-    runAiTurn();
-  }, 500);
 }
 
-// ================= Movement (once per your turn) =================
+// ================= Discrete move (cooldown-gated swap) =================
 moveBtn.addEventListener('click', () => {
   if (moveBtn.disabled) return;
   if (moveMode) cancelMoveMode();
@@ -281,8 +281,8 @@ function performMove(destIndex){
   ui.markMoveSource('you', src, false);
   const moved = game.moveLane(state, 'you', src, destIndex);
   if (moved){
-    ui.animateMove('you', src, state.youLanes[src].col);
-    ui.animateMove('you', destIndex, state.youLanes[destIndex].col);
+    ui.animateMove('you', src, state.youLanes[src].localPos);
+    ui.animateMove('you', destIndex, state.youLanes[destIndex].localPos);
   }
   moveMode = false;
   moveSource = null;
@@ -300,77 +300,108 @@ function cancelMoveMode(){
   updateMoveBtn();
 }
 
-// ================= Tank joystick (dedicated control, same 1/turn limit) =================
-// Push a direction to swap the Tank into that formation slot (col 1-4):
-// up-left/up-right are the front line (closer to the enemy and to the
-// Tank's own taunt radius), down-left/down-right are the back line.
-// "Up" on screen = toward the enemy, since the rival row renders above
-// yours.
+// ================= Tank joystick (continuous free-roam, no cooldown) =================
+// Holding the stick nudges the Tank around the formation's local space
+// every frame (see the game loop below) -- releasing just stops it where
+// it is. "Up" on the stick = toward the enemy (the rival row renders
+// above yours), since that's also the direction that brings it closer to
+// its own taunt radius against attackers.
 const JOY_MAX_PX = 24;
-const JOY_DEAD_ZONE_PX = 12;
-let joyDragging = false;
+const TANK_MOVE_SPEED = 1.8; // local units/sec at full stick deflection
+let joyHolding = false;
+let joyDirX = 0, joyDirZ = 0;
 let joyStartX = 0, joyStartY = 0;
-
-function quadrantFromDelta(dx, dy){
-  if (dy < 0) return dx < 0 ? 1 : 2; // front-left / front-right
-  return dx < 0 ? 3 : 4; // back-left / back-right
-}
-
-function moveTankToSlot(targetCol){
-  if (joystickWrap.classList.contains('disabled')) return;
-  cancelMoveMode();
-  const tankIdx = state.youLanes.findIndex(l => l.isTank);
-  if (tankIdx === -1 || state.youLanes[tankIdx].col === targetCol) return;
-  const destIdx = state.youLanes.findIndex(l => l.col === targetCol);
-  if (destIdx === -1) return;
-  const moved = game.moveLane(state, 'you', tankIdx, destIdx);
-  if (!moved) return;
-  ui.animateMove('you', tankIdx, state.youLanes[tankIdx].col);
-  ui.animateMove('you', destIdx, state.youLanes[destIdx].col);
-  updateMoveBtn();
-  updateJoystick();
-  ui.setHint('Tank moved! Choose a card to play.');
-}
 
 joystickBase.addEventListener('pointerdown', (e) => {
   if (joystickWrap.classList.contains('disabled')) return;
-  joyDragging = true;
+  cancelMoveMode();
+  joyHolding = true;
   joyStartX = e.clientX;
   joyStartY = e.clientY;
+  joyDirX = 0; joyDirZ = 0;
   joystickBase.setPointerCapture(e.pointerId);
 });
 joystickBase.addEventListener('pointermove', (e) => {
-  if (!joyDragging) return;
+  if (!joyHolding) return;
   const dx = e.clientX - joyStartX, dy = e.clientY - joyStartY;
   const dist = Math.min(Math.hypot(dx, dy), JOY_MAX_PX);
   const angle = Math.atan2(dy, dx);
   joystickKnob.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
+  const mag = dist / JOY_MAX_PX;
+  joyDirX = Math.cos(angle) * mag;
+  joyDirZ = -Math.sin(angle) * mag; // screen-up (negative dy) -> local +z (forward, toward the enemy)
 });
-function endJoystickDrag(e){
-  if (!joyDragging) return;
-  joyDragging = false;
+function endJoystickDrag(){
+  if (!joyHolding) return;
+  joyHolding = false;
+  joyDirX = 0; joyDirZ = 0;
   joystickKnob.style.transform = '';
-  const dx = e.clientX - joyStartX, dy = e.clientY - joyStartY;
-  if (Math.hypot(dx, dy) >= JOY_DEAD_ZONE_PX) moveTankToSlot(quadrantFromDelta(dx, dy));
+  const tankIdx = state.youLanes.findIndex(l => l.isTank);
+  if (tankIdx !== -1) ui.endLiveLanePosition('you', tankIdx);
 }
 joystickBase.addEventListener('pointerup', endJoystickDrag);
 joystickBase.addEventListener('pointercancel', endJoystickDrag);
 
-function runAiTurn(){
-  aiTakeTurn(state, {
-    onResolved: ({ bleedResults, result }) => {
-      applyBleedFx('rival', bleedResults);
+// ================= Real-time game loop =================
+// No turns: both sides regenerate energy and can play cards continuously;
+// the rival AI just acts on its own timer. One requestAnimationFrame loop
+// drives everything -- per-frame board/position updates are cheap (just
+// updating existing DOM refs), so only the heavier full re-renders (hand,
+// pips, piles) are throttled to a fixed interval.
+const UI_REFRESH_INTERVAL = 0.15;
+const AI_THINK_BASE = 1.5;
+const AI_THINK_JITTER = 1.0;
+let uiRefreshTimer = 0;
+let aiThinkTimer = AI_THINK_BASE;
+let lastFrameMs = null;
+
+function gameLoop(nowMs){
+  requestAnimationFrame(gameLoop);
+  if (!state || matchFinished){ lastFrameMs = nowMs; return; }
+  if (lastFrameMs == null) lastFrameMs = nowMs;
+  const dt = Math.min(0.1, (nowMs - lastFrameMs) / 1000);
+  lastFrameMs = nowMs;
+  if (state.gameOver){ finishMatch(); return; }
+
+  game.tickEnergyRealtime(state, dt);
+  game.tickMoveCooldown(state, dt);
+  const statusResults = game.tickStatusTimer(state, dt);
+  if (statusResults){
+    applyBleedFx('you', statusResults.you);
+    applyBleedFx('rival', statusResults.rival);
+  }
+  game.cullDeadHand(state);
+
+  if (joyHolding){
+    const tankIdx = state.youLanes.findIndex(l => l.isTank);
+    if (tankIdx !== -1 && state.youLanes[tankIdx].alive){
+      game.moveTankFreely(state, 'you', joyDirX * TANK_MOVE_SPEED * dt, joyDirZ * TANK_MOVE_SPEED * dt);
+      ui.setLiveLanePosition('you', tankIdx, state.youLanes[tankIdx].localPos);
+    }
+  }
+
+  aiThinkTimer -= dt;
+  if (aiThinkTimer <= 0){
+    aiThinkTimer = AI_THINK_BASE + Math.random() * AI_THINK_JITTER;
+    const result = aiMaybeAct(state);
+    if (result){
       applyResultFx(result);
-      syncUI();
-      setHintForResult('rival', result);
-      if (state.gameOver){ finishMatch(); return; }
-      setTimeout(() => {
-        const bleedYou = game.startYourTurn(state);
-        applyBleedFx('you', bleedYou);
-        syncUI();
-        if (state.gameOver){ finishMatch(); return; }
-        ui.setHint('Choose a card to play.');
-      }, 700);
-    },
-  });
+      if (!pendingAttack && !moveMode) setHintForResult('rival', result);
+    }
+  }
+
+  ui.updateBoard(state);
+
+  uiRefreshTimer += dt;
+  if (uiRefreshTimer >= UI_REFRESH_INTERVAL){
+    uiRefreshTimer = 0;
+    ui.renderPips(state);
+    ui.renderPiles(state);
+    ui.renderHand(state, { onPlay: onPlayerCardClick });
+    updateMoveBtn();
+    updateJoystick();
+  }
+
+  if (state.gameOver) finishMatch();
 }
+requestAnimationFrame(gameLoop);

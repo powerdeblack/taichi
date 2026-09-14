@@ -27,8 +27,8 @@ let elapsedTime = 0;
 // side:laneIndex -> { axie, side, laneIndex, targetPos, basePos, phase }
 const slots = new Map();
 const slotKey = (side, laneIndex) => side + ':' + laneIndex;
-const MOVE_LERP_SPEED = 6; // higher = snappier slide into the new column
-const PATROL_AMPLITUDE = 0.07; // how far units idly wander from their slot
+const MOVE_LERP_SPEED = 6; // higher = snappier slide into the new slot
+const PATROL_AMPLITUDE = 0.07; // how far idle units wander from their spot
 
 function ensureMixer(){
   if (!mixerPromise){
@@ -88,6 +88,7 @@ function animate(){
   elapsedTime += dt;
   slots.forEach(s => {
     if (s.axie && !s.axie.disposed) s.axie.update(dt);
+    if (s.live) return; // continuously driven from outside (the Tank while roaming) -- animate() shouldn't fight it
     if (s.targetPos){
       s.axie.wrapper.position.lerp(s.targetPos, Math.min(1, dt * MOVE_LERP_SPEED));
       if (s.axie.wrapper.position.distanceTo(s.targetPos) < 0.01){
@@ -97,8 +98,8 @@ function animate(){
       }
     } else if (s.basePos){
       // Idle "patrol": a small sway around the assigned slot so the board
-      // doesn't look frozen between turns -- purely cosmetic, doesn't
-      // touch the HTML overlay (projectLane keeps using the exact slot).
+      // doesn't look frozen when nothing's happening -- purely cosmetic,
+      // doesn't touch the HTML overlay (projectLane uses the exact spot).
       const t = elapsedTime + s.phase;
       s.axie.wrapper.position.x = s.basePos.x + Math.sin(t * 0.6) * PATROL_AMPLITUDE;
       s.axie.wrapper.position.z = s.basePos.z + Math.cos(t * 0.5) * PATROL_AMPLITUDE * 0.8;
@@ -108,12 +109,16 @@ function animate(){
 }
 
 // Formation slots, col 0..4: the Tank always starts at 0 (center); 1/2 are
-// the front line either side of it (closest to the enemy and to the
-// Tank's taunt radius), 3/4 are the back line (farther back, safer).
+// the front line either side of it (closest to the enemy and to its own
+// taunt radius), 3/4 are the back line (farther back, safer). These mirror
+// game.js's FORMATION_XZ exactly -- keep both in sync if you tune one.
 // Local {x,z} offsets are in the side's own facing space -- laneWorldPos
-// flips z for the far side so both formations face each other.
+// flips z for the far side so both formations face each other. Only
+// non-Tank lanes stay pinned to a slot; the Tank roams this same local
+// space freely (see game.js moveTankFreely) and its live {x,z} is passed
+// straight through instead of a slot lookup.
 const FORMATION = [
-  { x: 0,     z: 0 },     // 0: center (Tank)
+  { x: 0,     z: 0 },     // 0: center (Tank's default)
   { x: -1.05, z: 0.65 },  // 1: front-left
   { x: 1.05,  z: 0.65 },  // 2: front-right
   { x: -0.6,  z: -0.7 },  // 3: back-left
@@ -122,10 +127,9 @@ const FORMATION = [
 const COLS = FORMATION.length;
 const ROW_Z = { you: 1.5, rival: -1.5 };
 
-function laneWorldPos(side, col){
-  const slot = FORMATION[col] || FORMATION[0];
+function laneWorldPos(side, localXZ){
   const faceSign = side === 'you' ? -1 : 1; // "forward" (+z offset) means toward the enemy
-  return new THREE.Vector3(slot.x, 0, ROW_Z[side] + faceSign * slot.z);
+  return new THREE.Vector3(localXZ.x, 0, ROW_Z[side] + faceSign * localXZ.z);
 }
 
 // Flat isometric-style tiles under every formation slot, Apeiron-style --
@@ -150,7 +154,7 @@ function buildTiles(){
     const rimMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5 });
     const ringMat = new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.28, side: THREE.DoubleSide });
     for (let col=0; col<COLS; col++){
-      const pos = laneWorldPos(side, col);
+      const pos = laneWorldPos(side, FORMATION[col]);
       const isTankSlot = col === 0;
       const tile = new THREE.Mesh(isTankSlot ? tankTileGeo : tileGeo, isTankSlot ? tankMat : mat);
       tile.position.set(pos.x, -0.04, pos.z);
@@ -170,12 +174,12 @@ function buildTiles(){
   });
 }
 
-// Projects a lane's world position (by board column) to a [0..1] screen-
-// space fraction, for positioning an absolutely-positioned HTML overlay
+// Projects a lane's local {x,z} position to a [0..1] screen-space
+// fraction, for positioning an absolutely-positioned HTML overlay
 // (left/top in %) over it.
-export function projectLane(side, col){
+export function projectLane(side, localXZ){
   if (!camera) return null;
-  const pos = laneWorldPos(side, col);
+  const pos = laneWorldPos(side, localXZ);
   pos.y += 1.05; // float the tag above the model's head
   pos.project(camera);
   return { x: pos.x * 0.5 + 0.5, y: 1 - (pos.y * 0.5 + 0.5) };
@@ -184,8 +188,7 @@ export function projectLane(side, col){
 // Builds the 3D models for the current match's two squads (call once per
 // match start -- lane classes don't change mid-duel). Reuses the shared
 // renderer/scene; old slots from a previous match are disposed first.
-// Positions come from each lane's `col`, not its array index -- movement
-// changes col, not array position.
+// Positions come from each lane's live `localPos`, not its array index.
 export async function syncBoardAxies(youLanes, rivalLanes){
   const mixer = await ensureMixer();
   clearBoard3D();
@@ -194,7 +197,7 @@ export async function syncBoardAxies(youLanes, rivalLanes){
   const spawn = (side, lane, i) => (async () => {
     const descriptor = buildDescriptor(lane.classId);
     const axie = await mixer.create({ descriptor, quality: 'balanced', artMode: 'faithful', strict: true });
-    const basePos = laneWorldPos(side, lane.col);
+    const basePos = laneWorldPos(side, lane.localPos);
     axie.wrapper.position.copy(basePos);
     axie.wrapper.scale.setScalar(0.62);
     axie.wrapper.rotation.y = side === 'you' ? Math.PI : 0;
@@ -202,7 +205,7 @@ export async function syncBoardAxies(youLanes, rivalLanes){
     scene.add(axie.wrapper);
     axie.setLocomotion('idle');
     slots.set(slotKey(side, i), {
-      axie, side, laneIndex: i, targetPos: null,
+      axie, side, laneIndex: i, targetPos: null, live: false,
       basePos: basePos.clone(), phase: Math.random() * Math.PI * 2,
     });
   })();
@@ -218,13 +221,33 @@ export function setLaneAlive(side, laneIndex, alive){
   if (s) s.axie.wrapper.visible = alive;
 }
 
-// Slides a lane's 3D model toward its new column over the next few frames
-// (see animate()) instead of snapping -- the visible "movement" on the
-// board when moveLane() swaps two columns.
-export function moveLaneVisual(side, laneIndex, newCol){
+// Slides a lane's 3D model toward a new local {x,z} over the next few
+// frames (see animate()) instead of snapping -- the visible "movement" on
+// the board when moveLane() swaps two slots.
+export function moveLaneVisual(side, laneIndex, newLocalXZ){
   const s = slots.get(slotKey(side, laneIndex));
   if (!s) return;
-  s.targetPos = laneWorldPos(side, newCol);
+  s.live = false;
+  s.targetPos = laneWorldPos(side, newLocalXZ);
+}
+
+// Directly places a lane's 3D model at a local {x,z} this frame -- no
+// lerp, no patrol wobble -- for continuous per-frame control (the Tank
+// while its joystick is held). Call setLaneRoaming(side, laneIndex, false)
+// once the drag ends so idle patrol resumes around the new spot.
+export function setLaneLivePosition(side, laneIndex, localXZ){
+  const s = slots.get(slotKey(side, laneIndex));
+  if (!s) return;
+  s.live = true;
+  s.targetPos = null;
+  s.axie.wrapper.position.copy(laneWorldPos(side, localXZ));
+}
+
+export function setLaneRoaming(side, laneIndex, roaming){
+  const s = slots.get(slotKey(side, laneIndex));
+  if (!s) return;
+  s.live = roaming;
+  if (!roaming) s.basePos = s.axie.wrapper.position.clone();
 }
 
 export function clearBoard3D(){

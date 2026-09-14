@@ -1,15 +1,20 @@
-// Core board-duel rules: a 5-Axie squad per side, each Axie's power/
-// toughness/heal-strength computed from its own 5-card loadout (attack/
-// defense/heal counts -- see cards.js computeLaneStats), the classic class
-// triangle, and status effects (Bleed, Deathmark, Retain, Shield/Cleanse,
-// Ambush, the Pena combo). Targeting is manual: the player picks which
+// Core board-duel rules: a real-time (not turn-based) 5-Axie squad per
+// side, each Axie's power/toughness/heal-strength computed from its own
+// 5-card loadout (attack/defense/heal counts -- see cards.js
+// computeLaneStats), the classic class triangle, and status effects
+// (Bleed, Deathmark, Retain, Shield/Cleanse, Ambush, the Pena combo).
+// Both sides regenerate energy continuously and can play any affordable
+// card at any time -- there's no turn handoff; the rival AI just acts on
+// its own timer (see ai.js). Targeting is manual: the player picks which
 // enemy to hit among the legal targets for that card's range ('short' can
 // only reach an enemy sharing your board column, 'long' can reach anyone
-// alive); 'own' support cards act on the caster's own lane. Each lane also
-// has a mutable board `col` (0..SQUAD_SIZE-1) -- you can swap two of your
-// own lanes' columns once per turn (see moveLane) to dodge/set up short-
-// range matchups. Win condition: a team loses the instant its designated
-// Tank lane dies.
+// alive); 'own' support cards act on the caster's own lane. Every lane has
+// a `localPos` ({x,z}, in the same local space as FORMATION_XZ) -- for
+// non-Tank lanes it's just derived from their `col` slot and only changes
+// via the discrete moveLane swap (cooldown-gated); the Tank instead roams
+// that space freely and continuously (see moveTankFreely), which is what
+// the taunt radius below actually measures. Win condition: a team loses
+// the instant its designated Tank lane dies.
 import { axieById, classMultiplier, shuffle, buildLoadout, computeLaneStats, ALL_CLASSES, LOADOUT_SIZE, BASE_HP, BASE_MP } from './cards.js';
 
 export const MAX_ENERGY = 10;
@@ -36,19 +41,32 @@ export function randomSquad(){
   return picks;
 }
 
+// Formation slots, col 0..4: the Tank always starts at 0 (center); 1/2 are
+// the front line either side of it (closest to the enemy and to the
+// Tank's taunt radius), 3/4 are the back line (farther back, safer).
+// board3d.js's FORMATION mirrors these exact numbers for the 3D layout --
+// keep the two in sync if you tune one.
+export const FORMATION_XZ = [
+  { x: 0,     z: 0 },
+  { x: -1.05, z: 0.65 },
+  { x: 1.05,  z: 0.65 },
+  { x: -0.6,  z: -0.7 },
+  { x: 0.6,   z: -0.7 },
+];
+
 // The Tank always starts in the center formation slot (col 0); everyone
-// else fills the 4 surrounding slots in pick order. See board3d.js's
-// FORMATION for what each col actually looks like on the board.
+// else fills the 4 surrounding slots in pick order.
 function createLanes(picks){
   let nextCol = 1;
   return picks.map(({ classId, isTank, evolved, counts }) => {
     const axie = axieById(classId);
     const stats = computeLaneStats(counts, evolved);
+    const col = isTank ? 0 : nextCol++;
     return {
       classId, isTank, evolved: !!evolved, counts, name: axie.name, color: axie.color,
       maxHp: stats.maxHp, hp: stats.maxHp, mp: stats.mp,
       powerMult: stats.powerMult, damageReduction: stats.damageReduction,
-      status: {}, alive: true, col: isTank ? 0 : nextCol++,
+      status: {}, alive: true, col, localPos: { ...FORMATION_XZ[col] },
       cardPool: buildLoadout(classId, counts),
     };
   });
@@ -70,8 +88,8 @@ export function freshState(youPicks, rivalPicks){
     youLanes, rivalLanes,
     energyYou: 3, energyRival: 3,
     firstHitDone: false,
-    turn: 'you',
-    movedThisTurn: false,
+    moveCooldown: 0,
+    statusTimer: 0,
     deck, discard: [], hand,
     gameOver: false,
     winner: null,
@@ -89,7 +107,7 @@ export function drawCard(state){
   return card;
 }
 
-function cullDeadHand(state){
+export function cullDeadHand(state){
   let guard = 0;
   while (guard++ < 20){
     const deadIdx = state.hand.findIndex(c => !state.youLanes[c.laneIndex].alive);
@@ -104,33 +122,26 @@ export function aliveIndices(lanes){
   return lanes.map((l,i) => l.alive ? i : -1).filter(i => i >= 0);
 }
 
-// The Tank sits in the center formation slot and "taunts" -- any attacker
-// within this many formation-slots of the Tank is forced to hit it instead
-// of picking freely, regardless of the card's range. Mirrors the real
-// Origin Taunt/"Provocar" card: the Tank soaks hits for whoever's standing
-// near it. Distances come from a small hand-authored table (not raw col
-// difference) because the formation isn't a straight line: col 0 is the
-// center (Tank), 1/2 are the front line either side of it, 3/4 are the
-// back line -- see board3d.js's FORMATION for the matching visual layout.
-export const TAUNT_RADIUS = 1;
-const SLOT_DIST = [
-  [0,1,1,2,2],
-  [1,0,2,1,3],
-  [1,2,0,3,1],
-  [2,1,3,0,2],
-  [2,3,1,2,0],
-];
-function slotDistance(colA, colB){
-  return SLOT_DIST[colA]?.[colB] ?? Infinity;
+function localPosOf(lane){
+  return lane.isTank ? lane.localPos : FORMATION_XZ[lane.col];
 }
+
+// The Tank "taunts" -- any attacker whose position is within this local-
+// space radius of the Tank is forced to hit it instead of picking freely,
+// regardless of the card's range. Mirrors the real Origin Taunt/"Provocar"
+// card: the Tank soaks hits for whoever's standing near it. Since the Tank
+// can now roam continuously (see moveTankFreely), this is a real distance
+// check against its live position, not a fixed-slot lookup.
+export const TAUNT_RADIUS = 1.15;
 
 // Legal enemy targets for an attack card. If the caster is within the
 // enemy Tank's taunt radius, the Tank is the ONLY legal target. Otherwise:
-// 'short' can only reach an enemy currently sharing the caster's board
+// 'short' can only reach a non-Tank enemy sharing the caster's board
 // column (falls back to any alive enemy if nobody's there -- e.g. that
-// column's Axie already died); 'long' can reach any alive enemy. The
-// player picks among these; see pickAutoTarget for the rival AI's
-// automatic choice (which goes through this same taunt check).
+// column's Axie already died, or the only option left is a roaming Tank
+// outside taunt range); 'long' can reach any alive enemy. The player
+// picks among these; see pickAutoTarget for the rival AI's automatic
+// choice (which goes through this same taunt check).
 export function getLegalTargets(state, side, card, casterIndex){
   const ownLanes = side === 'you' ? state.youLanes : state.rivalLanes;
   const enemyLanes = side === 'you' ? state.rivalLanes : state.youLanes;
@@ -138,12 +149,13 @@ export function getLegalTargets(state, side, card, casterIndex){
   const alive = aliveIndices(enemyLanes);
 
   const tankIdx = enemyLanes.findIndex(l => l.isTank && l.alive);
-  if (tankIdx !== -1 && slotDistance(enemyLanes[tankIdx].col, casterLane.col) <= TAUNT_RADIUS){
-    return [tankIdx];
+  if (tankIdx !== -1){
+    const a = localPosOf(casterLane), b = enemyLanes[tankIdx].localPos;
+    if (Math.hypot(a.x - b.x, a.z - b.z) <= TAUNT_RADIUS) return [tankIdx];
   }
 
   if (card.range === 'short'){
-    const sameCol = alive.filter(i => enemyLanes[i].col === casterLane.col);
+    const sameCol = alive.filter(i => !enemyLanes[i].isTank && enemyLanes[i].col === casterLane.col);
     return sameCol.length ? sameCol : alive;
   }
   if (card.range === 'long') return alive;
@@ -164,17 +176,47 @@ export function pickAutoTarget(state, side, card, casterIndex){
 }
 
 // Swaps two of a side's own lanes' board columns -- the tactical payoff of
-// manual targeting: move your Tank out of a short-range attacker's column,
-// or line up your own short-range attacker on a juicy target. Once per
-// your turn; the rival AI doesn't move (kept simple on purpose).
+// manual targeting: move a lane out of a short-range attacker's column, or
+// line up your own short-range attacker on a juicy target. Cooldown-gated
+// instead of once-per-turn now that there are no turns; the rival AI
+// doesn't move (kept simple on purpose). Snaps both lanes' localPos back
+// to their new slot's formation position -- the Tank's free-roam offset
+// is reset if it gets moved this way (moveTankFreely is the live-roam
+// alternative).
+export const MOVE_COOLDOWN_SEC = 4;
 export function moveLane(state, side, sourceIndex, destIndex){
-  if (side === 'you' && state.movedThisTurn) return false;
+  if (side === 'you' && state.moveCooldown > 0) return false;
   const lanes = side === 'you' ? state.youLanes : state.rivalLanes;
   const src = lanes[sourceIndex], dest = lanes[destIndex];
   if (!src || !dest || sourceIndex === destIndex || !src.alive) return false;
   const tmp = src.col; src.col = dest.col; dest.col = tmp;
-  if (side === 'you') state.movedThisTurn = true;
+  src.localPos = { ...FORMATION_XZ[src.col] };
+  dest.localPos = { ...FORMATION_XZ[dest.col] };
+  if (side === 'you') state.moveCooldown = MOVE_COOLDOWN_SEC;
   return true;
+}
+
+export function tickMoveCooldown(state, dt){
+  if (state.moveCooldown > 0) state.moveCooldown = Math.max(0, state.moveCooldown - dt);
+}
+
+// The Tank's dedicated free-roam control (the joystick): nudges it by
+// (dx,dz) in local space, clamped to a radius around the formation center
+// so it can't wander into the enemy's half of the board. Unlike moveLane
+// this has no cooldown -- it's continuous positioning, not a discrete
+// action -- and only ever targets whichever lane is marked Tank.
+export const TANK_ROAM_RADIUS = 1.6;
+export function moveTankFreely(state, side, dx, dz){
+  const lanes = side === 'you' ? state.youLanes : state.rivalLanes;
+  const tank = lanes.find(l => l.isTank && l.alive);
+  if (!tank) return;
+  let x = tank.localPos.x + dx, z = tank.localPos.z + dz;
+  const dist = Math.hypot(x, z);
+  if (dist > TANK_ROAM_RADIUS){
+    const s = TANK_ROAM_RADIUS / dist;
+    x *= s; z *= s;
+  }
+  tank.localPos = { x, z };
 }
 
 function applyDamage(lane, amount, attackerClassId, casterLane){
@@ -311,22 +353,30 @@ function tickStatuses(lanes){
   return results;
 }
 
-export function startYourTurn(state){
-  const bleedResults = tickStatuses(state.youLanes);
-  checkGameOver(state);
-  if (state.gameOver) return bleedResults;
-  state.energyYou = Math.min(MAX_ENERGY, state.energyYou + 2);
-  state.turn = 'you';
-  state.movedThisTurn = false;
-  cullDeadHand(state);
-  return bleedResults;
+// ================= Real-time ticking =================
+// No more turn handoff: both sides regenerate energy continuously and
+// status effects tick on a fixed interval regardless of who's "acting".
+// main.js drives all of this from one requestAnimationFrame loop.
+export const ENERGY_REGEN_PER_SEC = 0.6; // ~ +3 energy every 5s
+export const STATUS_TICK_INTERVAL = 2; // seconds between Bleed/Poison ticks
+
+export function tickEnergyRealtime(state, dt){
+  if (state.gameOver) return;
+  state.energyYou = Math.min(MAX_ENERGY, state.energyYou + ENERGY_REGEN_PER_SEC * dt);
+  state.energyRival = Math.min(MAX_ENERGY, state.energyRival + ENERGY_REGEN_PER_SEC * dt);
 }
 
-export function startRivalPrep(state){
-  const bleedResults = tickStatuses(state.rivalLanes);
+// Returns { you, rival } tick results (each an array like tickStatuses'
+// output) once STATUS_TICK_INTERVAL has elapsed, else null.
+export function tickStatusTimer(state, dt){
+  if (state.gameOver) return null;
+  state.statusTimer += dt;
+  if (state.statusTimer < STATUS_TICK_INTERVAL) return null;
+  state.statusTimer -= STATUS_TICK_INTERVAL;
+  const you = tickStatuses(state.youLanes);
+  const rival = tickStatuses(state.rivalLanes);
   checkGameOver(state);
-  if (!state.gameOver) state.energyRival = Math.min(MAX_ENERGY, state.energyRival + 2);
-  return bleedResults;
+  return { you, rival };
 }
 
 export function checkGameOver(state){
@@ -336,7 +386,6 @@ export function checkGameOver(state){
   const rivalDead = !rivalTank || !rivalTank.alive;
   if (youDead || rivalDead){
     state.gameOver = true;
-    state.turn = 'over';
     state.winner = (youDead && rivalDead) ? 'draw' : (rivalDead ? 'you' : 'rival');
   }
 }
