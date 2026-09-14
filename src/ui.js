@@ -2,7 +2,7 @@
 // pips, pile counts, and the win/lose banner. No game rules live here.
 import { MAX_ENERGY, LOADOUT_SIZE } from './game.js';
 import { portraitHTML } from './axieArt.js';
-import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive } from './board3d.js';
+import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive, moveLaneVisual } from './board3d.js';
 
 const rosterGrid = document.getElementById('rosterGrid');
 const squadListEl = document.getElementById('squadList');
@@ -104,6 +104,8 @@ const boardOverlay = document.getElementById('boardOverlay');
 let board3dReady = null;
 let unitRefs = { you: [], rival: [] };
 let resizeListenerBound = false;
+let currentState = null;
+let activeSelectable = []; // { ref, cssClass, handler } -- see setSelectable/clearSelectable
 
 function statusLabel(key){
   return {bleed:'🩸 Bleed', poison:'☠️ Poison', deathmark:'💀 Mark', shield:'🛡️ Shield'}[key] || key;
@@ -131,10 +133,16 @@ function buildUnitTag(){
   };
 }
 
+// Overlay position tracks each lane's board `col` (mutable via movement),
+// not its array index -- repositionUnits reads it off the live game state.
 function repositionUnits(){
+  if (!currentState) return;
   ['you','rival'].forEach(side => {
+    const lanes = side === 'you' ? currentState.youLanes : currentState.rivalLanes;
     unitRefs[side].forEach((ref, i) => {
-      const p = projectLane(side, i);
+      const lane = lanes[i];
+      if (!ref || !lane) return;
+      const p = projectLane(side, lane.col);
       if (!p) return;
       ref.wrap.style.left = (p.x*100) + '%';
       ref.wrap.style.top = (p.y*100) + '%';
@@ -143,6 +151,7 @@ function repositionUnits(){
 }
 
 export function buildBoard(state){
+  currentState = state;
   boardOverlay.innerHTML = '';
   unitRefs = {
     you: state.youLanes.map(() => buildUnitTag()),
@@ -166,8 +175,49 @@ export function buildBoard(state){
 }
 
 export function updateBoard(state){
+  currentState = state;
   state.youLanes.forEach((lane, i) => updateUnit(unitRefs.you[i], lane, 'you', i));
   state.rivalLanes.forEach((lane, i) => updateUnit(unitRefs.rival[i], lane, 'rival', i));
+  repositionUnits();
+}
+
+// Animates a lane's overlay tag sliding to its new column (in lockstep with
+// the 3D model's slide, see board3d.js moveLaneVisual) and triggers the 3D
+// slide itself.
+export function animateMove(side, laneIndex, newCol){
+  moveLaneVisual(side, laneIndex, newCol);
+  repositionUnits();
+}
+
+// Highlights a set of unit chips as clickable (targeting an enemy, or
+// picking a lane to move) and wires a click handler on each. Call
+// clearSelectable() to remove any previous highlight/handlers first --
+// setSelectable does this automatically.
+export function setSelectable(entries){
+  clearSelectable();
+  entries.forEach(({ side, laneIndex, cssClass, onClick }) => {
+    const ref = unitRefs[side] && unitRefs[side][laneIndex];
+    if (!ref) return;
+    ref.chip.classList.add(cssClass);
+    ref.chip.style.pointerEvents = 'auto';
+    const handler = (e) => { e.stopPropagation(); onClick(); };
+    ref.chip.addEventListener('click', handler);
+    activeSelectable.push({ ref, cssClass, handler });
+  });
+}
+
+export function clearSelectable(){
+  activeSelectable.forEach(({ ref, cssClass, handler }) => {
+    ref.chip.classList.remove(cssClass);
+    ref.chip.style.pointerEvents = '';
+    ref.chip.removeEventListener('click', handler);
+  });
+  activeSelectable = [];
+}
+
+export function markMoveSource(side, laneIndex, on){
+  const ref = unitRefs[side] && unitRefs[side][laneIndex];
+  if (ref) ref.chip.classList.toggle('move-source', on);
 }
 
 function updateUnit(ref, lane, side, laneIndex){

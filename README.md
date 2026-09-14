@@ -61,6 +61,18 @@ npm run preview
   equipar.
 - Cartas de **ataque não gastam energia** (custo 0); defesa/cura seguem
   custando energia normalmente, regenerando por turno.
+- **Mira manual**: jogar uma carta de ataque não resolve sozinho — abre um
+  modo de mira que destaca (com brilho pulsante) os inimigos legais pra
+  aquele alcance, e você toca em qual quer acertar. Curto alcance só pode
+  acertar quem estiver **na sua mesma coluna** no tabuleiro (cai pra
+  "qualquer um vivo" se não houver ninguém lá); longo alcance pode acertar
+  qualquer inimigo vivo. O rival ainda mira automático (curto = mesma
+  coluna, longo = o mais fraco).
+- **Movimento**: uma vez por turno, dá pra trocar a coluna de um dos seus
+  próprios Axies com outra (toca "Mover", toca o Axie, toca o destino). É a
+  ferramenta tática pro sistema de mira acima — tira seu Tanque da coluna
+  de um atacante de curto alcance inimigo, ou reposiciona pra alinhar seu
+  próprio curto alcance num alvo específico.
 - Status effects: Bleed, **Poison** (empilha, bate 2x a stack atual e decai 1
   stack por turno — mais forte no início, some sozinho), Deathmark, Retain,
   Shield/Cleanse, Ambush (2x dano no 1º acerto) e o combo da Pena.
@@ -87,20 +99,26 @@ calibradas pra pools de HP de centenas de pontos, aqui pra ~100-150.
 - `src/cards.js` — roster de 6 Axies (2 cartas de ataque cada), cartas de
   defesa/cura universais, triângulo de classes, fórmula de stats por
   contagem de cartas (`computeLaneStats`)
-- `src/game.js` — estado do duelo, N linhas por lado, dano, cura, status
-  effects, condição de vitória (Tanque)
-- `src/ai.js` — turno do rival
+- `src/game.js` — estado do duelo, N linhas por lado (cada uma com um `col`
+  mutável = posição no tabuleiro), dano, cura, status effects, mira manual
+  (`getLegalTargets`/`pickAutoTarget`), movimento (`moveLane`), condição de
+  vitória (Tanque)
+- `src/ai.js` — turno do rival (mira automática via `pickAutoTarget`, não
+  move lanes)
 - `src/render.js` — feedback visual via DOM (números flutuantes, flash, shake)
 - `src/ui.js` — HUD/DOM (montagem de esquadrão com steppers de loadout,
-  overlay de HP/nome/status sobre o tabuleiro 3D, mão, energia, banner)
+  overlay de HP/nome/status sobre o tabuleiro 3D, destaque de alvo/movimento
+  clicável (`setSelectable`), mão, energia, banner)
 - `src/axieArt.js` — arte SVG original por classe, usada só no team picker
   (roster/esquadrão) como fallback quando o 3D não carrega
 - `src/axie3d.js` — preview 3D real (Axie Mixer 3D) no team picker (1 Axie
   por vez)
 - `src/board3d.js` — o tabuleiro de duelo em si: uma cena three.js
   **compartilhada** (1 renderer/câmera só) com até 10 Axies 3D reais (5 de
-  cada lado) em pé em duas fileiras se encarando, estilo Apeiron. HP/nome/
-  status ficam em HTML posicionado por cima via projeção de câmera
+  cada lado) em pé em duas fileiras se encarando sobre tiles em losango
+  (laranja/azul, estilo Apeiron), posicionados pelo `col` de cada lane —
+  movimento anima o Axie deslizando pra nova coluna (`moveLaneVisual`). HP/
+  nome/status ficam em HTML posicionado por cima via projeção de câmera
   (`projectLane`) — não são modelos 3D
 - `src/main.js` — entrada: wiring de DOM e o loop de turnos
 

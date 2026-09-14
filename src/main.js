@@ -13,11 +13,15 @@ const startDuelBtn = document.getElementById('startDuelBtn');
 const switchDeckBtn = document.getElementById('switchDeckBtn');
 const resetBtn = document.getElementById('resetBtn');
 const boardEl = document.getElementById('board');
+const moveBtn = document.getElementById('moveBtn');
 
 let squad = []; // [{ classId, isTank, counts:{attack,defense,heal} }] -- up to SQUAD_SIZE
 let state = null;
 let lastYouSquad = [];
 let lastRivalSquad = [];
+let pendingAttack = null; // the attack card currently awaiting a manual target, if any
+let moveMode = false;
+let moveSource = null; // laneIndex of the Axie picked up, mid move-selection
 
 // ================= Team builder =================
 function renderTeamScreen(){
@@ -93,6 +97,9 @@ function beginMatch(youSquad, rivalSquad){
   lastYouSquad = youSquad;
   lastRivalSquad = rivalSquad;
   state = game.freshState(youSquad, rivalSquad);
+  pendingAttack = null;
+  moveMode = false;
+  moveSource = null;
   ui.hideBanner();
   ui.buildBoard(state);
   syncUI();
@@ -104,6 +111,14 @@ function syncUI(){
   ui.renderPips(state);
   ui.renderPiles(state);
   ui.renderHand(state, { onPlay: onPlayerCardClick });
+  updateMoveBtn();
+}
+
+function updateMoveBtn(){
+  const canMove = state.turn === 'you' && !state.gameOver && !state.movedThisTurn;
+  moveBtn.disabled = !canMove;
+  moveBtn.classList.toggle('active', moveMode);
+  moveBtn.textContent = state.movedThisTurn ? '🔀 Already moved this turn' : '🔀 Move an Axie (1 / turn)';
 }
 
 function applyResultFx(result){
@@ -165,7 +180,33 @@ function finishMatch(){
 }
 
 function onPlayerCardClick(card){
-  const result = game.playerPlayCard(state, card);
+  cancelMoveMode();
+  pendingAttack = null;
+  ui.clearSelectable();
+  if (card.role !== 'attack'){
+    playCardAndAdvance(card, -1);
+    return;
+  }
+
+  const legal = game.getLegalTargets(state, 'you', card, card.laneIndex);
+  if (!legal.length){
+    ui.setHint('No target available!');
+    return;
+  }
+  pendingAttack = card;
+  ui.setHint(`${card.name}: choose which enemy to hit.`);
+  ui.setSelectable(legal.map(targetIndex => ({
+    side: 'rival', laneIndex: targetIndex, cssClass: 'targetable',
+    onClick: () => {
+      pendingAttack = null;
+      ui.clearSelectable();
+      playCardAndAdvance(card, targetIndex);
+    },
+  })));
+}
+
+function playCardAndAdvance(card, targetIndex){
+  const result = game.playerPlayCard(state, card, targetIndex);
   applyResultFx(result);
   syncUI();
   setHintForResult('you', result);
@@ -175,6 +216,73 @@ function onPlayerCardClick(card){
     ui.setHint('The rival is thinking...');
     runAiTurn();
   }, 500);
+}
+
+// ================= Movement (once per your turn) =================
+moveBtn.addEventListener('click', () => {
+  if (moveBtn.disabled) return;
+  if (moveMode) cancelMoveMode();
+  else startMoveMode();
+});
+
+function startMoveMode(){
+  pendingAttack = null;
+  ui.clearSelectable();
+  moveMode = true;
+  moveSource = null;
+  updateMoveBtn();
+  ui.setHint('Move: tap one of your own Axies to pick it up.');
+  offerMoveSourceSelection();
+}
+
+function offerMoveSourceSelection(){
+  const entries = state.youLanes
+    .map((lane, i) => ({ lane, i }))
+    .filter(({ lane }) => lane.alive)
+    .map(({ i }) => ({
+      side: 'you', laneIndex: i, cssClass: 'selectable-move',
+      onClick: () => pickMoveSource(i),
+    }));
+  ui.setSelectable(entries);
+}
+
+function pickMoveSource(laneIndex){
+  moveSource = laneIndex;
+  ui.clearSelectable();
+  ui.markMoveSource('you', laneIndex, true);
+  ui.setHint('Move: now tap where it should swap to.');
+  const entries = state.youLanes
+    .map((lane, i) => ({ lane, i }))
+    .filter(({ i }) => i !== moveSource)
+    .map(({ i }) => ({
+      side: 'you', laneIndex: i, cssClass: 'selectable-move',
+      onClick: () => performMove(i),
+    }));
+  ui.setSelectable(entries);
+}
+
+function performMove(destIndex){
+  const src = moveSource;
+  ui.clearSelectable();
+  ui.markMoveSource('you', src, false);
+  const moved = game.moveLane(state, 'you', src, destIndex);
+  if (moved){
+    ui.animateMove('you', src, state.youLanes[src].col);
+    ui.animateMove('you', destIndex, state.youLanes[destIndex].col);
+  }
+  moveMode = false;
+  moveSource = null;
+  updateMoveBtn();
+  ui.setHint(moved ? 'Axie moved! Choose a card to play.' : 'Choose a card to play.');
+}
+
+function cancelMoveMode(){
+  if (!moveMode) return;
+  if (moveSource !== null) ui.markMoveSource('you', moveSource, false);
+  ui.clearSelectable();
+  moveMode = false;
+  moveSource = null;
+  updateMoveBtn();
 }
 
 function runAiTurn(){

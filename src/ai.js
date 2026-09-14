@@ -1,7 +1,9 @@
 // Rival AI: after its energy/bleed tick, gathers every card its alive lanes
 // can currently afford (from each lane's own loadout) and plays one at
-// random. Simple on purpose.
-import { startRivalPrep, resolveCard } from './game.js';
+// random. Targets are picked automatically (pickAutoTarget) -- the rival
+// doesn't get the player's manual targeting UI. Simple on purpose; the AI
+// doesn't move lanes either.
+import { startRivalPrep, resolveCard, pickAutoTarget } from './game.js';
 
 export function aiTakeTurn(state, { onResolved }){
   const bleedResults = startRivalPrep(state);
@@ -21,7 +23,8 @@ export function aiTakeTurn(state, { onResolved }){
   setTimeout(() => {
     const casterIndex = card.laneIndex;
     state.energyRival -= card.cost;
-    const result = resolveCard(state, 'rival', card, casterIndex);
+    const targetIndex = card.role === 'attack' ? pickAutoTarget(state, 'rival', card, casterIndex) : -1;
+    const result = resolveCard(state, 'rival', card, casterIndex, targetIndex);
     onResolved({ bleedResults, result });
   }, 900);
 }

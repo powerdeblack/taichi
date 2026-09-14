@@ -2,10 +2,14 @@
 // toughness/heal-strength computed from its own 5-card loadout (attack/
 // defense/heal counts -- see cards.js computeLaneStats), the classic class
 // triangle, and status effects (Bleed, Deathmark, Retain, Shield/Cleanse,
-// Ambush, the Pena combo). Targeting: 'short' cards hit the mirrored enemy
-// lane, 'long' cards hit whichever enemy lane has the least HP, 'own'
-// support cards act on the caster's own lane. Win condition: a team loses
-// the instant its designated Tank lane dies.
+// Ambush, the Pena combo). Targeting is manual: the player picks which
+// enemy to hit among the legal targets for that card's range ('short' can
+// only reach an enemy sharing your board column, 'long' can reach anyone
+// alive); 'own' support cards act on the caster's own lane. Each lane also
+// has a mutable board `col` (0..SQUAD_SIZE-1) -- you can swap two of your
+// own lanes' columns once per turn (see moveLane) to dodge/set up short-
+// range matchups. Win condition: a team loses the instant its designated
+// Tank lane dies.
 import { axieById, classMultiplier, shuffle, buildLoadout, computeLaneStats, ALL_CLASSES, LOADOUT_SIZE, BASE_HP, BASE_MP } from './cards.js';
 
 export const MAX_ENERGY = 10;
@@ -33,14 +37,14 @@ export function randomSquad(){
 }
 
 function createLanes(picks){
-  return picks.map(({ classId, isTank, evolved, counts }) => {
+  return picks.map(({ classId, isTank, evolved, counts }, i) => {
     const axie = axieById(classId);
     const stats = computeLaneStats(counts, evolved);
     return {
       classId, isTank, evolved: !!evolved, counts, name: axie.name, color: axie.color,
       maxHp: stats.maxHp, hp: stats.maxHp, mp: stats.mp,
       powerMult: stats.powerMult, damageReduction: stats.damageReduction,
-      status: {}, alive: true,
+      status: {}, alive: true, col: i,
       cardPool: buildLoadout(classId, counts),
     };
   });
@@ -63,6 +67,7 @@ export function freshState(youPicks, rivalPicks){
     energyYou: 3, energyRival: 3,
     firstHitDone: false,
     turn: 'you',
+    movedThisTurn: false,
     deck, discard: [], hand,
     gameOver: false,
     winner: null,
@@ -91,24 +96,53 @@ function cullDeadHand(state){
   }
 }
 
-function aliveIndices(lanes){
+export function aliveIndices(lanes){
   return lanes.map((l,i) => l.alive ? i : -1).filter(i => i >= 0);
 }
 
-function lowestHpIndex(lanes){
-  const alive = aliveIndices(lanes);
-  if (!alive.length) return -1;
-  return alive.reduce((best,i) => (lanes[i].hp < lanes[best].hp ? i : best), alive[0]);
+// Legal enemy targets for an attack card: 'short' can only reach an enemy
+// currently sharing the caster's board column (falls back to any alive
+// enemy if nobody's there -- e.g. that column's Axie already died);
+// 'long' can reach any alive enemy. The player picks among these; see
+// pickAutoTarget for the rival AI's automatic choice.
+export function getLegalTargets(state, side, card, casterIndex){
+  const ownLanes = side === 'you' ? state.youLanes : state.rivalLanes;
+  const enemyLanes = side === 'you' ? state.rivalLanes : state.youLanes;
+  const casterLane = ownLanes[casterIndex];
+  const alive = aliveIndices(enemyLanes);
+  if (card.range === 'short'){
+    const sameCol = alive.filter(i => enemyLanes[i].col === casterLane.col);
+    return sameCol.length ? sameCol : alive;
+  }
+  if (card.range === 'long') return alive;
+  return [];
 }
 
-function resolveTargetLane(enemyLanes, casterIndex, range){
-  if (range === 'short'){
-    if (enemyLanes[casterIndex] && enemyLanes[casterIndex].alive) return casterIndex;
-    const alive = aliveIndices(enemyLanes);
-    return alive.length ? alive[0] : -1;
+// The rival AI doesn't get an interactive target picker: short range picks
+// whoever's legal (usually the same-column enemy), long range picks the
+// legal target with the least HP.
+export function pickAutoTarget(state, side, card, casterIndex){
+  const legal = getLegalTargets(state, side, card, casterIndex);
+  if (!legal.length) return -1;
+  if (card.range === 'long'){
+    const enemyLanes = side === 'you' ? state.rivalLanes : state.youLanes;
+    return legal.reduce((best,i) => (enemyLanes[i].hp < enemyLanes[best].hp ? i : best), legal[0]);
   }
-  if (range === 'long') return lowestHpIndex(enemyLanes);
-  return -1;
+  return legal[0];
+}
+
+// Swaps two of a side's own lanes' board columns -- the tactical payoff of
+// manual targeting: move your Tank out of a short-range attacker's column,
+// or line up your own short-range attacker on a juicy target. Once per
+// your turn; the rival AI doesn't move (kept simple on purpose).
+export function moveLane(state, side, sourceIndex, destIndex){
+  if (side === 'you' && state.movedThisTurn) return false;
+  const lanes = side === 'you' ? state.youLanes : state.rivalLanes;
+  const src = lanes[sourceIndex], dest = lanes[destIndex];
+  if (!src || !dest || sourceIndex === destIndex || !src.alive) return false;
+  const tmp = src.col; src.col = dest.col; dest.col = tmp;
+  if (side === 'you') state.movedThisTurn = true;
+  return true;
 }
 
 function applyDamage(lane, amount, attackerClassId, casterLane){
@@ -174,9 +208,12 @@ function applyShield(lane, cleanse){
   if (cleanse){ delete lane.status.bleed; delete lane.status.deathmark; }
 }
 
-// Applies one card's effect and mutates state. Returns a result descriptor
-// used by main.js to drive floating-text/shake feedback.
-export function resolveCard(state, side, card, casterIndex){
+// Applies one card's effect and mutates state. `targetIndex` is required
+// for attack cards (the player or AI already picked it -- see
+// getLegalTargets/pickAutoTarget); defense/heal cards ignore it and always
+// act on the caster's own lane. Returns a result descriptor used by main.js
+// to drive floating-text/shake feedback.
+export function resolveCard(state, side, card, casterIndex, targetIndex){
   const ownLanes = side === 'you' ? state.youLanes : state.rivalLanes;
   const enemyLanes = side === 'you' ? state.rivalLanes : state.youLanes;
   const casterLane = ownLanes[casterIndex];
@@ -196,8 +233,7 @@ export function resolveCard(state, side, card, casterIndex){
     return result;
   }
 
-  const targetIndex = resolveTargetLane(enemyLanes, casterIndex, card.range);
-  if (targetIndex === -1) return result;
+  if (targetIndex == null || targetIndex < 0 || !enemyLanes[targetIndex] || !enemyLanes[targetIndex].alive) return result;
   const targetLane = enemyLanes[targetIndex];
 
   const ambush = !state.firstHitDone && card.effect === 'ambush';
@@ -221,7 +257,7 @@ export function resolveCard(state, side, card, casterIndex){
   return result;
 }
 
-export function playerPlayCard(state, card){
+export function playerPlayCard(state, card, targetIndex){
   const casterIndex = card.laneIndex;
   state.energyYou -= card.cost;
   if (card.effect !== 'retain'){
@@ -229,7 +265,7 @@ export function playerPlayCard(state, card){
     state.discard.push(card);
     drawCard(state);
   }
-  return resolveCard(state, 'you', card, casterIndex);
+  return resolveCard(state, 'you', card, casterIndex, targetIndex);
 }
 
 function tickStatuses(lanes){
@@ -249,6 +285,7 @@ export function startYourTurn(state){
   if (state.gameOver) return bleedResults;
   state.energyYou = Math.min(MAX_ENERGY, state.energyYou + 2);
   state.turn = 'you';
+  state.movedThisTurn = false;
   cullDeadHand(state);
   return bleedResults;
 }

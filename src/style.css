@@ -225,15 +225,28 @@ h1{
 .unit-tag{
   position:absolute; transform:translate(-50%,-100%);
   width:78px; pointer-events:none;
+  transition:left .4s ease, top .4s ease;
 }
 .unit-chip{
   position:relative; border-radius:10px; padding:4px 6px;
   background:#1c130cd0; border:1px solid #ffffff25; backdrop-filter:blur(2px);
-  transition:background .15s ease, opacity .3s ease;
+  transition:background .15s ease, opacity .3s ease, box-shadow .15s ease;
 }
 .unit-chip.dead{ opacity:.35; filter:grayscale(1); }
 .unit-chip.lane-hit{ background:#b8452fcc; }
 .unit-chip.lane-heal{ background:#3f6b4acc; }
+.unit-chip.targetable{
+  cursor:pointer; box-shadow:0 0 0 2px #ffd23f, 0 0 12px 2px #ffd23f80;
+  animation:target-pulse 1s ease-in-out infinite;
+}
+.unit-chip.selectable-move{
+  cursor:pointer; box-shadow:0 0 0 2px #8fd0ff, 0 0 10px 2px #8fd0ff70;
+}
+.unit-chip.move-source{ box-shadow:0 0 0 2px var(--gold), 0 0 10px 2px #d9b44a90; }
+@keyframes target-pulse{
+  0%,100%{ box-shadow:0 0 0 2px #ffd23f, 0 0 8px 1px #ffd23f60; }
+  50%{ box-shadow:0 0 0 2px #ffd23f, 0 0 16px 4px #ffd23fb0; }
+}
 .lane-name{
   font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.6rem;
   margin-bottom:3px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
@@ -291,6 +304,14 @@ h1{
 .pile-counts{
   font-size:.68rem; color:var(--text-dim); display:flex; gap:10px; font-weight:700;
 }
+.action-row{display:flex; justify-content:center; margin-bottom:8px;}
+.move-btn{
+  font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.74rem;
+  color:var(--text-light); background:#4a382480; border:1px solid #ffffff25;
+  padding:6px 16px; border-radius:20px; cursor:pointer;
+}
+.move-btn.active{ background:var(--aqua); color:#fff; border-color:var(--aqua); }
+.move-btn:disabled{ opacity:.4; cursor:default; }
 .hand{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
 .hint{text-align:center; font-size:.72rem; color:var(--text-dim); margin-top:10px; min-height:16px;}
 .btn-row{display:flex; gap:10px; margin-top:14px; justify-content:center;}
