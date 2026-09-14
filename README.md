@@ -73,6 +73,14 @@ npm run preview
   ferramenta tática pro sistema de mira acima — tira seu Tanque da coluna
   de um atacante de curto alcance inimigo, ou reposiciona pra alinhar seu
   próprio curto alcance num alvo específico.
+- **Formação e Provocação (Taunt)**: cada lado forma um losango — o Tanque
+  sempre nasce no **centro** (tile dourado brilhante, com um anel de raio),
+  e os outros 4 Axies ficam 2 na frente/2 atrás ao redor dele. Quem ataca
+  **da linha de frente** (perto do Tanque) é **obrigado** a mirar nele,
+  não importa o alcance da carta — igual à carta real "Provocar" do
+  Origin. A linha de trás fica livre pra mirar em qualquer inimigo vivo.
+  Mover um Axie pra linha de frente/trás muda essa exposição em tempo
+  real — é o motivo tático de usar o movimento.
 - Status effects: Bleed, **Poison** (empilha, bate 2x a stack atual e decai 1
   stack por turno — mais forte no início, some sozinho), Deathmark, Retain,
   Shield/Cleanse, Ambush (2x dano no 1º acerto) e o combo da Pena.
@@ -80,7 +88,6 @@ npm run preview
   dá +15% flat em poder/HP/MP daquele loadout inteiro — nossa versão do
   padrão de evolução de carta do Origin (α → base → **+**), sem reintroduzir
   o sistema de breeding (a Sky Mavis já resolve isso).
-- Clicar numa carta jogável resolve a ação na hora — sem mira manual.
 
 ### Cartas reskinadas com nomes reais do Axie Origin
 
@@ -100,9 +107,10 @@ calibradas pra pools de HP de centenas de pontos, aqui pra ~100-150.
   defesa/cura universais, triângulo de classes, fórmula de stats por
   contagem de cartas (`computeLaneStats`)
 - `src/game.js` — estado do duelo, N linhas por lado (cada uma com um `col`
-  mutável = posição no tabuleiro), dano, cura, status effects, mira manual
-  (`getLegalTargets`/`pickAutoTarget`), movimento (`moveLane`), condição de
-  vitória (Tanque)
+  mutável = slot na formação: 0 é o centro/Tanque, 1-4 são frente/trás),
+  dano, cura, status effects, mira manual + Provocação do Tanque
+  (`getLegalTargets`/`TAUNT_RADIUS`/`pickAutoTarget`), movimento
+  (`moveLane`), condição de vitória (Tanque)
 - `src/ai.js` — turno do rival (mira automática via `pickAutoTarget`, não
   move lanes)
 - `src/render.js` — feedback visual via DOM (números flutuantes, flash, shake)
@@ -115,11 +123,14 @@ calibradas pra pools de HP de centenas de pontos, aqui pra ~100-150.
   por vez)
 - `src/board3d.js` — o tabuleiro de duelo em si: uma cena three.js
   **compartilhada** (1 renderer/câmera só) com até 10 Axies 3D reais (5 de
-  cada lado) em pé em duas fileiras se encarando sobre tiles em losango
-  (laranja/azul, estilo Apeiron), posicionados pelo `col` de cada lane —
-  movimento anima o Axie deslizando pra nova coluna (`moveLaneVisual`). HP/
-  nome/status ficam em HTML posicionado por cima via projeção de câmera
-  (`projectLane`) — não são modelos 3D
+  cada lado) sobre tiles em losango (laranja/azul, estilo Apeiron) numa
+  **formação centrada no Tanque** (`FORMATION`: centro + frente/trás),
+  com um tile maior e anel pulsante no slot do Tanque marcando o raio de
+  Provocação. Cada Axie balança sutilmente perto da sua posição quando
+  não é o turno dele ("patrulha"), e desliza suavemente pra nova coluna
+  quando move (`moveLaneVisual`). HP/nome/status ficam em HTML
+  posicionado por cima via projeção de câmera (`projectLane`) — não são
+  modelos 3D
 - `src/main.js` — entrada: wiring de DOM e o loop de turnos
 
 `axie-duel-prototype.html` na raiz é o protótipo original (mira física de

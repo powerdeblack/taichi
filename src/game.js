@@ -36,15 +36,19 @@ export function randomSquad(){
   return picks;
 }
 
+// The Tank always starts in the center formation slot (col 0); everyone
+// else fills the 4 surrounding slots in pick order. See board3d.js's
+// FORMATION for what each col actually looks like on the board.
 function createLanes(picks){
-  return picks.map(({ classId, isTank, evolved, counts }, i) => {
+  let nextCol = 1;
+  return picks.map(({ classId, isTank, evolved, counts }) => {
     const axie = axieById(classId);
     const stats = computeLaneStats(counts, evolved);
     return {
       classId, isTank, evolved: !!evolved, counts, name: axie.name, color: axie.color,
       maxHp: stats.maxHp, hp: stats.maxHp, mp: stats.mp,
       powerMult: stats.powerMult, damageReduction: stats.damageReduction,
-      status: {}, alive: true, col: i,
+      status: {}, alive: true, col: isTank ? 0 : nextCol++,
       cardPool: buildLoadout(classId, counts),
     };
   });
@@ -100,16 +104,44 @@ export function aliveIndices(lanes){
   return lanes.map((l,i) => l.alive ? i : -1).filter(i => i >= 0);
 }
 
-// Legal enemy targets for an attack card: 'short' can only reach an enemy
-// currently sharing the caster's board column (falls back to any alive
-// enemy if nobody's there -- e.g. that column's Axie already died);
-// 'long' can reach any alive enemy. The player picks among these; see
-// pickAutoTarget for the rival AI's automatic choice.
+// The Tank sits in the center formation slot and "taunts" -- any attacker
+// within this many formation-slots of the Tank is forced to hit it instead
+// of picking freely, regardless of the card's range. Mirrors the real
+// Origin Taunt/"Provocar" card: the Tank soaks hits for whoever's standing
+// near it. Distances come from a small hand-authored table (not raw col
+// difference) because the formation isn't a straight line: col 0 is the
+// center (Tank), 1/2 are the front line either side of it, 3/4 are the
+// back line -- see board3d.js's FORMATION for the matching visual layout.
+export const TAUNT_RADIUS = 1;
+const SLOT_DIST = [
+  [0,1,1,2,2],
+  [1,0,2,1,3],
+  [1,2,0,3,1],
+  [2,1,3,0,2],
+  [2,3,1,2,0],
+];
+function slotDistance(colA, colB){
+  return SLOT_DIST[colA]?.[colB] ?? Infinity;
+}
+
+// Legal enemy targets for an attack card. If the caster is within the
+// enemy Tank's taunt radius, the Tank is the ONLY legal target. Otherwise:
+// 'short' can only reach an enemy currently sharing the caster's board
+// column (falls back to any alive enemy if nobody's there -- e.g. that
+// column's Axie already died); 'long' can reach any alive enemy. The
+// player picks among these; see pickAutoTarget for the rival AI's
+// automatic choice (which goes through this same taunt check).
 export function getLegalTargets(state, side, card, casterIndex){
   const ownLanes = side === 'you' ? state.youLanes : state.rivalLanes;
   const enemyLanes = side === 'you' ? state.rivalLanes : state.youLanes;
   const casterLane = ownLanes[casterIndex];
   const alive = aliveIndices(enemyLanes);
+
+  const tankIdx = enemyLanes.findIndex(l => l.isTank && l.alive);
+  if (tankIdx !== -1 && slotDistance(enemyLanes[tankIdx].col, casterLane.col) <= TAUNT_RADIUS){
+    return [tankIdx];
+  }
+
   if (card.range === 'short'){
     const sameCol = alive.filter(i => enemyLanes[i].col === casterLane.col);
     return sameCol.length ? sameCol : alive;

@@ -194,7 +194,10 @@ function onPlayerCardClick(card){
     return;
   }
   pendingAttack = card;
-  ui.setHint(`${card.name}: choose which enemy to hit.`);
+  const taunted = legal.length === 1 && state.rivalLanes[legal[0]].isTank;
+  ui.setHint(taunted
+    ? `🎯 Taunted! You're too close to the enemy Tank — ${card.name} must hit it.`
+    : `${card.name}: choose which enemy to hit.`);
   ui.setSelectable(legal.map(targetIndex => ({
     side: 'rival', laneIndex: targetIndex, cssClass: 'targetable',
     onClick: () => {
