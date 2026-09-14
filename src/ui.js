@@ -2,12 +2,12 @@
 // pips, pile counts, and the win/lose banner. No game rules live here.
 import { MAX_ENERGY, LOADOUT_SIZE } from './game.js';
 import { portraitHTML } from './axieArt.js';
+import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive } from './board3d.js';
 
 const rosterGrid = document.getElementById('rosterGrid');
 const squadListEl = document.getElementById('squadList');
 const deckCountEl = document.getElementById('deckCount');
 const startDuelBtn = document.getElementById('startDuelBtn');
-const boardEl = document.getElementById('board');
 const handEl = document.getElementById('hand');
 const pipsEl = document.getElementById('pips');
 const hintEl = document.getElementById('hint');
@@ -94,71 +94,97 @@ export function renderSquadHeader(squad, maxCount){
   else startDuelBtn.textContent = 'Needs exactly 1 Tank';
 }
 
-// ================= Board =================
-let laneRefs = [];
+// ================= Board (3D) =================
+// The battlefield itself is a shared three.js scene (board3d.js): every
+// alive Axie on both squads is a real 3D model standing in two facing rows.
+// HP/name/status stay plain HTML "unit tags" absolutely positioned over
+// each model by projecting its world position through the camera.
+const board3dCanvas = document.getElementById('board3dCanvas');
+const boardOverlay = document.getElementById('boardOverlay');
+let board3dReady = null;
+let unitRefs = { you: [], rival: [] };
+let resizeListenerBound = false;
 
 function statusLabel(key){
   return {bleed:'🩸 Bleed', poison:'☠️ Poison', deathmark:'💀 Mark', shield:'🛡️ Shield'}[key] || key;
 }
 
-function laneSideHTML(lane){
-  const { attack, defense, heal } = lane.counts;
-  return `
-    ${portraitHTML(lane.classId, lane.color, 'board-portrait')}
-    <div class="lane-info">
-      <div class="lane-name">${lane.name}${lane.evolved ? '<span class="role-badge evolved">+</span>' : ''} ${lane.isTank ? '<span class="role-badge tank">🎯 TANK</span>' : ''}</div>
-      <div class="hp-bar-bg"><div class="hp-bar-fill" style="width:${Math.max(0,lane.hp/lane.maxHp*100)}%"></div></div>
-      <div class="mp-label">MP ${lane.mp} · ⚔️${attack} 🛡️${defense} 💚${heal}</div>
+function buildUnitTag(){
+  const wrap = document.createElement('div');
+  wrap.className = 'unit-tag';
+  wrap.innerHTML = `
+    <div class="unit-chip">
+      <div class="lane-name"></div>
+      <div class="hp-bar-bg"><div class="hp-bar-fill"></div></div>
+      <div class="mp-label"></div>
       <div class="status-icons"></div>
     </div>
   `;
+  boardOverlay.appendChild(wrap);
+  return {
+    wrap,
+    chip: wrap.querySelector('.unit-chip'),
+    nameEl: wrap.querySelector('.lane-name'),
+    hpFill: wrap.querySelector('.hp-bar-fill'),
+    mpEl: wrap.querySelector('.mp-label'),
+    statusEl: wrap.querySelector('.status-icons'),
+  };
+}
+
+function repositionUnits(){
+  ['you','rival'].forEach(side => {
+    unitRefs[side].forEach((ref, i) => {
+      const p = projectLane(side, i);
+      if (!p) return;
+      ref.wrap.style.left = (p.x*100) + '%';
+      ref.wrap.style.top = (p.y*100) + '%';
+    });
+  });
 }
 
 export function buildBoard(state){
-  boardEl.innerHTML = '';
-  laneRefs = [];
-  for (let i=0; i<state.youLanes.length; i++){
-    const row = document.createElement('div');
-    row.className = 'lane-row';
-    const youSide = document.createElement('div');
-    youSide.className = 'lane-side you' + (state.youLanes[i].isTank ? ' is-tank' : '');
-    youSide.innerHTML = laneSideHTML(state.youLanes[i]);
-    const mid = document.createElement('div');
-    mid.className = 'lane-mid';
-    mid.textContent = 'VS';
-    const rivalSide = document.createElement('div');
-    rivalSide.className = 'lane-side rival' + (state.rivalLanes[i].isTank ? ' is-tank' : '');
-    rivalSide.innerHTML = laneSideHTML(state.rivalLanes[i]);
+  boardOverlay.innerHTML = '';
+  unitRefs = {
+    you: state.youLanes.map(() => buildUnitTag()),
+    rival: state.rivalLanes.map(() => buildUnitTag()),
+  };
 
-    row.appendChild(youSide);
-    row.appendChild(mid);
-    row.appendChild(rivalSide);
-    boardEl.appendChild(row);
+  // initBoard3D sets up the camera synchronously, so overlays can be
+  // positioned right away -- they shouldn't wait on the 3D models (which
+  // load asynchronously and pop in a moment later via syncBoardAxies).
+  if (!board3dReady) board3dReady = initBoard3D(board3dCanvas);
+  repositionUnits();
+  board3dReady
+    .then(() => syncBoardAxies(state.youLanes, state.rivalLanes))
+    .catch(err => console.error('3D board failed:', err));
 
-    laneRefs.push({
-      you: { side: youSide, hpFill: youSide.querySelector('.hp-bar-fill'), status: youSide.querySelector('.status-icons') },
-      rival: { side: rivalSide, hpFill: rivalSide.querySelector('.hp-bar-fill'), status: rivalSide.querySelector('.status-icons') },
-    });
+  if (!resizeListenerBound){
+    resizeListenerBound = true;
+    window.addEventListener('resize', repositionUnits);
   }
   updateBoard(state);
 }
 
 export function updateBoard(state){
-  state.youLanes.forEach((lane, i) => updateLaneSide(laneRefs[i].you, lane));
-  state.rivalLanes.forEach((lane, i) => updateLaneSide(laneRefs[i].rival, lane));
+  state.youLanes.forEach((lane, i) => updateUnit(unitRefs.you[i], lane, 'you', i));
+  state.rivalLanes.forEach((lane, i) => updateUnit(unitRefs.rival[i], lane, 'rival', i));
 }
 
-function updateLaneSide(ref, lane){
+function updateUnit(ref, lane, side, laneIndex){
+  if (!ref) return;
+  const { attack, defense, heal } = lane.counts;
+  ref.nameEl.innerHTML = `${lane.name}${lane.evolved ? '<span class="role-badge evolved">+</span>' : ''}${lane.isTank ? '<span class="role-badge tank">🎯</span>' : ''}`;
   ref.hpFill.style.width = Math.max(0, lane.hp/lane.maxHp*100) + '%';
-  ref.status.innerHTML = Object.keys(lane.status).filter(k => lane.status[k]>0 || lane.status[k]===true)
+  ref.mpEl.textContent = `MP ${lane.mp} · ⚔️${attack} 🛡️${defense} 💚${heal}`;
+  ref.statusEl.innerHTML = Object.keys(lane.status).filter(k => lane.status[k]>0 || lane.status[k]===true)
     .map(k => `<span class="status-pill">${statusLabel(k)}</span>`).join('');
-  ref.side.classList.toggle('dead', !lane.alive);
+  ref.chip.classList.toggle('dead', !lane.alive);
+  setLaneAlive(side, laneIndex, lane.alive);
 }
 
 export function getLaneSideEl(side, laneIndex){
-  const ref = laneRefs[laneIndex];
-  if (!ref) return null;
-  return side === 'you' ? ref.you.side : ref.rival.side;
+  const ref = unitRefs[side] && unitRefs[side][laneIndex];
+  return ref ? ref.chip : null;
 }
 
 // ================= Hand / energy / piles =================

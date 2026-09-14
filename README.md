@@ -92,10 +92,16 @@ calibradas pra pools de HP de centenas de pontos, aqui pra ~100-150.
 - `src/ai.js` — turno do rival
 - `src/render.js` — feedback visual via DOM (números flutuantes, flash, shake)
 - `src/ui.js` — HUD/DOM (montagem de esquadrão com steppers de loadout,
-  tabuleiro, mão, energia, status, banner)
-- `src/axieArt.js` — arte SVG original por classe (fallback quando o 3D não
-  carrega) + convenção pra imagem 2D real
-- `src/axie3d.js` — preview 3D real (Axie Mixer 3D) no team picker
+  overlay de HP/nome/status sobre o tabuleiro 3D, mão, energia, banner)
+- `src/axieArt.js` — arte SVG original por classe, usada só no team picker
+  (roster/esquadrão) como fallback quando o 3D não carrega
+- `src/axie3d.js` — preview 3D real (Axie Mixer 3D) no team picker (1 Axie
+  por vez)
+- `src/board3d.js` — o tabuleiro de duelo em si: uma cena three.js
+  **compartilhada** (1 renderer/câmera só) com até 10 Axies 3D reais (5 de
+  cada lado) em pé em duas fileiras se encarando, estilo Apeiron. HP/nome/
+  status ficam em HTML posicionado por cima via projeção de câmera
+  (`projectLane`) — não são modelos 3D
 - `src/main.js` — entrada: wiring de DOM e o loop de turnos
 
 `axie-duel-prototype.html` na raiz é o protótipo original (mira física de
@@ -125,10 +131,20 @@ node scripts/trim-axie3d-assets.mjs
 ```
 
 `RIGHTS.md`/`THIRD_PARTY_NOTICES.md` do pacote oficial estão copiados em
-`public/assets/axie3d/`. Por ora o 3D real só aparece no team picker — o
-tabuleiro de duelo continua com a arte SVG 2D (`axieArt.js`) por
-performance/simplicidade, com espaço pra imagem 2D real via
-`public/assets/axies/README.md` se preferir esse caminho ali também.
+`public/assets/axie3d/`.
+
+O tabuleiro de duelo (`src/board3d.js`) também usa o 3D real, mas de um jeito
+mais pesado: até 10 Axies simultâneos (5 de cada lado), todos numa única
+cena/câmera/renderer three.js compartilhada — cada `mixer.create()` só
+adiciona mais um modelo à mesma cena, então não abre 10 contextos WebGL
+(pesado pro celular). HP/nome/status ficam em `<div>`s absolutamente
+posicionados por cima, calculados projetando a posição 3D de cada Axie pela
+câmera (`projectLane`) — a mesma técnica que jogos como Apeiron usam pra UI
+flutuante sobre um campo de batalha 3D. Pegadinha: `camera.matrixWorldInverse`
+(usada por `Vector3.project`) só é recalculada durante um `render()`, então
+`initBoard3D` chama `camera.updateMatrixWorld(true)` na configuração —
+sem isso, a primeira leitura de posição (antes do primeiro frame) vem toda
+errada.
 
 ## Próximos passos
 
