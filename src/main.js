@@ -14,6 +14,9 @@ const switchDeckBtn = document.getElementById('switchDeckBtn');
 const resetBtn = document.getElementById('resetBtn');
 const boardEl = document.getElementById('board');
 const moveBtn = document.getElementById('moveBtn');
+const joystickWrap = document.getElementById('joystickWrap');
+const joystickBase = document.getElementById('joystickBase');
+const joystickKnob = document.getElementById('joystickKnob');
 
 let squad = []; // [{ classId, isTank, counts:{attack,defense,heal} }] -- up to SQUAD_SIZE
 let state = null;
@@ -112,6 +115,14 @@ function syncUI(){
   ui.renderPiles(state);
   ui.renderHand(state, { onPlay: onPlayerCardClick });
   updateMoveBtn();
+  updateJoystick();
+}
+
+function updateJoystick(){
+  const tankIdx = state.youLanes.findIndex(l => l.isTank);
+  const canMove = state.turn === 'you' && !state.gameOver && !state.movedThisTurn
+    && tankIdx !== -1 && state.youLanes[tankIdx].alive;
+  joystickWrap.classList.toggle('disabled', !canMove);
 }
 
 function updateMoveBtn(){
@@ -276,6 +287,7 @@ function performMove(destIndex){
   moveMode = false;
   moveSource = null;
   updateMoveBtn();
+  updateJoystick();
   ui.setHint(moved ? 'Axie moved! Choose a card to play.' : 'Choose a card to play.');
 }
 
@@ -287,6 +299,62 @@ function cancelMoveMode(){
   moveSource = null;
   updateMoveBtn();
 }
+
+// ================= Tank joystick (dedicated control, same 1/turn limit) =================
+// Push a direction to swap the Tank into that formation slot (col 1-4):
+// up-left/up-right are the front line (closer to the enemy and to the
+// Tank's own taunt radius), down-left/down-right are the back line.
+// "Up" on screen = toward the enemy, since the rival row renders above
+// yours.
+const JOY_MAX_PX = 24;
+const JOY_DEAD_ZONE_PX = 12;
+let joyDragging = false;
+let joyStartX = 0, joyStartY = 0;
+
+function quadrantFromDelta(dx, dy){
+  if (dy < 0) return dx < 0 ? 1 : 2; // front-left / front-right
+  return dx < 0 ? 3 : 4; // back-left / back-right
+}
+
+function moveTankToSlot(targetCol){
+  if (joystickWrap.classList.contains('disabled')) return;
+  cancelMoveMode();
+  const tankIdx = state.youLanes.findIndex(l => l.isTank);
+  if (tankIdx === -1 || state.youLanes[tankIdx].col === targetCol) return;
+  const destIdx = state.youLanes.findIndex(l => l.col === targetCol);
+  if (destIdx === -1) return;
+  const moved = game.moveLane(state, 'you', tankIdx, destIdx);
+  if (!moved) return;
+  ui.animateMove('you', tankIdx, state.youLanes[tankIdx].col);
+  ui.animateMove('you', destIdx, state.youLanes[destIdx].col);
+  updateMoveBtn();
+  updateJoystick();
+  ui.setHint('Tank moved! Choose a card to play.');
+}
+
+joystickBase.addEventListener('pointerdown', (e) => {
+  if (joystickWrap.classList.contains('disabled')) return;
+  joyDragging = true;
+  joyStartX = e.clientX;
+  joyStartY = e.clientY;
+  joystickBase.setPointerCapture(e.pointerId);
+});
+joystickBase.addEventListener('pointermove', (e) => {
+  if (!joyDragging) return;
+  const dx = e.clientX - joyStartX, dy = e.clientY - joyStartY;
+  const dist = Math.min(Math.hypot(dx, dy), JOY_MAX_PX);
+  const angle = Math.atan2(dy, dx);
+  joystickKnob.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
+});
+function endJoystickDrag(e){
+  if (!joyDragging) return;
+  joyDragging = false;
+  joystickKnob.style.transform = '';
+  const dx = e.clientX - joyStartX, dy = e.clientY - joyStartY;
+  if (Math.hypot(dx, dy) >= JOY_DEAD_ZONE_PX) moveTankToSlot(quadrantFromDelta(dx, dy));
+}
+joystickBase.addEventListener('pointerup', endJoystickDrag);
+joystickBase.addEventListener('pointercancel', endJoystickDrag);
 
 function runAiTurn(){
   aiTakeTurn(state, {

@@ -72,7 +72,11 @@ npm run preview
   próprios Axies com outra (toca "Mover", toca o Axie, toca o destino). É a
   ferramenta tática pro sistema de mira acima — tira seu Tanque da coluna
   de um atacante de curto alcance inimigo, ou reposiciona pra alinhar seu
-  próprio curto alcance num alvo específico.
+  próprio curto alcance num alvo específico. O Tanque também tem um
+  **joystick dedicado** ao lado do botão de mover: arrasta na direção do
+  slot que quer (frente-esquerda/frente-direita/trás-esquerda/trás-direita)
+  pra jogá-lo lá, trocando com quem estiver — mesmo limite de 1x por
+  turno, compartilhado com o botão genérico.
 - **Formação e Provocação (Taunt)**: cada lado forma um losango — o Tanque
   sempre nasce no **centro** (tile dourado brilhante, com um anel de raio),
   e os outros 4 Axies ficam 2 na frente/2 atrás ao redor dele. Quem ataca

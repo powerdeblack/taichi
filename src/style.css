@@ -304,7 +304,7 @@ h1{
 .pile-counts{
   font-size:.68rem; color:var(--text-dim); display:flex; gap:10px; font-weight:700;
 }
-.action-row{display:flex; justify-content:center; margin-bottom:8px;}
+.action-row{display:flex; align-items:center; justify-content:center; gap:16px; margin-bottom:8px; flex-wrap:wrap;}
 .move-btn{
   font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.74rem;
   color:var(--text-light); background:#4a382480; border:1px solid #ffffff25;
@@ -312,6 +312,31 @@ h1{
 }
 .move-btn.active{ background:var(--aqua); color:#fff; border-color:var(--aqua); }
 .move-btn:disabled{ opacity:.4; cursor:default; }
+
+.joystick-wrap{
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  transition:opacity .2s ease;
+}
+.joystick-wrap.disabled{ opacity:.35; pointer-events:none; }
+.joystick-label{
+  font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.62rem; color:var(--gold);
+}
+.joystick-base{
+  position:relative; width:64px; height:64px; border-radius:50%;
+  background:#1c130ccc; border:2px solid #ffffff25;
+  touch-action:none; cursor:grab;
+}
+.joystick-base::before{
+  content:''; position:absolute; inset:6px; border-radius:50%;
+  border:1px dashed #ffffff20;
+}
+.joystick-knob{
+  position:absolute; top:50%; left:50%; width:28px; height:28px; margin:-14px 0 0 -14px;
+  border-radius:50%; background:linear-gradient(160deg,var(--gold),#a9791f);
+  box-shadow:0 0 8px #d9b44a80; transition:transform .12s ease;
+}
+.joystick-base:active{ cursor:grabbing; }
+.joystick-base:active .joystick-knob{ transition:none; }
 .hand{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
 .hint{text-align:center; font-size:.72rem; color:var(--text-dim); margin-top:10px; min-height:16px;}
 .btn-row{display:flex; gap:10px; margin-top:14px; justify-content:center;}
