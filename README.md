@@ -75,6 +75,14 @@ npm run preview
   "qualquer um vivo" se não houver ninguém lá); longo alcance pode acertar
   qualquer inimigo vivo. O rival ainda mira automático (curto = mesma
   coluna, longo = o mais fraco).
+- **Mira de Defesa/Cura em qualquer lado (Cura Reversa)**: cartas de defesa
+  e cura também abrem um modo de mira — mas nesse a lista de alvos legais
+  cobre **os dois lados do tabuleiro**: qualquer aliado vivo (brilho verde,
+  `.targetable-ally`) recebe o efeito normal da carta, e qualquer inimigo
+  vivo (brilho rosa, `.targetable-reverse`) recebe a versão **invertida**
+  dela, igual à mecânica real do Origin de "Cura Reversa": Guarda/Bulwark
+  viram **Vulnerável** (+30% de dano recebido nos próximos golpes) e
+  Cura/Regeneração viram **dano/DOT** direto no inimigo em vez de cura.
 - **Movimento**: dá pra trocar a coluna de um dos seus próprios Axies com
   outra (toca "Mover", toca o Axie, toca o destino) — sem turno pra
   esperar, só um cooldown curto (4s) depois de usar. É a ferramenta tática
@@ -101,7 +109,19 @@ npm run preview
   qualquer um.
 - Status effects: Bleed, **Poison** (empilha, bate 2x a stack atual e decai 1
   stack por tick — mais forte no início, some sozinho), Deathmark, Retain,
-  Shield/Cleanse, Ambush (2x dano no 1º acerto) e o combo da Pena.
+  Ambush (2x dano no 1º acerto) e o combo da Pena. As cartas universais de
+  defesa/cura têm mecânicas nomeadas próprias, cada uma com sua versão
+  revertida (ver mira de Defesa/Cura acima):
+  - **Ornitorrinco** (Guarda): bloqueia 50% do próximo golpe. Revertido:
+    aplica **Vulnerável**.
+  - **Guardião Tropical** (Limpeza + Bastião): remove Bleed/Poison/
+    Deathmark e depois reduz os próximos 2 golpes recebidos em 25% cada.
+    Revertido: aplica **Vulnerável** direto (sem limpar nada).
+  - **Cachorrinho** (Cura instantânea): cura na hora, escalado pelo MP do
+    conjurador. Revertido: **Cura Reversa** — a mesma quantidade vira dano.
+  - **Trevo** (Regeneração): cura um pouco a cada tick por 3 ticks, em vez
+    de um valor único maior. Revertido: aplica o equivalente em dano ao
+    longo do tempo.
 - Cada Axie pode ser marcado como **Evoluído (+)** no montador de esquadrão:
   dá +15% flat em poder/HP/MP daquele loadout inteiro — nossa versão do
   padrão de evolução de carta do Origin (α → base → **+**), sem reintroduzir
@@ -129,10 +149,12 @@ calibradas pra pools de HP de centenas de pontos, aqui pra ~100-150.
   frente/trás) e um `localPos` ({x,z} ao vivo — igual ao slot pra não-
   Tanque, livre e contínuo só pro Tanque via `moveTankFreely`), dano, cura,
   status effects, mira manual + Provocação por distância real
-  (`getLegalTargets`/`TAUNT_RADIUS`/`pickAutoTarget`), movimento discreto
-  com cooldown (`moveLane`/`MOVE_COOLDOWN_SEC`), regen de energia e tick de
-  status contínuos (`tickEnergyRealtime`/`tickStatusTimer`), condição de
-  vitória (Tanque)
+  (`getLegalTargets`/`TAUNT_RADIUS`/`pickAutoTarget`), mira de defesa/cura
+  nos dois lados (`getSupportTargets`), movimento discreto com cooldown
+  (`moveLane`/`MOVE_COOLDOWN_SEC`), regen de energia e tick de status
+  contínuos (`tickEnergyRealtime`/`tickStatusTimer`), `resolveCard` recebe
+  `targetSide` e decide normal-vs-revertido (Bulwark/Vulnerable/Regen/Cura
+  Reversa), condição de vitória (Tanque)
 - `src/ai.js` — `aiMaybeAct`: chamado periodicamente pelo loop de
   `main.js` (não mais "turno do rival") — tenta jogar 1 carta afordável,
   mira automática via `pickAutoTarget`; não move lanes

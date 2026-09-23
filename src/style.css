@@ -244,9 +244,25 @@ h1{
   cursor:pointer; box-shadow:0 0 0 2px #8fd0ff, 0 0 10px 2px #8fd0ff70;
 }
 .unit-chip.move-source{ box-shadow:0 0 0 2px var(--gold), 0 0 10px 2px #d9b44a90; }
+.unit-chip.targetable-ally{
+  cursor:pointer; box-shadow:0 0 0 2px #6fd68a, 0 0 12px 2px #6fd68a80;
+  animation:ally-pulse 1s ease-in-out infinite;
+}
+.unit-chip.targetable-reverse{
+  cursor:pointer; box-shadow:0 0 0 2px #d65f8a, 0 0 12px 2px #d65f8a80;
+  animation:reverse-pulse 1s ease-in-out infinite;
+}
 @keyframes target-pulse{
   0%,100%{ box-shadow:0 0 0 2px #ffd23f, 0 0 8px 1px #ffd23f60; }
   50%{ box-shadow:0 0 0 2px #ffd23f, 0 0 16px 4px #ffd23fb0; }
+}
+@keyframes ally-pulse{
+  0%,100%{ box-shadow:0 0 0 2px #6fd68a, 0 0 8px 1px #6fd68a60; }
+  50%{ box-shadow:0 0 0 2px #6fd68a, 0 0 16px 4px #6fd68ab0; }
+}
+@keyframes reverse-pulse{
+  0%,100%{ box-shadow:0 0 0 2px #d65f8a, 0 0 8px 1px #d65f8a60; }
+  50%{ box-shadow:0 0 0 2px #d65f8a, 0 0 16px 4px #d65f8ab0; }
 }
 .lane-name{
   font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.6rem;

@@ -68,17 +68,22 @@ export const AXIES = [
 ];
 
 // Universal support cards -- any class's Axie can be loaded with these.
+// Each one has its own named mechanic (not just a bigger number), the way
+// real Origin support cards work. Both can target an ally (normal effect)
+// or an enemy (reversed -- see game.js resolveCard): shield/cleanse
+// reversed becomes Vulnerable (a debuff), heal/regen reversed becomes
+// straight damage (Reverse Heal, a real Origin mechanic).
 export const DEFENSE_CARDS = [
   { id:'ornitorrinco', name:'Ornitorrinco', range:'own', role:'defense', cost:1, effect:'shield',
-    desc:'Blocks 50% of the next hit taken by this lane.' },
-  { id:'guardiao_tropical', name:'Guardião Tropical', range:'own', role:'defense', cost:2, effect:'shield_cleanse',
-    desc:'Blocks 50% of the next hit and removes 1 negative status from this lane.' },
+    desc:'Guard: blocks 50% of the next hit taken. Reversed on an enemy: Vulnerable, +30% damage taken for its next 2 hits.' },
+  { id:'guardiao_tropical', name:'Guardião Tropical', range:'own', role:'defense', cost:2, effect:'bulwark_cleanse',
+    desc:'Cleanse: removes Bleed/Poison/Deathmark, then Bulwark reduces its next 2 hits by 25% each. Reversed on an enemy: Vulnerable instead.' },
 ];
 export const HEAL_CARDS = [
   { id:'cachorrinho', name:'Cachorrinho', range:'own', role:'heal', cost:1, heal:15,
-    desc:'Heals 15 HP (scaled by MP) on this lane.' },
-  { id:'trevo', name:'Trevo', range:'own', role:'heal', cost:2, heal:25,
-    desc:'Heals 25 HP (scaled by MP) on this lane.' },
+    desc:'Heals 15 HP (scaled by MP) right away. Reversed on an enemy: Reverse Heal, deals that much damage instead.' },
+  { id:'trevo', name:'Trevo', range:'own', role:'heal', cost:2, effect:'regen', regenTicks:3,
+    desc:'Regeneration: heals a little HP (scaled by MP) every tick for 3 ticks. Reversed on an enemy: the same as damage over time instead.' },
 ];
 
 // Beast > Plant > Aqua > Beast

@@ -162,6 +162,20 @@ export function getLegalTargets(state, side, card, casterIndex){
   return [];
 }
 
+// Legal targets for a defense/heal card: any of your own alive lanes
+// (normal effect) plus any alive enemy lane (reversed effect -- see
+// resolveCard). The player can shield/heal an ally, or turn the same card
+// into a debuff/damage on an enemy, matching the real Origin "Reverse
+// Heal" pattern.
+export function getSupportTargets(state, side){
+  const ownLanes = side === 'you' ? state.youLanes : state.rivalLanes;
+  const enemyLanes = side === 'you' ? state.rivalLanes : state.youLanes;
+  const enemySide = side === 'you' ? 'rival' : 'you';
+  const own = aliveIndices(ownLanes).map(laneIndex => ({ side, laneIndex, reversed: false }));
+  const enemy = aliveIndices(enemyLanes).map(laneIndex => ({ side: enemySide, laneIndex, reversed: true }));
+  return [...own, ...enemy];
+}
+
 // The rival AI doesn't get an interactive target picker: short range picks
 // whoever's legal (usually the same-column enemy), long range picks the
 // legal target with the least HP.
@@ -219,17 +233,31 @@ export function moveTankFreely(state, side, dx, dz){
   tank.localPos = { x, z };
 }
 
+const BULWARK_REDUCTION = 0.25;
+const VULNERABLE_BONUS = 0.3;
+
 function applyDamage(lane, amount, attackerClassId, casterLane){
   const mult = classMultiplier(attackerClassId, lane.classId);
   let dmg = amount * mult * casterLane.powerMult;
-  let deathmarked = false, shielded = false;
+  let deathmarked = false, shielded = false, bulwarked = false;
   if (lane.status.deathmark){ dmg += 10; delete lane.status.deathmark; deathmarked = true; }
   if (lane.status.shield){ dmg *= 0.5; delete lane.status.shield; shielded = true; }
+  if (lane.status.bulwark && lane.status.bulwark > 0){
+    dmg *= (1 - BULWARK_REDUCTION);
+    lane.status.bulwark -= 1;
+    if (lane.status.bulwark <= 0) delete lane.status.bulwark;
+    bulwarked = true;
+  }
+  if (lane.status.vulnerable && lane.status.vulnerable > 0){
+    dmg *= (1 + VULNERABLE_BONUS);
+    lane.status.vulnerable -= 1;
+    if (lane.status.vulnerable <= 0) delete lane.status.vulnerable;
+  }
   dmg *= (1 - lane.damageReduction);
   dmg = Math.max(0, Math.round(dmg));
   lane.hp = Math.max(0, lane.hp - dmg);
   if (lane.hp <= 0) lane.alive = false;
-  return { dmg, deathmarked, shielded };
+  return { dmg, deathmarked, shielded, bulwarked };
 }
 
 function applyBleed(lane){ lane.status.bleed = 2; }
@@ -277,48 +305,143 @@ function applyHeal(lane, amount, casterLane){
   return lane.hp - before;
 }
 
-function applyShield(lane, cleanse){
+// Guard: a plain 50%-off shield for the next hit -- unchanged from before,
+// still the base for Ornitorrinco's normal (non-reversed) effect.
+function applyShield(lane){
   lane.status.shield = true;
-  if (cleanse){ delete lane.status.bleed; delete lane.status.deathmark; }
 }
 
-// Applies one card's effect and mutates state. `targetIndex` is required
-// for attack cards (the player or AI already picked it -- see
-// getLegalTargets/pickAutoTarget); defense/heal cards ignore it and always
-// act on the caster's own lane. Returns a result descriptor used by main.js
-// to drive floating-text/shake feedback.
-export function resolveCard(state, side, card, casterIndex, targetIndex){
+const BULWARK_HITS = 2;
+const VULNERABLE_HITS = 2;
+
+// Bulwark: Guardião Tropical's normal effect after its cleanse -- reduces
+// the next BULWARK_HITS hits by BULWARK_REDUCTION each (see applyDamage).
+function applyBulwark(lane, hits = BULWARK_HITS){
+  lane.status.bulwark = Math.max(lane.status.bulwark || 0, hits);
+}
+
+// Vulnerable: the reversed form of Guard/Cleanse cast on an enemy -- a
+// debuff that INCREASES the next VULNERABLE_HITS hits it takes, instead of
+// reducing them.
+function applyVulnerable(lane, hits = VULNERABLE_HITS){
+  lane.status.vulnerable = Math.max(lane.status.vulnerable || 0, hits);
+}
+
+// Cleanse: strips the DOTs/debuffs Guardião Tropical is meant to counter.
+function applyGuardianCleanse(lane){
+  delete lane.status.bleed;
+  delete lane.status.poison;
+  delete lane.status.deathmark;
+}
+
+// Regeneration: Trevo's normal effect -- heals a flat MP-scaled amount each
+// STATUS_TICK_INTERVAL tick for `ticks` ticks (see tickRegen).
+const REGEN_HEAL_PER_TICK = 8;
+function applyRegen(lane, ticks){
+  lane.status.regen = Math.max(lane.status.regen || 0, ticks);
+}
+
+function tickRegen(lane, casterLane){
+  if (lane.status.regen && lane.status.regen > 0){
+    const healed = applyHeal(lane, REGEN_HEAL_PER_TICK, casterLane || lane);
+    lane.status.regen -= 1;
+    if (lane.status.regen <= 0) delete lane.status.regen;
+    return healed;
+  }
+  return 0;
+}
+
+// Poison-equivalent DOT used by Trevo's reversed (enemy-cast) form: same
+// shape as applyPoison/tickPoison but stored separately so it doesn't
+// interact with the class's normal Poison stacking/cap.
+const REGEN_ROT_PER_TICK = 8;
+function applyRegenRot(lane, ticks){
+  lane.status.regenRot = Math.max(lane.status.regenRot || 0, ticks);
+}
+
+function tickRegenRot(lane){
+  if (lane.status.regenRot && lane.status.regenRot > 0){
+    const dmg = REGEN_ROT_PER_TICK;
+    lane.hp = Math.max(0, lane.hp - dmg);
+    lane.status.regenRot -= 1;
+    if (lane.status.regenRot <= 0) delete lane.status.regenRot;
+    if (lane.hp <= 0) lane.alive = false;
+    return dmg;
+  }
+  return 0;
+}
+
+// Applies one card's effect and mutates state. `targetIndex`/`targetSide`
+// matter for every card now: attack cards always hit the enemy side (as
+// before); defense/heal cards can go on any alive lane on EITHER side --
+// `targetSide === side` (or omitted, defaulting to the caster's own side)
+// applies the card's normal ally effect, `targetSide` being the other side
+// applies its reversed form instead (Guard/Bulwark -> Vulnerable, instant
+// Heal -> instant damage, Regen -> a matching DOT), matching the real
+// Origin "Reverse Heal" pattern. Returns a result descriptor used by
+// main.js to drive floating-text/shake feedback.
+export function resolveCard(state, side, card, casterIndex, targetIndex, targetSide){
   const ownLanes = side === 'you' ? state.youLanes : state.rivalLanes;
   const enemyLanes = side === 'you' ? state.rivalLanes : state.youLanes;
   const casterLane = ownLanes[casterIndex];
   const result = {
-    side, card, casterIndex, targetIndex: -1, dmg: 0, healed: 0,
-    ambush: false, shielded: false, deathmarked: false, comboBonus: 0,
+    side, card, casterIndex, targetIndex: -1, targetSide: side, reversed: false,
+    dmg: 0, healed: 0,
+    ambush: false, shielded: false, deathmarked: false, bulwarked: false, comboBonus: 0,
   };
 
-  if (card.role === 'defense'){
-    applyShield(casterLane, card.effect === 'shield_cleanse');
-    result.targetIndex = casterIndex;
-    return result;
-  }
-  if (card.role === 'heal'){
-    result.healed = applyHeal(casterLane, card.heal, casterLane);
-    result.targetIndex = casterIndex;
+  if (card.role === 'defense' || card.role === 'heal'){
+    const finalSide = targetSide || side;
+    const reversed = finalSide !== side;
+    const supportLanes = finalSide === 'you' ? state.youLanes : state.rivalLanes;
+    const finalIndex = (targetIndex != null && targetIndex >= 0 && supportLanes[targetIndex] && supportLanes[targetIndex].alive)
+      ? targetIndex : casterIndex;
+    const targetLane = supportLanes[finalIndex];
+    if (!targetLane || !targetLane.alive) return result;
+    result.targetIndex = finalIndex;
+    result.targetSide = finalSide;
+    result.reversed = reversed;
+
+    if (card.role === 'defense'){
+      if (!reversed){
+        if (card.effect === 'bulwark_cleanse'){ applyGuardianCleanse(targetLane); applyBulwark(targetLane); result.bulwarked = true; }
+        else { applyShield(targetLane); result.shielded = true; }
+      } else {
+        applyVulnerable(targetLane);
+      }
+      checkGameOver(state);
+      return result;
+    }
+
+    // heal role
+    if (!reversed){
+      if (card.effect === 'regen') applyRegen(targetLane, card.regenTicks || 3);
+      else result.healed = applyHeal(targetLane, card.heal, casterLane);
+    } else {
+      if (card.effect === 'regen') applyRegenRot(targetLane, card.regenTicks || 3);
+      else {
+        const { dmg } = applyDamage(targetLane, card.heal, card.cls, casterLane);
+        result.dmg = dmg;
+        if (dmg > 0) state.firstHitDone = true;
+      }
+    }
+    checkGameOver(state);
     return result;
   }
 
   if (targetIndex == null || targetIndex < 0 || !enemyLanes[targetIndex] || !enemyLanes[targetIndex].alive) return result;
   const targetLane = enemyLanes[targetIndex];
+  result.targetSide = side === 'you' ? 'rival' : 'you';
 
   const ambush = !state.firstHitDone && card.effect === 'ambush';
   const dmgToApply = card.dmg * (ambush ? 2 : 1);
-  const { dmg, deathmarked, shielded } = applyDamage(targetLane, dmgToApply, card.cls, casterLane);
+  const { dmg, deathmarked, shielded, bulwarked } = applyDamage(targetLane, dmgToApply, card.cls, casterLane);
   if (dmg > 0) state.firstHitDone = true;
   if (card.effect === 'bleed') applyBleed(targetLane);
   if (card.effect === 'poison') applyPoison(targetLane);
   if (card.effect === 'deathmark') targetLane.status.deathmark = true;
 
-  Object.assign(result, { targetIndex, dmg, ambush, deathmarked, shielded });
+  Object.assign(result, { targetIndex, dmg, ambush, deathmarked, shielded, bulwarked });
 
   if (card.effect === 'multi' && targetLane.alive){
     const bonus = Math.round(card.dmg * 0.5 * casterLane.powerMult);
@@ -331,7 +454,7 @@ export function resolveCard(state, side, card, casterIndex, targetIndex){
   return result;
 }
 
-export function playerPlayCard(state, card, targetIndex){
+export function playerPlayCard(state, card, targetIndex, targetSide){
   const casterIndex = card.laneIndex;
   state.energyYou -= card.cost;
   if (card.effect !== 'retain'){
@@ -339,7 +462,7 @@ export function playerPlayCard(state, card, targetIndex){
     state.discard.push(card);
     drawCard(state);
   }
-  return resolveCard(state, 'you', card, casterIndex, targetIndex);
+  return resolveCard(state, 'you', card, casterIndex, targetIndex, targetSide);
 }
 
 function tickStatuses(lanes){
@@ -349,6 +472,10 @@ function tickStatuses(lanes){
     if (bleedDmg > 0) results.push({ lane: l, dmg: bleedDmg, kind: 'bleed' });
     const poisonDmg = tickPoison(l);
     if (poisonDmg > 0) results.push({ lane: l, dmg: poisonDmg, kind: 'poison' });
+    const regenRotDmg = tickRegenRot(l);
+    if (regenRotDmg > 0) results.push({ lane: l, dmg: regenRotDmg, kind: 'regenRot' });
+    const regenHeal = tickRegen(l);
+    if (regenHeal > 0) results.push({ lane: l, dmg: regenHeal, kind: 'regen' });
   });
   return results;
 }

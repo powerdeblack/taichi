@@ -137,32 +137,52 @@ function updateMoveBtn(){
 
 function applyResultFx(result){
   if (!result) return;
-  const { side, card, casterIndex, targetIndex } = result;
-  const enemySide = side === 'you' ? 'rival' : 'you';
+  const { side, card, casterIndex } = result;
 
-  if (card.role === 'defense'){
-    const el = ui.getLaneSideEl(side, casterIndex);
-    render.flashHeal(el);
-    render.spawnFloatingText(el, 'SHIELD!', 'text-shield');
+  if (card.role === 'defense' || card.role === 'heal'){
+    if (result.targetIndex === -1){
+      const el = ui.getLaneSideEl(side, casterIndex);
+      render.spawnFloatingText(el, 'No target!', 'text-dmg');
+      return;
+    }
+    const el = ui.getLaneSideEl(result.targetSide, result.targetIndex);
+    if (card.role === 'defense'){
+      if (result.reversed){
+        render.flashHit(el);
+        render.spawnFloatingText(el, 'VULNERABLE!', 'text-block');
+      } else if (card.effect === 'bulwark_cleanse'){
+        render.flashHeal(el);
+        render.spawnFloatingText(el, 'CLEANSE + BULWARK!', 'text-shield');
+      } else {
+        render.flashHeal(el);
+        render.spawnFloatingText(el, 'GUARD!', 'text-shield');
+      }
+      return;
+    }
+    // heal role
+    if (result.reversed){
+      render.flashHit(el);
+      render.shakeBoard(boardEl);
+      render.spawnFloatingText(el, (card.effect === 'regen' ? 'ROT! -' : 'REVERSE HEAL! -')+result.dmg, 'text-dmg');
+    } else {
+      render.flashHeal(el);
+      render.spawnFloatingText(el, card.effect === 'regen' ? 'REGEN!' : '+'+result.healed, 'text-heal');
+    }
     return;
   }
-  if (card.role === 'heal'){
-    const el = ui.getLaneSideEl(side, casterIndex);
-    render.flashHeal(el);
-    render.spawnFloatingText(el, '+'+result.healed, 'text-heal');
-    return;
-  }
-  if (targetIndex === -1){
+
+  if (result.targetIndex === -1){
     const el = ui.getLaneSideEl(side, casterIndex);
     render.spawnFloatingText(el, 'No target!', 'text-dmg');
     return;
   }
-  const el = ui.getLaneSideEl(enemySide, targetIndex);
+  const el = ui.getLaneSideEl(result.targetSide, result.targetIndex);
   render.flashHit(el);
   render.shakeBoard(boardEl);
   render.spawnFloatingText(el, '-'+result.dmg, 'text-dmg');
   if (result.ambush) render.spawnFloatingText(el, 'AMBUSH! x2', 'text-ambush');
   if (result.shielded) render.spawnFloatingText(el, 'BLOCKED!', 'text-block');
+  if (result.bulwarked) render.spawnFloatingText(el, 'BULWARK!', 'text-block');
   if (result.deathmarked) render.spawnFloatingText(el, '+10 MARK', 'text-mark');
   if (result.comboBonus) render.spawnFloatingText(el, 'COMBO! -'+result.comboBonus, 'text-combo');
 }
@@ -173,8 +193,13 @@ function applyBleedFx(side, statusResults){
   statusResults.forEach(({ lane, dmg, kind }) => {
     const laneIndex = lanesArr.indexOf(lane);
     const el = ui.getLaneSideEl(side, laneIndex);
+    if (kind === 'regen'){
+      render.flashHeal(el);
+      render.spawnFloatingText(el, '+'+dmg+' 🌿', 'text-heal');
+      return;
+    }
     render.flashHit(el);
-    const icon = kind === 'poison' ? '☠️' : '🩸';
+    const icon = kind === 'poison' ? '☠️' : (kind === 'regenRot' ? '🥀' : '🩸');
     render.spawnFloatingText(el, '-'+dmg+' '+icon, 'text-bleed');
   });
 }
@@ -182,8 +207,15 @@ function applyBleedFx(side, statusResults){
 function setHintForResult(side, result){
   const who = side === 'you' ? 'You' : 'The rival';
   if (!result) return; // no card affordable right now -- not worth a hint, it happens constantly
-  if (result.card.role === 'defense'){ ui.setHint(`${who} activated ${result.card.name}!`); return; }
-  if (result.card.role === 'heal'){ ui.setHint(`${who} healed with ${result.card.name}!`); return; }
+  if (result.card.role === 'defense' || result.card.role === 'heal'){
+    if (result.targetIndex === -1){ ui.setHint(`${who}: no target available!`); return; }
+    const onSelf = result.targetSide === side;
+    const targetWho = onSelf ? 'its own ally' : 'the enemy';
+    ui.setHint(result.reversed
+      ? `${who} reversed ${result.card.name} on ${targetWho}!`
+      : `${who} used ${result.card.name} on ${targetWho}!`);
+    return;
+  }
   if (result.targetIndex === -1){ ui.setHint(`${who}: no target available!`); return; }
   ui.setHint(`${who}: ${result.card.name} dealt ${result.dmg} damage!`);
 }
@@ -200,33 +232,48 @@ function onPlayerCardClick(card){
   cancelMoveMode();
   pendingAttack = null;
   ui.clearSelectable();
-  if (card.role !== 'attack'){
-    playCard(card, -1);
+
+  if (card.role === 'attack'){
+    const legal = game.getLegalTargets(state, 'you', card, card.laneIndex);
+    if (!legal.length){
+      ui.setHint('No target available!');
+      return;
+    }
+    pendingAttack = card;
+    const taunted = legal.length === 1 && state.rivalLanes[legal[0]].isTank;
+    ui.setHint(taunted
+      ? `🎯 Taunted! You're too close to the enemy Tank — ${card.name} must hit it.`
+      : `${card.name}: choose which enemy to hit.`);
+    ui.setSelectable(legal.map(targetIndex => ({
+      side: 'rival', laneIndex: targetIndex, cssClass: 'targetable',
+      onClick: () => {
+        pendingAttack = null;
+        ui.clearSelectable();
+        playCard(card, targetIndex, 'rival');
+      },
+    })));
     return;
   }
 
-  const legal = game.getLegalTargets(state, 'you', card, card.laneIndex);
-  if (!legal.length){
+  // Defense/heal: aim at an ally for the normal effect, or at an enemy to
+  // reverse it (Guard/Bulwark -> Vulnerable, Heal/Regen -> damage/DOT).
+  const targets = game.getSupportTargets(state, 'you');
+  if (!targets.length){
     ui.setHint('No target available!');
     return;
   }
-  pendingAttack = card;
-  const taunted = legal.length === 1 && state.rivalLanes[legal[0]].isTank;
-  ui.setHint(taunted
-    ? `🎯 Taunted! You're too close to the enemy Tank — ${card.name} must hit it.`
-    : `${card.name}: choose which enemy to hit.`);
-  ui.setSelectable(legal.map(targetIndex => ({
-    side: 'rival', laneIndex: targetIndex, cssClass: 'targetable',
+  ui.setHint(`${card.name}: choose an ally to help, or an enemy to reverse it on.`);
+  ui.setSelectable(targets.map(({ side, laneIndex, reversed }) => ({
+    side, laneIndex, cssClass: reversed ? 'targetable-reverse' : 'targetable-ally',
     onClick: () => {
-      pendingAttack = null;
       ui.clearSelectable();
-      playCard(card, targetIndex);
+      playCard(card, laneIndex, side);
     },
   })));
 }
 
-function playCard(card, targetIndex){
-  const result = game.playerPlayCard(state, card, targetIndex);
+function playCard(card, targetIndex, targetSide){
+  const result = game.playerPlayCard(state, card, targetIndex, targetSide);
   applyResultFx(result);
   syncUI();
   setHintForResult('you', result);
