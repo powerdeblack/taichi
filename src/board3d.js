@@ -88,7 +88,7 @@ export function initBoard3D(canvas){
   scene.add(dir);
   clock = new THREE.Clock();
   buildHall();
-  buildTiles();
+  buildTauntRings();
   resizeBoard3D();
   window.addEventListener('resize', resizeBoard3D);
   if (!loopStarted){
@@ -130,10 +130,11 @@ function animate(){
   if (renderer && scene && camera) renderer.render(scene, camera);
 }
 
-// Short-lived 3D "hit" feedback at a lane's current position: an
-// expanding, fading ring plus a handful of sparks that pop outward and
-// fall -- real visual impact on attacks (and a softer version on heals),
-// instead of just DOM flash/shake/floating text.
+// Short-lived 3D feedback at a lane's current position: an expanding,
+// fading ring plus a handful of sparks whose motion/color depend on
+// `kind` (see IMPACT_STYLES/spawnImpact below) -- real visual effects for
+// hits, glowing heals, defenses activating, poison ticking, bleed
+// dripping, instead of just DOM flash/shake/floating text.
 function tickImpacts(dt){
   for (let i = impacts.length - 1; i >= 0; i--){
     const im = impacts[i];
@@ -143,7 +144,7 @@ function tickImpacts(dt){
     im.ring.material.opacity = im.ringOpacity * (1 - t);
     im.sparks.forEach(sp => {
       sp.position.addScaledVector(sp.userData.vel, dt);
-      sp.userData.vel.y -= dt * 2.4; // gravity
+      sp.userData.vel.y -= dt * sp.userData.gravity;
       sp.material.opacity = 1 - t;
     });
     if (t >= 1){
@@ -154,18 +155,32 @@ function tickImpacts(dt){
   }
 }
 
-const IMPACT_COLORS = { hit: 0xff7a4d, heal: 0x8fe6a0, shield: 0x8fd0ff };
+// One tuning entry per status/effect "flavor" -- color, how many sparks,
+// how they move (outward burst vs. rising sparkle vs. bubbling vs.
+// dripping), and how long the whole thing lingers. `kind` is picked by
+// the caller (see main.js's applyResultFx/applyBleedFx) to match what
+// actually just happened: a plain hit, a heal "with a shine" (glowing
+// sparkles that rise), a defense card activating (a calm outward glint,
+// not a violent burst), poison ticking (slow purple bubbles), or bleed
+// (dark red drops that just fall).
+const IMPACT_STYLES = {
+  hit:    { color: 0xff7a4d, count: 8, life: 0.45, speed: [0.9, 1.8], up: [0, 0.6], gravity: 2.4, spread: 0.6 },
+  heal:   { color: 0x9be6a8, count: 9, life: 0.7,  speed: [0.3, 0.7], up: [1.4, 2.0], gravity: 1.1, spread: 0.3 },
+  shield: { color: 0x8fd0ff, count: 7, life: 0.55, speed: [0.2, 0.45], up: [0.3, 0.6], gravity: 1.0, spread: 0.25 },
+  poison: { color: 0x9b6fd6, count: 9, life: 0.85, speed: [0.15, 0.4], up: [0.5, 1.0], gravity: 0.5, spread: 0.35 },
+  bleed:  { color: 0xb8452f, count: 5, life: 0.55, speed: [0.25, 0.55], up: [0.1, 0.25], gravity: 3.2, spread: 0.4 },
+};
 
 export function spawnImpact(side, laneIndex, kind = 'hit'){
   if (!scene) return;
+  const style = IMPACT_STYLES[kind] || IMPACT_STYLES.hit;
   const s = slots.get(slotKey(side, laneIndex));
   const pos = s ? s.axie.wrapper.position.clone() : laneWorldPos(side, { x: 0, z: 0 });
   pos.y += 0.9;
-  const color = IMPACT_COLORS[kind] || IMPACT_COLORS.hit;
 
   const ringGeo = new THREE.RingGeometry(0.06, 0.16, 24);
   const ringMat = new THREE.MeshBasicMaterial({
-    color, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false,
+    color: style.color, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false,
   });
   const ring = new THREE.Mesh(ringGeo, ringMat);
   ring.position.copy(pos);
@@ -173,39 +188,35 @@ export function spawnImpact(side, laneIndex, kind = 'hit'){
   scene.add(ring);
 
   const sparks = [];
-  const sparkCount = kind === 'heal' ? 5 : 8;
-  for (let i = 0; i < sparkCount; i++){
-    const sparkMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1, depthWrite: false });
+  for (let i = 0; i < style.count; i++){
+    const sparkMat = new THREE.MeshBasicMaterial({ color: style.color, transparent: true, opacity: 1, depthWrite: false });
     const spark = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), sparkMat);
     spark.position.copy(pos);
     const angle = Math.random() * Math.PI * 2;
-    const speed = kind === 'heal' ? 0.5 + Math.random() * 0.4 : 0.9 + Math.random() * 0.9;
-    const upBias = kind === 'heal' ? 1.4 + Math.random() * 0.6 : Math.random() * 0.6;
-    spark.userData.vel = new THREE.Vector3(Math.cos(angle) * speed, upBias, Math.sin(angle) * speed * 0.6);
+    const speed = style.speed[0] + Math.random() * (style.speed[1] - style.speed[0]);
+    const upBias = style.up[0] + Math.random() * style.up[1];
+    spark.userData.vel = new THREE.Vector3(Math.cos(angle) * speed, upBias, Math.sin(angle) * speed * style.spread);
+    spark.userData.gravity = style.gravity;
     scene.add(spark);
     sparks.push(spark);
   }
 
-  impacts.push({ ring, sparks, age: 0, life: kind === 'heal' ? 0.6 : 0.45, ringOpacity: 0.95 });
+  impacts.push({ ring, sparks, age: 0, life: style.life, ringOpacity: 0.95 });
 }
 
-// Formation slots, col 0..4: the Tank always starts at 0 (center); 1/2 are
-// the front line either side of it (closest to the enemy and to its own
-// taunt radius), 3/4 are the back line (farther back, safer). These mirror
-// game.js's FORMATION_XZ exactly -- keep both in sync if you tune one.
-// Local {x,z} offsets are in the side's own facing space -- laneWorldPos
-// flips z for the far side so both formations face each other. The Tank
-// roams this same local space freely (see game.js moveSquadWithTank) and
-// the other 4 lanes escort it, keeping this same offset relative to
-// wherever it currently stands, instead of a fixed slot lookup.
+// Formation slots, col 0..2: the Tank always starts at 0 (center); 1/2
+// flank it left/right at the front line. These mirror game.js's
+// FORMATION_XZ exactly -- keep both in sync if you tune one. Local {x,z}
+// offsets are in the side's own facing space -- laneWorldPos flips z for
+// the far side so both formations face each other. The Tank roams this
+// same local space freely (see game.js moveSquadWithTank) and the other
+// 2 lanes escort it, keeping this same offset relative to wherever it
+// currently stands, instead of a fixed slot lookup.
 const FORMATION = [
   { x: 0,     z: 0 },     // 0: center (Tank's default)
-  { x: -1.05, z: 0.65 },  // 1: front-left
-  { x: 1.05,  z: 0.65 },  // 2: front-right
-  { x: -0.6,  z: -0.7 },  // 3: back-left
-  { x: 0.6,   z: -0.7 },  // 4: back-right
+  { x: -1.05, z: 0.65 },  // 1: left
+  { x: 1.05,  z: 0.65 },  // 2: right
 ];
-const COLS = FORMATION.length;
 const ROW_Z = { you: 1.5, rival: -1.5 };
 
 function laneWorldPos(side, localXZ){
@@ -213,45 +224,20 @@ function laneWorldPos(side, localXZ){
   return new THREE.Vector3(localXZ.x, 0, ROW_Z[side] + faceSign * localXZ.z);
 }
 
-// Flat isometric-style tiles under every formation slot, Apeiron-style --
-// purely cosmetic, positions are fixed regardless of who's standing there.
-// The Tank's center tile is bigger and gets a pulsing ring showing its
-// taunt radius (see game.js TAUNT_RADIUS/getLegalTargets).
-function buildTiles(){
-  const tileGeo = new THREE.CylinderGeometry(0.48, 0.48, 0.07, 4);
-  const tankTileGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.08, 4);
-  const rimGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.03, 4);
+// A pulsing ring under each Tank's default slot showing its taunt radius
+// (see game.js TAUNT_RADIUS/getLegalTargets) -- the only floor marking
+// left under the formation now that the Lunacia hall's own floor (see
+// buildHall) grounds the whole board; the old per-slot square/diamond
+// tiles were dropped for being visual clutter on top of it.
+function buildTauntRings(){
   const ringGeo = new THREE.RingGeometry(1.35, 1.5, 32);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.28, side: THREE.DoubleSide });
   ['you','rival'].forEach(side => {
-    const color = side === 'you' ? 0xe39a5f : 0x7bb9d6;
-    const mat = new THREE.MeshStandardMaterial({
-      color, roughness: 0.55, metalness: 0.15,
-      emissive: color, emissiveIntensity: 0.35,
-    });
-    const tankMat = new THREE.MeshStandardMaterial({
-      color: 0xffd23f, roughness: 0.4, metalness: 0.2,
-      emissive: 0xffd23f, emissiveIntensity: 0.5,
-    });
-    const rimMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5 });
-    const ringMat = new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.28, side: THREE.DoubleSide });
-    for (let col=0; col<COLS; col++){
-      const pos = laneWorldPos(side, FORMATION[col]);
-      const isTankSlot = col === 0;
-      const tile = new THREE.Mesh(isTankSlot ? tankTileGeo : tileGeo, isTankSlot ? tankMat : mat);
-      tile.position.set(pos.x, -0.04, pos.z);
-      tile.rotation.y = Math.PI / 4;
-      scene.add(tile);
-      const rim = new THREE.Mesh(rimGeo, rimMat);
-      rim.position.set(pos.x, -0.06, pos.z);
-      rim.rotation.y = Math.PI / 4;
-      scene.add(rim);
-      if (isTankSlot){
-        const ring = new THREE.Mesh(ringGeo, ringMat);
-        ring.position.set(pos.x, -0.03, pos.z);
-        ring.rotation.x = -Math.PI / 2;
-        scene.add(ring);
-      }
-    }
+    const pos = laneWorldPos(side, FORMATION[0]);
+    const ring = new THREE.Mesh(ringGeo, ringMat.clone());
+    ring.position.set(pos.x, -0.03, pos.z);
+    ring.rotation.x = -Math.PI / 2;
+    scene.add(ring);
   });
 }
 

@@ -30,7 +30,7 @@ import { axieById, setById, classMultiplier, shuffle, buildLoadout, computeLaneS
 
 export const MAX_ENERGY = 10;
 export const HAND_SIZE = 3;
-export const SQUAD_SIZE = 5;
+export const SQUAD_SIZE = 3;
 export { LOADOUT_SIZE };
 
 // Auto-builds a valid rival squad: random species, random card set,
@@ -54,21 +54,19 @@ export function randomSquad(){
   return picks;
 }
 
-// Formation slots, col 0..4: the Tank always starts at 0 (center); 1/2 are
-// the front line either side of it (closest to the enemy and to the
-// Tank's taunt radius), 3/4 are the back line (farther back, safer).
+// Formation slots, col 0..2: the Tank always starts at 0 (center); 1/2
+// flank it left/right, both at the front line (closest to the enemy and
+// to the Tank's own taunt radius) -- a 3-Axie squad has no back line.
 // board3d.js's FORMATION mirrors these exact numbers for the 3D layout --
 // keep the two in sync if you tune one.
 export const FORMATION_XZ = [
   { x: 0,     z: 0 },
   { x: -1.05, z: 0.65 },
   { x: 1.05,  z: 0.65 },
-  { x: -0.6,  z: -0.7 },
-  { x: 0.6,   z: -0.7 },
 ];
 
 // The Tank always starts in the center formation slot (col 0); everyone
-// else fills the 4 surrounding slots in pick order. `classId` (species)
+// else fills the surrounding slots in pick order. `classId` (species)
 // drives name/color/visuals; `setId` (card set) drives the actual cardPool.
 function createLanes(picks){
   let nextCol = 1;

@@ -3,7 +3,7 @@
 Protótipo de duelo em tabuleiro 3D pro Axie Vibeathon (Sky Mavis / Axie
 Infinity), ambientado num **Salão Lunacia** (chão de pedra, colunas e um
 emblema lunar brilhante no centro, estilo arena 3x3 de WoW): esquadrão
-livre de 5 Axies, cada um com um **loadout de 5 cartas** que você monta
+livre de 3 Axies, cada um com um **loadout de 5 cartas** que você monta
 (ataque/defesa/cura, na proporção que quiser) — é essa composição, não um
 papel fixo, que determina o quão forte, tanque ou curador cada Axie fica.
 A **espécie** de um Axie (Beast/Aqua/Plant/Bird/Bug/Reptile) e sua
@@ -59,7 +59,7 @@ npm run preview
 
 ## Como o tabuleiro funciona
 
-- Você escolhe **5 Axies livremente** entre as 6 classes (pode repetir
+- Você escolhe **3 Axies livremente** entre as 6 classes (pode repetir
   classe). Pra cada um, distribui um **loadout de exatamente 5 cartas**
   entre Ataque / Defesa / Cura, na proporção que quiser (5/0/0, 2/2/1,
   0/0/5...). Marca **exatamente 1 Axie como Tanque** (só define o alvo da
@@ -124,7 +124,7 @@ npm run preview
   lados**: ao lado do botão de mover, um joystick **só do Tanque** —
   **segura e arrasta** pra ele andar continuamente na direção empurrada
   (sem cooldown, sem encaixar em slot fixo), até um raio máximo ao redor
-  do centro da formação. Os outros 4 Axies **escoltam**: seguem
+  do centro da formação. Os outros 2 Axies **escoltam**: seguem
   automaticamente, mantendo seu deslocamento de formação relativo à
   posição atual do Tanque (`moveSquadWithTank`), então o esquadrão
   inteiro avança/recua junto. Solta e todo mundo para onde estiver. "Pra
@@ -136,17 +136,20 @@ npm run preview
   do joystick do jogador, só que sem pointer events. Isso é independente
   do `col` (slot fixo, usado pro alcance curto/longo e pro swap discreto)
   -- o roam livre só mexe na posição `localPos`.
-- **Formação e Provocação (Taunt)**: cada lado forma um losango — o Tanque
-  nasce no **centro** (tile dourado brilhante, com um anel de raio), e os
-  outros 4 Axies ficam 2 na frente/2 atrás ao redor dele, fixos nesses
-  slots (só mudam via o botão "Mover"). Quem ataca de perto do Tanque
-  inimigo — agora medido por **distância real** até a posição atual dele,
-  já que ele anda livre — é **obrigado** a mirar nele, não importa o
-  alcance da carta, igual à carta real "Provocar" do Origin. Longe do
-  raio, mira livre. Isso faz o joystick do Tanque ser genuinamente tático:
-  correr pra frente pra proteger a retaguarda puxando os golpes pra si, ou
-  recuar pra fugir da provocação e liberar os aliados pra mirar em
-  qualquer um.
+- **Formação e Provocação (Taunt)**: cada lado forma um triângulo curto —
+  o Tanque nasce no **centro** (com um anel dourado pulsante marcando seu
+  raio de Provocação, `buildTauntRings`), e os outros 2 Axies flanqueiam
+  ele, um de cada lado, fixos nesses slots (só mudam via o botão
+  "Mover"). Não tem mais tile quadrado/losango debaixo de cada Axie como
+  na v1 — o chão de pedra do próprio Salão Lunacia já dá a base visual, e
+  os tiles individuais só poluíam a visão por cima dele. Quem ataca de
+  perto do Tanque inimigo — agora medido por **distância real** até a
+  posição atual dele, já que ele anda livre — é **obrigado** a mirar
+  nele, não importa o alcance da carta, igual à carta real "Provocar" do
+  Origin. Longe do raio, mira livre. Isso faz o joystick do Tanque ser
+  genuinamente tático: correr pra frente pra proteger a retaguarda
+  puxando os golpes pra si, ou recuar pra fugir da provocação e liberar
+  os aliados pra mirar em qualquer um.
 - **Salão Lunacia**: o tabuleiro é um salão circular grande (raio 11,
   chão de pedra, 12 colunas de ~4.8 de altura num anel bem mais perto do
   centro que a borda do salão — pra ficarem legíveis como pilares
@@ -250,10 +253,10 @@ Ainda não implementado:
   nativeClassId`), `buildLoadout(setId, classId, counts)` monta o pool real
   de uma Axie, fórmula de stats por contagem de cartas (`computeLaneStats`)
 - `src/game.js` — estado do duelo (**tempo real, sem `turn`**): N linhas
-  por lado, cada uma com um `col` (slot fixo: 0 é o centro/Tanque, 1-4 são
-  frente/trás, dita alcance curto e o swap discreto) e um `localPos`
+  por lado, cada uma com um `col` (slot fixo: 0 é o centro/Tanque, 1-2
+  flanqueiam ele, dita alcance curto e o swap discreto) e um `localPos`
   ({x,z} ao vivo; o Tanque anda livre nele via `moveSquadWithTank`/
-  `ROAM_RADIUS`, e essa mesma função reposiciona os outros 4 relativo à
+  `ROAM_RADIUS`, e essa mesma função reposiciona os outros 2 relativo à
   posição atual dele, formação de escolta), dano, cura, status effects
   (inclui `applyBarrier`/`applyDodge`/`applyThorns` além dos antigos
   Bulwark/Vulnerable/Regen), mira manual + Provocação por distância real
@@ -286,16 +289,19 @@ Ainda não implementado:
 - `src/axie3d.js` — preview 3D real (Axie Mixer 3D) no team picker (1 Axie
   por vez)
 - `src/board3d.js` — o tabuleiro de duelo em si: uma cena three.js
-  **compartilhada** (1 renderer/câmera só) com até 10 Axies 3D reais (5 de
+  **compartilhada** (1 renderer/câmera só) com até 6 Axies 3D reais (3 de
   cada lado). O **Salão Lunacia** (`buildHall`) é o piso circular de
   pedra (raio 11) + anel de 12 colunas de ~4.8 de altura + o emblema lunar
   central desenhado via canvas em runtime (`buildLunaciaSigilTexture`) +
-  névoa de distância (`scene.fog`), por cima do qual ficam os tiles em
-  losango (laranja/azul, estilo Apeiron) numa **formação centrada no
-  Tanque** (`FORMATION`: centro + frente/trás), com um tile maior e anel
-  pulsante no slot do Tanque marcando o raio de Provocação. `spawnImpact`
-  estoura um anel + faíscas em 3D na posição de um lane quando um golpe
-  acerta ou cura. No início da partida cada Axie nasce afastado da sua
+  névoa de distância (`scene.fog`) -- os antigos tiles em losango por
+  baixo de cada Axie foram removidos (poluíam a visão por cima do chão do
+  salão), sobrando só `buildTauntRings`: um anel pulsante no slot do
+  Tanque marcando seu raio de Provocação. `spawnImpact` estoura um efeito
+  em 3D na posição de um lane conforme o que aconteceu -- anel + faíscas
+  laranja num acerto, verdes brilhantes subindo numa cura, azul num
+  glint calmo de defesa ativada, bolhas roxas num tick de veneno, gotas
+  vermelhas caindo num tick de sangramento (`IMPACT_STYLES`, uma entrada
+  por "sabor" de efeito). No início da partida cada Axie nasce afastado da sua
   posição real e **caminha** até ela (`syncBoardAxies`'s `introWalk`,
   lerp mais lento que o normal + `setLocomotion('walk')` até chegar).
   Fora disso, cada Axie balança sutilmente perto da sua posição quando
@@ -341,9 +347,9 @@ node scripts/trim-axie3d-assets.mjs
 `public/assets/axie3d/`.
 
 O tabuleiro de duelo (`src/board3d.js`) também usa o 3D real, mas de um jeito
-mais pesado: até 10 Axies simultâneos (5 de cada lado), todos numa única
+mais pesado: até 6 Axies simultâneos (3 de cada lado), todos numa única
 cena/câmera/renderer three.js compartilhada — cada `mixer.create()` só
-adiciona mais um modelo à mesma cena, então não abre 10 contextos WebGL
+adiciona mais um modelo à mesma cena, então não abre vários contextos WebGL
 (pesado pro celular). HP/nome/status ficam em `<div>`s absolutamente
 posicionados por cima, calculados projetando a posição 3D de cada Axie pela
 câmera (`projectLane`) — a mesma técnica que jogos como Apeiron usam pra UI

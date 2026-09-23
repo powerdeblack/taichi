@@ -178,6 +178,7 @@ function applyResultFx(result){
           barrier: 'BARRIER!', dodge: 'EVASION!', thorns: 'THORNS!',
         };
         render.spawnFloatingText(el, labels[card.effect] || 'GUARD!', 'text-shield');
+        ui.spawnImpact(result.targetSide, result.targetIndex, 'shield');
       }
       return;
     }
@@ -208,6 +209,8 @@ function applyResultFx(result){
     render.shakeBoard(boardEl);
     render.spawnFloatingText(el, '-'+result.dmg, 'text-dmg');
     ui.spawnImpact(result.targetSide, result.targetIndex, 'hit');
+    if (card.effect === 'bleed') ui.spawnImpact(result.targetSide, result.targetIndex, 'bleed');
+    if (card.effect === 'poison') ui.spawnImpact(result.targetSide, result.targetIndex, 'poison');
     if (result.ambush) render.spawnFloatingText(el, 'AMBUSH! x2', 'text-ambush');
     if (result.shielded) render.spawnFloatingText(el, 'BLOCKED!', 'text-block');
     if (result.bulwarked) render.spawnFloatingText(el, 'BULWARK!', 'text-block');
@@ -231,11 +234,13 @@ function applyBleedFx(side, statusResults){
     if (kind === 'regen'){
       render.flashHeal(el);
       render.spawnFloatingText(el, '+'+dmg+' 🌿', 'text-heal');
+      ui.spawnImpact(side, laneIndex, 'heal');
       return;
     }
     render.flashHit(el);
     const icon = kind === 'poison' ? '☠️' : (kind === 'regenRot' ? '🥀' : '🩸');
     render.spawnFloatingText(el, '-'+dmg+' '+icon, 'text-bleed');
+    ui.spawnImpact(side, laneIndex, kind === 'poison' ? 'poison' : 'bleed');
   });
 }
 
