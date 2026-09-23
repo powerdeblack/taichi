@@ -156,8 +156,8 @@ function updateMoveBtn(){
   moveBtn.disabled = !canMove;
   moveBtn.classList.toggle('active', moveMode);
   moveBtn.textContent = state.moveCooldown > 0
-    ? `🔀 Move (${Math.ceil(state.moveCooldown)}s)`
-    : '🔀 Move an Axie';
+    ? `🔀 ${Math.ceil(state.moveCooldown)}s`
+    : '🔀 Move';
 }
 
 function applyResultFx(result){

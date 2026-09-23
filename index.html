@@ -56,17 +56,22 @@
           <span id="discardPileCount">Discard: 0</span>
         </div>
       </div>
-      <div class="action-row">
-        <button class="move-btn" id="moveBtn">🔀 Move an Axie</button>
-        <div class="joystick-wrap" id="joystickWrap">
-          <div class="joystick-label">🎯 Tank</div>
-          <div class="joystick-base" id="joystickBase">
-            <div class="joystick-knob" id="joystickKnob"></div>
+      <div class="hint" id="hint">Choose a card to play.</div>
+      <div class="play-row">
+        <div class="stick-zone">
+          <button class="move-btn" id="moveBtn">🔀 Move</button>
+          <div class="joystick-wrap" id="joystickWrap">
+            <div class="joystick-label">🎯 Tank</div>
+            <div class="joystick-base" id="joystickBase">
+              <div class="joystick-knob" id="joystickKnob"></div>
+            </div>
           </div>
         </div>
+        <div class="zone-divider"></div>
+        <div class="hand-zone">
+          <div class="hand" id="hand"></div>
+        </div>
       </div>
-      <div class="hand" id="hand"></div>
-      <div class="hint" id="hint">Choose a card to play.</div>
     </div>
 
     <div class="btn-row">
@@ -90,8 +95,6 @@
       <p>The Tank sits at the center and "taunts" — anyone attacking from close to it is forced to hit the Tank instead of picking freely, win or lose. Hold the joystick to roam the Tank around; the other 4 Axies escort it automatically, keeping formation around wherever it goes. Use "Move an Axie" (a short cooldown) to swap two of your own lanes instead — handy for ducking out of Taunt range or lining up a short-range hit.</p>
     </div>
   </div>
-
-  <p class="note">Concept prototype for the Vibeathon — a big Lunacia dueling hall (stone floor, a ring of columns, a glowing lunar sigil at the center), real-time, no turns: both squads walk in from a distance when the duel starts, both sides regenerate energy continuously and can play cards anytime. Tap any Axie on the board (yours or the rival's), or its HP bar directly, to select it — glowing white ring — then tap a card in your hand to use it on that target: attack cards only work on a selected enemy in range, defense/heal cards work on either side (ally = normal effect, enemy = reversed — Vulnerable instead of a shield, damage instead of healing). Every hit, heal, bleed/poison tick, and defense activation bursts its own 3D effect (orange hits, glowing green heals, blue shield glints, purple poison bubbles, dark red bleed drips) at the point of contact, and floating damage/heal text lingers longer so the action's easier to follow. The Tank sits in the center with a taunt radius: attack from the front line and you're forced to hit it. Hold the joystick to roam the Tank freely — the other 2 escort it, staying in formation around wherever it goes — or use "Move an Axie" (a few seconds' cooldown) to swap any two of your own. The rival wanders the hall on its own too.</p>
 </div>
 
 <script type="module" src="/src/main.js"></script>

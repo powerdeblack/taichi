@@ -96,16 +96,16 @@ export function initBoard3D(canvas){
   // Pulled back and slightly wider than the original tiles-only framing so
   // the much bigger hall (see buildHall) actually reads as a big room
   // instead of just a slightly larger floor color.
-  camera = new THREE.PerspectiveCamera(34, 1, 0.1, 60);
-  camera.position.set(0, 7.4, 7.8);
-  camera.lookAt(0, 0, -0.3);
+  camera = new THREE.PerspectiveCamera(26, 1, 0.1, 60);
+  camera.position.set(0, 11.5, 12.6);
+  camera.lookAt(0, 0, 0.2);
   // matrixWorldInverse (needed by Vector3.project, used for overlay
   // positioning) is normally only refreshed during a render() pass -- force
   // it now so projectLane() works before the first animation frame ticks.
   camera.updateMatrixWorld(true);
   // Fog so the hall fades into darkness at the edges instead of the floor
   // just hard-cutting -- sells the sense of a vast dim room.
-  scene.fog = new THREE.Fog(0x120c08, 9, 26);
+  scene.fog = new THREE.Fog(0x120c08, 14, 32);
   scene.add(new THREE.HemisphereLight(0xfff3d6, 0x241a10, 1.6));
   const dir = new THREE.DirectionalLight(0xffffff, 1.6);
   dir.position.set(3, 6, 3);

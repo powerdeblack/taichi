@@ -159,6 +159,24 @@ npm run preview
   genuinamente tático: correr pra frente pra proteger a retaguarda
   puxando os golpes pra si, ou recuar pra fugir da provocação e liberar
   os aliados pra mirar em qualquer um.
+- **HUD dividido, dois dedos**: o joystick e a mão de cartas ficam em
+  **zonas separadas lado a lado** (`.play-row`: `.stick-zone` na
+  esquerda, `.hand-zone` na direita, com um divisor fino entre as duas) —
+  dá pra segurar o joystick com um polegar e tocar numa carta com o outro
+  ao mesmo tempo, sem um atrapalhar o outro. O painel de controles inteiro
+  (`.controls`) fica fixo (`position:sticky`) na parte de baixo da tela.
+- **Modo paisagem (celular deitado)**: abaixo de `520px` de altura em
+  paisagem (`@media (orientation:landscape) and (max-height:520px)`), o
+  duelo vira um **HUD flutuante sobre o tabuleiro em tela cheia** em vez
+  da faixa de controles embaixo -- energia/dica/Revanche no topo,
+  joystick no canto inferior esquerdo, cartas no canto inferior direito,
+  cada zona com fundo translúcido só pra legibilidade, sem nenhuma barra
+  "comendo" espaço vertical. Isso deixa o jogo inteiro (tabuleiro +
+  controles) cabendo numa tela só, sem rolar, exatamente como um jogo
+  mobile de verdade seguraria os dois polegares nos cantos. O montador de
+  time (`#deckScreen`) só reduz o que não é essencial (título, "How to
+  Play", o preview 3D some no aperto) e mantém rolagem normal -- montar
+  time não é tão sensível ao tempo quanto mirar no meio do duelo.
 - **Salão Lunacia**: o tabuleiro é um salão circular grande (raio 11,
   chão de pedra, 12 colunas de ~4.8 de altura num anel bem mais perto do
   centro que a borda do salão — pra ficarem legíveis como pilares
@@ -168,7 +186,13 @@ npm run preview
   entre as duas fileiras, e névoa (`scene.fog`) escurecendo a distância
   pra reforçar a sensação de um salão vasto. A câmera foi recuada/alargada
   (FOV 28→34, mais longe) pra esse tamanho maior realmente aparecer, não só
-  o chão. Ao começar o duelo, os dois esquadrões nascem afastados (atrás
+  o chão -- e depois ajustada de novo pra um **FOV bem mais fechado (26) e
+  bem mais recuada** (era muito próxima, o Tanque do seu próprio time,
+  por ficar mais perto da câmera, aparecia como um "domo" gigante
+  cobrindo metade da tela): FOV mais teleobjetiva + mais distância
+  comprime a diferença de tamanho entre quem tá perto e longe da câmera,
+  então os dois lados ficam em escala parecida em vez do time mais
+  próximo dominando o quadro. Ao começar o duelo, os dois esquadrões nascem afastados (atrás
   da própria formação) e **caminham** até a posição real (`introWalk`,
   reaproveitando o sistema de lerp que já existia pro swap discreto, só
   que mais lento) — a etiqueta de nome/vida de cada Axie só aparece
