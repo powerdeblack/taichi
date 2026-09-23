@@ -120,6 +120,22 @@ npm run preview
   ao Origin — Guarda/Bulwark/Barreira/Evasão/Espinhos viram
   **Vulnerável**, Cura/Regeneração viram **dano/DOT**); sem seleção, vai no
   próprio Axie da carta.
+- **Conjuração de ~5s por carta (ritmo mais lento)**: ao soltar uma carta
+  ela não aplica na hora. São três tempos (`game.js`'s `CAST_LAUNCH_AT` =
+  1.2s, `CAST_IMPACT_AT` = 3.2s, `CAST_TIME` = 5s):
+  **carga** — runa girando no chão, coluna de luz e um orbe na cor do
+  conjunto crescendo sobre o Axie (`board3d.js`'s `startCastFX`);
+  **voo** — o orbe faz um arco até o alvo, seguindo a posição dele, com
+  rastro (`launchCastFX`; um ataque que errou desvia pro lado); **impacto**
+  — só aí as regras aplicam (`landCast` → `resolveCard`), com os efeitos de
+  acerto/cura e o som, e uma onda lenta se espalha no chão
+  (`landCastFX`). Durante os 5s a mão inteira fica travada ("⏳ Next card
+  in 3.2s" sobre as cartas). O alcance é decidido quando você solta. O
+  rival segue a mesma regra (uma carta por vez, `aiBeginCard`), e cada
+  Axie conjurando mostra uma **barra de carga com o nome da carta** —
+  então dá pra ver o golpe do rival vindo. Se quem conjura morrer antes do
+  impacto, a carta se perde. A energia regenera mais devagar (0.3/s) pra
+  acompanhar o ritmo novo.
 - **Alcance em distância real**: `game.js` converte a posição de cada
   Axie pra coordenadas do tabuleiro (`worldPos`, com `ROW_Z` — o mesmo
   sistema que o `board3d.js` usa pra desenhar) e mede distância de verdade:

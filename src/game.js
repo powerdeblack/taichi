@@ -82,6 +82,8 @@ export function freshState(youPicks, rivalPicks){
     energyYou: 3, energyRival: 3,
     firstHitDone: false,
     moveCooldown: 0,
+    castYou: 0,
+    castRival: 0,
     statusTimer: 0,
     deck, discard: [], hand,
     gameOver: false,
@@ -511,7 +513,7 @@ function tickRegenRot(lane){
 function baseResult(side, card, casterIndex){
   return {
     side, card, casterIndex, targetIndex: -1, targetSide: side, reversed: false,
-    dmg: 0, healed: 0, missed: false,
+    dmg: 0, healed: 0, missed: false, fizzled: false,
     ambush: false, shielded: false, deathmarked: false, bulwarked: false,
     barrierApplied: false, dodgeApplied: false, thornsApplied: false,
     dodged: false, thornReflected: 0, comboBonus: 0,
@@ -612,13 +614,33 @@ export function resolveCard(state, side, card, casterIndex, targetIndex, targetS
   return result;
 }
 
-// Plays a card from the player's hand. The card is spent either way; an
-// attack whose aimed enemy is outside the card's range at the moment it's
-// released simply misses (result.missed) -- the range ring shown while the
-// card is held is the warning. A taunted caster always swings at the Tank.
-export function playerPlayCard(state, card, targetIndex, targetSide){
+// ================= Casting =================
+// Every card takes a while to go off: it charges on its Axie, flies to
+// its target and only then lands (CAST_IMPACT_AT seconds after release),
+// and the whole side is locked out of playing another card until
+// CAST_TIME has passed. The rival follows the same rule, so both sides
+// play at most one card every CAST_TIME seconds and can see the other's
+// cast coming. main.js drives the timing and calls resolveCard at impact.
+export const CAST_TIME = 5;
+export const CAST_LAUNCH_AT = 1.2;
+export const CAST_IMPACT_AT = 3.2;
+
+export function tickCasts(state, dt){
+  state.castYou = Math.max(0, state.castYou - dt);
+  state.castRival = Math.max(0, state.castRival - dt);
+}
+
+// Starts a card from the player's hand: spends its energy, moves it to the
+// discard (Retain cards stay), locks the hand for CAST_TIME, and decides
+// the target now. An attack whose aimed enemy is outside the card's range
+// at the moment it's released is marked `missed` -- the range ring shown
+// while the card is held is the warning. A taunted caster always swings at
+// the enemy Tank. Returns the cast plan, or null if the hand is locked.
+export function playerBeginCard(state, card, targetIndex, targetSide){
+  if (state.castYou > 0 || state.energyYou < card.cost) return null;
   const casterIndex = card.laneIndex;
   state.energyYou -= card.cost;
+  state.castYou = CAST_TIME;
   if (card.effect !== 'retain'){
     state.hand = state.hand.filter(c => c !== card);
     state.discard.push(card);
@@ -627,13 +649,24 @@ export function playerPlayCard(state, card, targetIndex, targetSide){
   if (card.role === 'attack'){
     const taunt = tauntedBy(state, 'you', casterIndex);
     const aim = taunt !== -1 ? taunt : targetIndex;
-    if (aim < 0 || !getLegalTargets(state, 'you', card, casterIndex).includes(aim)){
-      const miss = baseResult('you', card, casterIndex);
-      return Object.assign(miss, { missed: true, targetIndex: aim, targetSide: 'rival' });
-    }
-    return resolveCard(state, 'you', card, casterIndex, aim);
+    const missed = aim < 0 || !getLegalTargets(state, 'you', card, casterIndex).includes(aim);
+    return { side: 'you', card, casterIndex, targetIndex: aim, targetSide: 'rival', missed };
   }
-  return resolveCard(state, 'you', card, casterIndex, targetIndex, targetSide);
+  return { side: 'you', card, casterIndex, targetIndex, targetSide, missed: false };
+}
+
+// Lands a cast plan (at CAST_IMPACT_AT). If the caster died mid-cast the
+// card fizzles; a missed attack returns a `missed` result without effect.
+export function landCast(state, plan){
+  const casterLane = lanesOf(state, plan.side)[plan.casterIndex];
+  if (!casterLane || !casterLane.alive){
+    return Object.assign(baseResult(plan.side, plan.card, plan.casterIndex), { fizzled: true });
+  }
+  if (plan.missed){
+    return Object.assign(baseResult(plan.side, plan.card, plan.casterIndex),
+      { missed: true, targetIndex: plan.targetIndex, targetSide: plan.targetSide });
+  }
+  return resolveCard(state, plan.side, plan.card, plan.casterIndex, plan.targetIndex, plan.targetSide);
 }
 
 function tickStatuses(lanes){
@@ -655,7 +688,7 @@ function tickStatuses(lanes){
 // No more turn handoff: both sides regenerate energy continuously and
 // status effects tick on a fixed interval regardless of who's "acting".
 // main.js drives all of this from one requestAnimationFrame loop.
-export const ENERGY_REGEN_PER_SEC = 0.6; // ~ +3 energy every 5s
+export const ENERGY_REGEN_PER_SEC = 0.3; // ~1.5 energy per 5s cast window
 export const STATUS_TICK_INTERVAL = 2; // seconds between Bleed/Poison ticks
 
 export function tickEnergyRealtime(state, dt){

@@ -370,6 +370,16 @@ h1{
   50%{ box-shadow:0 0 0 2px #e8f2ff, 0 0 16px 4px #e8f2ffd0; }
 }
 .unit-chip.dead{ opacity:.35; filter:grayscale(1); }
+.cast-bar{
+  display:none; position:relative; margin-top:3px; height:13px; border-radius:7px; overflow:hidden;
+  background:#1c130cd8; border:1px solid #ffd23f80;
+}
+.cast-bar.active{ display:block; }
+.cast-bar-fill{ position:absolute; inset:0 auto 0 0; width:0; background:linear-gradient(90deg,#ffb830,#ffe07a); opacity:.85; }
+.cast-bar-label{
+  position:relative; display:block; font-size:.5rem; font-weight:800; line-height:13px;
+  text-align:center; color:#fff; text-shadow:0 1px 2px #000; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
 .unit-chip.in-range{
   box-shadow:0 0 0 2px #5fe07a, 0 0 12px 3px #5fe07a90;
 }
@@ -534,6 +544,22 @@ h1{
 .hand{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; width:100%; }
 .hand .card{ padding:8px 6px 6px; }
 .hand .card:active:not(.disabled){ transform:scale(.95); }
+.hand-zone{ position:relative; }
+.hand.locked .card{ filter:grayscale(.7) brightness(.7); }
+.cast-lock{
+  display:none; position:absolute; left:0; right:0; top:50%; transform:translateY(-50%);
+  pointer-events:none; text-align:center; z-index:2;
+}
+.cast-lock.active{ display:block; }
+.cast-lock span{
+  position:relative; display:inline-block; font-family:'Baloo 2',sans-serif; font-weight:800; font-size:.8rem;
+  color:#fff; background:#1c130ce0; border:1px solid #ffd23f90; border-radius:14px; padding:4px 12px;
+  text-shadow:0 1px 2px #000;
+}
+.cast-lock-fill{
+  position:absolute; left:8%; bottom:-10px; height:4px; border-radius:3px;
+  background:linear-gradient(90deg,#ffb830,#ffe07a); box-shadow:0 0 8px #ffb83090;
+}
 .hand .card{ touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
 .hand .card.aiming{
   transform:translateY(-6px) scale(1.03); border-color:var(--gold) !important;
@@ -607,4 +633,9 @@ h1{
   .reset-btn, .switch-deck-btn{ padding:5px 10px; font-size:.58rem; border-radius:14px; }
 
   #deckScreen{ max-height:100vh; overflow-y:auto; }
+
+  /* Smaller unit tags so they don't bury the fight on a short screen. */
+  .unit-tag{ width:66px; }
+  .unit-chip{ padding:3px 5px; }
+  .mp-label{ display:none; }
 }

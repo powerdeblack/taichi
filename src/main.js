@@ -4,7 +4,7 @@ import { AXIES, CARD_SETS, setById, ARCHETYPES, copyArchetypePicks } from './car
 import * as game from './game.js';
 import * as ui from './ui.js';
 import * as render from './render.js';
-import { aiMaybeAct } from './ai.js';
+import { aiBeginCard } from './ai.js';
 import { initPreview, showAxie } from './axie3d.js';
 import * as sfx from './sfx.js';
 
@@ -172,6 +172,8 @@ function beginMatch(youSquad, rivalSquad){
   matchFinished = false;
   aiMoveTimer = 1 + Math.random() * 1.5;
   aiWandering = false;
+  aiThinkTimer = 2.5; // let both squads finish walking in first
+  clearCasts();
   ui.hideBanner();
   ui.buildBoard(state, onUnitClick);
   syncUI();
@@ -206,6 +208,8 @@ function updateMoveBtn(){
 function applyResultFx(result){
   if (!result) return;
   const { side, card, casterIndex } = result;
+
+  if (result.fizzled) return;
 
   if (result.missed){
     const el = result.targetIndex >= 0
@@ -320,6 +324,7 @@ function applyBleedFx(side, statusResults){
 function setHintForResult(side, result){
   const who = side === 'you' ? 'You' : 'The rival';
   if (!result) return; // no card affordable right now -- not worth a hint, it happens constantly
+  if (result.fizzled){ ui.setHint(`${who}: ${result.card.name} fizzled — its caster fell.`); return; }
   if (result.missed){ ui.setHint(`${result.card.name} missed — the target was out of range.`); return; }
   if (result.card.role === 'defense' || result.card.role === 'heal'){
     if (result.targetIndex === -1){ ui.setHint(`${who}: no target available!`); return; }
@@ -337,6 +342,7 @@ function setHintForResult(side, result){
 function finishMatch(){
   if (matchFinished) return;
   matchFinished = true;
+  clearCasts();
   if (state.winner === 'draw') ui.showBanner('Draw!', 'Both Tanks fell together.');
   else if (state.winner === 'you') ui.showBanner('You won the duel!', 'The rival Tank was defeated.');
   else ui.showBanner('You lost the duel.', 'Your Tank was defeated.');
@@ -455,8 +461,9 @@ function onCardRelease(card){
   const a = aimFor(card);
   aiming = null;
   hideAimVisuals();
-  if (state.gameOver || state.energyYou < card.cost){ syncHand(); return; }
-  playCard(card, a.targetIndex, a.targetSide);
+  const plan = state.gameOver ? null : game.playerBeginCard(state, card, a.targetIndex, a.targetSide);
+  if (plan) startCast(plan);
+  syncUI();
 }
 
 function onCardCancel(card){
@@ -467,11 +474,57 @@ function syncHand(){
   ui.renderHand(state, { onPress: onCardPress, onRelease: onCardRelease, onCancel: onCardCancel, aimingUid: aiming && aiming.uid });
 }
 
-function playCard(card, targetIndex, targetSide){
-  const result = game.playerPlayCard(state, card, targetIndex, targetSide);
-  applyResultFx(result);
-  syncUI();
-  setHintForResult('you', result);
+// ================= Cast timeline =================
+// A released card (or the rival's pick) charges on its Axie until
+// CAST_LAUNCH_AT, flies to the target, and only lands -- rules applied,
+// hit/heal effects, sound -- at CAST_IMPACT_AT; that side can't start
+// another card until CAST_TIME. Self-targeted cards just charge longer.
+let pendingCasts = [];
+let castSeq = 0;
+
+function castColor(card){
+  const set = setById(card.setId);
+  return set ? set.color : card.color;
+}
+
+function startCast(plan){
+  const id = ++castSeq;
+  const selfCast = plan.targetSide === plan.side && plan.targetIndex === plan.casterIndex;
+  const travels = !selfCast && plan.targetIndex >= 0;
+  ui.startCastFX(id, plan.side, plan.casterIndex, castColor(plan.card), travels ? game.CAST_LAUNCH_AT : game.CAST_IMPACT_AT);
+  sfx.playCastStart(plan.card);
+  pendingCasts.push({ id, plan, age: 0, travels, launched: false });
+  if (plan.side === 'you') ui.setHint(`⏳ Casting ${plan.card.name}…`);
+  else if (!aiming) ui.setHint(`⚠️ The rival is casting ${plan.card.name}!`);
+}
+
+function tickPendingCasts(dt){
+  pendingCasts = pendingCasts.filter(c => {
+    c.age += dt;
+    if (c.travels && !c.launched && c.age >= game.CAST_LAUNCH_AT){
+      c.launched = true;
+      ui.launchCastFX(c.id, c.plan.targetSide, c.plan.targetIndex, game.CAST_IMPACT_AT - game.CAST_LAUNCH_AT, c.plan.missed);
+      sfx.playLaunch(c.plan.card);
+    }
+    if (c.age < game.CAST_IMPACT_AT) return true;
+    ui.landCastFX(c.id);
+    const result = game.landCast(state, c.plan);
+    applyResultFx(result);
+    if (!aiming && (c.plan.side === 'you' || !moveMode)) setHintForResult(c.plan.side, result);
+    syncUI();
+    return false;
+  });
+  ui.setCastBars(pendingCasts.map(c => ({
+    side: c.plan.side, laneIndex: c.plan.casterIndex,
+    frac: Math.min(1, c.age / game.CAST_IMPACT_AT),
+    label: `${c.plan.card.setIcon || ''} ${c.plan.card.name}`,
+  })));
+}
+
+function clearCasts(){
+  pendingCasts = [];
+  ui.clearCastsFX();
+  ui.setCastBars([]);
 }
 
 // ================= Discrete move (cooldown-gated swap) =================
@@ -635,8 +688,8 @@ function pickAiWanderMove(){
 // updating existing DOM refs), so only the heavier full re-renders (hand,
 // pips, piles) are throttled to a fixed interval.
 const UI_REFRESH_INTERVAL = 0.15;
-const AI_THINK_BASE = 1.5;
-const AI_THINK_JITTER = 1.0;
+const AI_THINK_BASE = 0.6;
+const AI_THINK_JITTER = 1.2;
 let uiRefreshTimer = 0;
 let aiThinkTimer = AI_THINK_BASE;
 let lastFrameMs = null;
@@ -651,6 +704,7 @@ function gameLoop(nowMs){
 
   game.tickEnergyRealtime(state, dt);
   game.tickMoveCooldown(state, dt);
+  game.tickCasts(state, dt);
   const statusResults = game.tickStatusTimer(state, dt);
   if (statusResults){
     applyBleedFx('you', statusResults.you);
@@ -676,15 +730,18 @@ function gameLoop(nowMs){
     }
   }
 
-  aiThinkTimer -= dt;
-  if (aiThinkTimer <= 0){
-    aiThinkTimer = AI_THINK_BASE + Math.random() * AI_THINK_JITTER;
-    const result = aiMaybeAct(state);
-    if (result){
-      applyResultFx(result);
-      if (!selectedTarget && !moveMode) setHintForResult('rival', result);
+  // The rival waits out its own cast lock, then pauses a beat before the
+  // next card so it doesn't fire the instant the lock clears.
+  if (state.castRival <= 0){
+    aiThinkTimer -= dt;
+    if (aiThinkTimer <= 0){
+      aiThinkTimer = AI_THINK_BASE + Math.random() * AI_THINK_JITTER;
+      const plan = aiBeginCard(state);
+      if (plan) startCast(plan);
     }
   }
+  tickPendingCasts(dt);
+  ui.renderCastLock(state.castYou, game.CAST_TIME);
 
   ui.updateBoard(state);
   updateAim();

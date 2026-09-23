@@ -168,6 +168,7 @@ function animate(){
     }
   });
   tickImpacts(dt);
+  tickCasts(dt);
   tickScenery(dt);
   if (renderer && scene && camera) renderer.render(scene, camera);
 }
@@ -244,6 +245,153 @@ export function spawnImpact(side, laneIndex, kind = 'hit'){
   }
 
   impacts.push({ ring, sparks, age: 0, life: style.life, ringOpacity: 0.95 });
+}
+
+// ================= Card casts =================
+// A card goes off in three beats, driven by main.js's cast timeline:
+//  1. charge -- a spinning rune ring on the snow, a light column and an orb
+//     gathering over the caster, with motes spiraling into it;
+//  2. flight -- the orb arcs to its target (homing on the target's live
+//     position; a miss veers off to the side), motes trailing behind;
+//  3. aftermath -- a slow shockwave rolls out under the target while the
+//     cast lock runs out.
+// Self-targeted cards skip the flight and just keep charging until impact.
+const casts = new Map();
+const AFTERMATH_TIME = 1.8;
+
+// Normal (not additive) blending: additive glow washes out to white
+// against the bright snow, solid color reads.
+function castMaterial(color, opacity){
+  return new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide,
+  });
+}
+
+function slotWorld(side, laneIndex){
+  const s = slots.get(slotKey(side, laneIndex));
+  return s ? s.axie.wrapper.position : null;
+}
+
+export function startCastFX(id, side, laneIndex, color, chargeTime){
+  if (!scene) return;
+  const c = new THREE.Color(color);
+  const deep = c.clone().multiplyScalar(0.75);
+  const core = c.clone().lerp(new THREE.Color(0xffffff), 0.55);
+  const rune = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.58, 6, 1), castMaterial(deep, 0));
+  rune.rotation.x = -Math.PI / 2;
+  const column = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.46, 1.8, 24, 1, true), castMaterial(c, 0));
+  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), castMaterial(core, 1));
+  const halo = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 12), castMaterial(c, 0.55));
+  const motes = [];
+  for (let i = 0; i < 10; i++){
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 6), castMaterial(deep, 0.95));
+    m.userData.angle = (i / 10) * Math.PI * 2;
+    m.userData.lift = Math.random();
+    motes.push(m);
+  }
+  [rune, column, orb, halo, ...motes].forEach(o => { o.renderOrder = 6; scene.add(o); });
+  casts.set(id, { side, laneIndex, age: 0, chargeTime, phase: 'charge', rune, column, orb, halo, motes, proj: null });
+}
+
+export function launchCastFX(id, toSide, toIndex, duration, miss){
+  const cast = casts.get(id);
+  if (!cast) return;
+  const side = new THREE.Vector3((Math.random() < 0.5 ? -1 : 1) * 1.1, 0, 0.4);
+  cast.proj = { toSide, toIndex, dur: duration, t: 0, from: cast.orb.position.clone(), miss, offset: miss ? side : new THREE.Vector3() };
+  cast.phase = 'fly';
+}
+
+// Impact: drops the orb/column/motes and turns the rune into the slow
+// aftermath shockwave at the target (or where the missed shot landed).
+export function landCastFX(id){
+  const cast = casts.get(id);
+  if (!cast) return;
+  const at = cast.orb.position.clone();
+  [cast.column, cast.orb, cast.halo, ...cast.motes].forEach(o => { scene.remove(o); o.geometry.dispose(); o.material.dispose(); });
+  cast.column = cast.orb = cast.halo = null;
+  cast.motes = [];
+  cast.rune.position.set(at.x, -0.04, at.z);
+  cast.phase = 'aftermath';
+  cast.age = 0;
+}
+
+function disposeCast(cast){
+  [cast.rune, cast.column, cast.orb, cast.halo, ...cast.motes].forEach(o => {
+    if (!o) return;
+    scene.remove(o); o.geometry.dispose(); o.material.dispose();
+  });
+}
+
+export function clearCastsFX(){
+  casts.forEach(disposeCast);
+  casts.clear();
+}
+
+function tickCasts(dt){
+  casts.forEach((cast, id) => {
+    cast.age += dt;
+    if (cast.phase === 'aftermath'){
+      const t = Math.min(1, cast.age / AFTERMATH_TIME);
+      cast.rune.scale.setScalar(1 + t * 5);
+      cast.rune.rotation.z += dt * 0.8;
+      cast.rune.material.opacity = 0.85 * (1 - t);
+      if (t >= 1){ disposeCast(cast); casts.delete(id); }
+      return;
+    }
+    const caster = slotWorld(cast.side, cast.laneIndex);
+    const pulse = 0.5 + 0.5 * Math.sin(cast.age * 9);
+
+    if (cast.phase === 'charge'){
+      const k = Math.min(1, cast.age / cast.chargeTime);
+      if (caster){
+        cast.rune.position.set(caster.x, -0.04, caster.z);
+        cast.column.position.set(caster.x, 0.9, caster.z);
+        cast.orb.position.set(caster.x, 1.45 + Math.sin(cast.age * 3) * 0.06, caster.z);
+      }
+      cast.rune.rotation.z += dt * (1.5 + k * 5);
+      cast.rune.scale.setScalar(1 + k * 1.1);
+      cast.rune.material.opacity = 0.45 + 0.5 * k;
+      cast.column.material.opacity = (0.1 + 0.25 * k) * (0.7 + 0.3 * pulse);
+      cast.column.scale.set(1 - k * 0.35, 0.6 + k * 0.4, 1 - k * 0.35);
+      cast.orb.scale.setScalar(0.4 + k * 1.1);
+      cast.halo.position.copy(cast.orb.position);
+      cast.halo.scale.setScalar((0.6 + k * 1.4) * (0.9 + 0.2 * pulse));
+      cast.motes.forEach(m => {
+        m.userData.angle += dt * (3 + k * 5);
+        const r = 0.75 * (1 - k) + 0.2;
+        m.position.set(
+          cast.orb.position.x + Math.cos(m.userData.angle) * r,
+          cast.orb.position.y - 0.9 * (1 - k) * (1 - m.userData.lift) + Math.sin(m.userData.angle * 2) * 0.05,
+          cast.orb.position.z + Math.sin(m.userData.angle) * r,
+        );
+      });
+      return;
+    }
+
+    // flight
+    const p = cast.proj;
+    p.t += dt;
+    const t = Math.min(1, p.t / p.dur);
+    const ease = t * t * (3 - 2 * t);
+    const target = slotWorld(p.toSide, p.toIndex);
+    const to = target ? target.clone() : p.from.clone();
+    to.y = 0.9;
+    to.add(p.offset);
+    const pos = p.from.clone().lerp(to, ease);
+    pos.y += Math.sin(Math.PI * t) * 1.3;
+    const prev = cast.orb.position.clone();
+    cast.orb.position.copy(pos);
+    cast.halo.position.copy(pos);
+    cast.halo.scale.setScalar(1.6 + 0.4 * pulse);
+    cast.column.material.opacity *= 0.9;
+    cast.rune.material.opacity *= 0.93;
+    let lead = prev;
+    cast.motes.forEach((m, i) => {
+      m.position.lerp(lead, Math.min(1, dt * 14));
+      m.material.opacity = 0.85 * (1 - i / cast.motes.length);
+      lead = m.position;
+    });
+  });
 }
 
 // Formation slots, col 0..2: the Tank always starts at 0 (center); 1/2
@@ -784,6 +932,7 @@ export function setLaneRoaming(side, laneIndex, roaming){
 }
 
 export function clearBoard3D(){
+  clearCastsFX();
   slots.forEach(s => { scene.remove(s.axie.wrapper); s.axie.dispose(); });
   slots.clear();
 }

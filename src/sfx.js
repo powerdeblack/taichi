@@ -124,6 +124,25 @@ export function playAttack(card, dmg){
   if (card.effect === 'poison') playPoison(lead + 0.08);
 }
 
+// ---- casting ----
+
+// A rising shimmer while the card charges on its Axie.
+export function playCastStart(card){
+  if (!ready()) return;
+  const base = card.role === 'attack' ? 220 : 330;
+  tone({ type: 'triangle', freq: base, freqEnd: base * 3, peak: 0.07, attack: 0.3, decay: 0.9 });
+  tone({ type: 'sine', freq: base * 1.5, freqEnd: base * 4, peak: 0.05, attack: 0.4, decay: 0.8, detune: 7 });
+  noise({ peak: 0.04, attack: 0.5, decay: 0.6, filter: 'bandpass', freq: 800, freqEnd: 3000, q: 3 });
+}
+
+// The card leaving its Axie toward the target.
+export function playLaunch(card){
+  if (!ready()) return;
+  if (card.setId === 'ranger') arrow(0);
+  else if (MAGIC_SETS.has(card.setId)) tone({ type: 'sine', freq: 900, freqEnd: 300, peak: 0.1, decay: 0.35 });
+  noise({ peak: 0.14, attack: 0.05, decay: 0.45, filter: 'bandpass', freq: 400, freqEnd: 1600, q: 1.5 });
+}
+
 // ---- support / status ----
 
 export function playHeal(){

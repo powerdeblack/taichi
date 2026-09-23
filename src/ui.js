@@ -2,8 +2,9 @@
 // pips, pile counts, and the win/lose banner. No game rules live here.
 import { MAX_ENERGY, LOADOUT_SIZE, SQUAD_SIZE } from './game.js';
 import { portraitHTML } from './axieArt.js';
-import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive, moveLaneVisual, setLaneLivePosition, setLaneRoaming, spawnImpact as spawnImpact3D, setTauntRing, showAim, hideAim } from './board3d.js';
-export { setTauntRing, showAim, hideAim };
+import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive, moveLaneVisual, setLaneLivePosition, setLaneRoaming, spawnImpact as spawnImpact3D, setTauntRing, showAim, hideAim,
+  startCastFX, launchCastFX, landCastFX, clearCastsFX } from './board3d.js';
+export { setTauntRing, showAim, hideAim, startCastFX, launchCastFX, landCastFX, clearCastsFX };
 
 const rosterGrid = document.getElementById('rosterGrid');
 const squadListEl = document.getElementById('squadList');
@@ -190,6 +191,7 @@ function buildUnitTag(){
       <div class="mp-label"></div>
       <div class="status-icons"></div>
     </div>
+    <div class="cast-bar"><div class="cast-bar-fill"></div><span class="cast-bar-label"></span></div>
   `;
   boardOverlay.appendChild(wrap);
   return {
@@ -199,7 +201,39 @@ function buildUnitTag(){
     hpFill: wrap.querySelector('.hp-bar-fill'),
     mpEl: wrap.querySelector('.mp-label'),
     statusEl: wrap.querySelector('.status-icons'),
+    castBar: wrap.querySelector('.cast-bar'),
+    castFill: wrap.querySelector('.cast-bar-fill'),
+    castLabel: wrap.querySelector('.cast-bar-label'),
   };
+}
+
+// A small bar over each Axie that's mid-cast (both sides), filling up to
+// the moment the card lands -- so you can see the rival's card coming.
+export function setCastBars(bars){
+  ['you', 'rival'].forEach(side => {
+    (unitRefs[side] || []).forEach((ref, i) => {
+      if (!ref) return;
+      const bar = bars.find(b => b.side === side && b.laneIndex === i);
+      ref.castBar.classList.toggle('active', !!bar);
+      if (!bar) return;
+      ref.castFill.style.width = `${Math.round(bar.frac * 100)}%`;
+      if (ref.castLabel.textContent !== bar.label) ref.castLabel.textContent = bar.label;
+    });
+  });
+}
+
+// The hand's cast lock: while it runs every card is greyed out and a
+// countdown + draining bar sit over the hand.
+const castLockEl = document.getElementById('castLock');
+const castLockFill = document.getElementById('castLockFill');
+const castLockText = document.getElementById('castLockText');
+export function renderCastLock(remaining, total){
+  const on = remaining > 0;
+  castLockEl.classList.toggle('active', on);
+  handEl.classList.toggle('locked', on);
+  if (!on) return;
+  castLockFill.style.width = `${(remaining / total) * 100}%`;
+  castLockText.textContent = `⏳ Next card in ${remaining.toFixed(1)}s`;
 }
 
 // Overlay position tracks each lane's live `localPos` (mutable via the
@@ -390,7 +424,7 @@ export function renderHand(state, { onPress, onRelease, onCancel, aimingUid }){
     const casterLane = state.youLanes[card.laneIndex];
     const laneAlive = casterLane && casterLane.alive;
     const affordable = state.energyYou >= card.cost;
-    const playable = affordable && !state.gameOver && laneAlive;
+    const playable = affordable && !state.gameOver && laneAlive && state.castYou <= 0;
     const rangeLabel = card.range==='short' ? 'Short' : card.range==='long' ? 'Long'
       : card.role==='heal' ? 'Heal' : 'Defense';
 

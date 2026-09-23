@@ -1,15 +1,14 @@
-// Rival AI: called periodically by main.js's real-time loop (not once per
-// "turn" -- there are no turns anymore). Each call, it gathers every card
-// its alive lanes can currently afford and plays one at random, with a
-// target picked automatically via pickAutoTarget (which includes the Tank
-// taunt check, same as the player gets). Attack cards with nobody in range
-// are skipped. Returns the resolveCard result, or null if it had nothing
-// useful to play. Movement is handled separately (main.js rival wander).
-import { resolveCard, pickAutoTarget } from './game.js';
+// Rival AI: when its cast lock is free, picks one affordable card at
+// random (attacks only if someone is in range, target via pickAutoTarget,
+// which includes the Tank taunt check), pays for it and starts the cast.
+// Returns the cast plan -- main.js animates it and lands it with
+// game.landCast, same as the player's -- or null if nothing useful to
+// play. Movement is handled separately (main.js rival wander).
+import { pickAutoTarget, CAST_TIME } from './game.js';
 import { setById } from './cards.js';
 
-export function aiMaybeAct(state){
-  if (state.gameOver) return null;
+export function aiBeginCard(state){
+  if (state.gameOver || state.castRival > 0) return null;
 
   const candidates = [];
   state.rivalLanes.forEach((lane, laneIndex) => {
@@ -30,7 +29,10 @@ export function aiMaybeAct(state){
   if (!candidates.length) return null;
 
   const card = candidates[Math.floor(Math.random()*candidates.length)];
-  const casterIndex = card.laneIndex;
   state.energyRival -= card.cost;
-  return resolveCard(state, 'rival', card, casterIndex, card.role === 'attack' ? card.target : -1);
+  state.castRival = CAST_TIME;
+  // Support cards go on the rival's own caster (normal effect).
+  return card.role === 'attack'
+    ? { side: 'rival', card, casterIndex: card.laneIndex, targetIndex: card.target, targetSide: 'you', missed: false }
+    : { side: 'rival', card, casterIndex: card.laneIndex, targetIndex: card.laneIndex, targetSide: 'rival', missed: false };
 }
