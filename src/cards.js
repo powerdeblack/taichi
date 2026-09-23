@@ -227,3 +227,54 @@ export function computeLaneStats(counts, evolved){
   const mp = Math.round((BASE_MP + counts.heal * 20) * mult);
   return { powerMult, damageReduction, maxHp, mp };
 }
+
+// Ready-made squads built around one synergy each. `picks` uses the exact
+// squad-builder shape (species, card set, loadout counts, Tank flag), so
+// loading one is just copying it into the squad. Every member is on its
+// native set, so each unlocks its signature card.
+export const ARCHETYPES = [
+  {
+    id: 'bleed', name: 'Savage Bleed', icon: '🩸', color: '#d9534f',
+    tags: ['Bleed', 'Burst', 'Melee'],
+    how: 'Warrior and Mage cut the same target up close: every Bleed hit adds a stack (up to 3) and each stack bleeds 4 every tick. The Shaman Tank walks in front, taunting attackers onto itself and reflecting their damage back with Thorns. Charge forward -- the Bleed hits are short range.',
+    picks: [
+      { classId: 'Reptile', setId: 'shaman', isTank: true, evolved: false, counts: { attack: 1, defense: 3, heal: 1 } },
+      { classId: 'Beast', setId: 'warrior', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
+      { classId: 'Aqua', setId: 'mage', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
+    ],
+  },
+  {
+    id: 'poison', name: 'Plague', icon: '☠️', color: '#8e5cc9',
+    tags: ['Poison', 'Long range', 'Sustain'],
+    how: 'Rogue and Mage stack Poison from long range: each hit adds 3 stacks (up to 9), a tick deals 2 per stack and then fades by one -- a full stack does about 90 damage over time. Stay back and keep re-applying it while the Priest Tank shields itself and heals through the pressure.',
+    picks: [
+      { classId: 'Plant', setId: 'priest', isTank: true, evolved: false, counts: { attack: 1, defense: 2, heal: 2 } },
+      { classId: 'Bug', setId: 'rogue', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
+      { classId: 'Aqua', setId: 'mage', isTank: false, evolved: false, counts: { attack: 3, defense: 1, heal: 1 } },
+    ],
+  },
+  {
+    id: 'damage', name: 'Steel Rain', icon: '⚔️', color: '#e0a13a',
+    tags: ['Damage', 'Long range', 'Burst'],
+    how: 'Raw damage from far away: Ranger arrow volleys (+50% when they land), Mage Arcane Blast and the Warrior Tank\'s Brutal Charge are long-range hits that reach 6 units. The Warrior Tank soaks hits with Bulwark and taunts anyone who gets too close. Pick the weakest enemy and focus it down.',
+    picks: [
+      { classId: 'Beast', setId: 'warrior', isTank: true, evolved: false, counts: { attack: 2, defense: 3, heal: 0 } },
+      { classId: 'Bird', setId: 'ranger', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
+      { classId: 'Aqua', setId: 'mage', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
+    ],
+  },
+  {
+    id: 'heal', name: 'Sanctuary', icon: '💚', color: '#4caf6a',
+    tags: ['Heal', 'Regen', 'Tank'],
+    how: 'Outlast them: the Priest drops big heals and Regeneration on whoever is hurt, the Shaman Tank regenerates for 4 ticks and punishes attackers with Thorns, and the Ranger chips damage from range. Keep your Tank topped up and the enemy wears itself out.',
+    picks: [
+      { classId: 'Reptile', setId: 'shaman', isTank: true, evolved: false, counts: { attack: 0, defense: 3, heal: 2 } },
+      { classId: 'Plant', setId: 'priest', isTank: false, evolved: false, counts: { attack: 1, defense: 0, heal: 4 } },
+      { classId: 'Bird', setId: 'ranger', isTank: false, evolved: false, counts: { attack: 3, defense: 1, heal: 1 } },
+    ],
+  },
+];
+
+export function copyArchetypePicks(archetype){
+  return archetype.picks.map(p => ({ ...p, counts: { ...p.counts } }));
+}

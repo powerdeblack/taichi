@@ -63,8 +63,8 @@ npm run preview
   classe). Pra cada um, distribui um **loadout de exatamente 5 cartas**
   entre Ataque / Defesa / Cura, na proporção que quiser (5/0/0, 2/2/1,
   0/0/5...). Marca **exatamente 1 Axie como Tanque** (só define o alvo da
-  vitória, não muda status). O rival monta um time aleatório com a mesma
-  regra. **Vencer = derrubar o Tanque inimigo** (as outras linhas não
+  vitória, não muda status) — ou carrega um **arquétipo** pronto (ver
+  abaixo). O rival sempre entra com um arquétipo. **Vencer = derrubar o Tanque inimigo** (as outras linhas não
   precisam morrer).
 - A composição do loadout — não um papel fixo — é o que define os stats:
   - Cada carta de **Ataque** dá **+15% de poder de dano** daquele Axie.
@@ -101,66 +101,63 @@ npm run preview
   rival". O rival age sozinho, em intervalos aleatórios (~1.5-2.5s), via
   `ai.js`'s `aiMaybeAct`. Bleed/Poison tickam num timer fixo (a cada 2s)
   compartilhado pelos dois lados, não mais "no início do seu turno".
-- **Mira: toca no alvo, depois na carta**: diferente do modelo antigo
-  (carta primeiro), agora você toca em **qualquer Axie no tabuleiro**
-  (seu ou do rival) pra selecioná-lo — vira um anel branco pulsante
-  (`.unit-chip.selected-target`), independente de qual carta você vai
-  usar. A seleção é **fixa**: continua marcada depois de jogar cartas (dá
-  pra encadear várias no mesmo alvo) e só muda quando você toca em outro
-  Axie — ou some sozinha se o alvo morrer. Então você toca
-  numa carta da mão: cartas de **Ataque** só resolvem se o alvo
-  selecionado for um inimigo dentro do alcance daquela carta. Curto
-  alcance agora é um **raio de contato real** (`SHORT_RANGE_RADIUS`,
-  distância entre as posições `localPos` ao vivo dos dois lados, não mais
-  "mesma coluna") — se ninguém inimigo estiver fisicamente perto o
-  suficiente agora, a carta simplesmente não tem alvo, sem cair pra
-  "qualquer um" como no sistema antigo; longo alcance continua acertando
-  qualquer inimigo vivo, não importa a distância. Como o Tanque (e agora
-  também o rival, ver abaixo) andam de verdade pelo salão, esse raio muda
-  a cada momento — sai da carta o hint explica por quê (fora de alcance,
-  ou "Provocado" se o Tanque inimigo estiver puxando). Cartas de
-  **Defesa/Cura** aceitam qualquer alvo vivo dos dois lados: aliado =
-  efeito normal, inimigo = **revertido** (Cura Reversa, igual ao Origin)
-  — Guarda/Bulwark/Barreira/Evasão/Espinhos viram **Vulnerável**, Cura/
-  Regeneração viram **dano/DOT**. O clique é sempre ativo em cada unit
-  chip (não é mais um modo que abre/fecha por carta) — ver `ui.js`'s
-  `buildBoard(state, onUnitClick)`. O rival ainda mira automático (curto
-  = dentro do mesmo raio de contato, longo = o mais fraco).
-- **Movimento discreto**: dá pra trocar a coluna de um dos seus próprios
-  Axies com outra (toca "Mover", toca o Axie, toca o destino) — sem turno
-  pra esperar, só um cooldown curto (4s) depois de usar. Tira um Axie do
-  raio de contato de um atacante inimigo, ou reposiciona pra entrar no
-  alcance do seu próprio curto alcance num alvo específico.
-- **Joystick do Tanque + escolta (posição livre, em tempo real) — dos dois
-  lados**: ao lado do botão de mover, um joystick **só do Tanque** —
-  **segura e arrasta** pra ele andar continuamente na direção empurrada
-  (sem cooldown, sem encaixar em slot fixo), até um raio máximo ao redor
-  do centro da formação. Os outros 2 Axies **escoltam**: seguem
-  automaticamente, mantendo seu deslocamento de formação relativo à
-  posição atual do Tanque (`moveSquadWithTank`), então o esquadrão
-  inteiro avança/recua junto. Solta e todo mundo para onde estiver. "Pra
-  cima" no joystick = rumo ao inimigo (mais perto do raio de Provocação
-  do Tanque inimigo); "pra baixo" = recuar pra linha de trás. O **rival
-  também anda sozinho**, num timer que alterna entre vagar numa direção
-  aleatória por 1-3s e ficar parado por um instante (`main.js`'s
-  `pickAiWanderMove`/`aiMoveTimer`) — chama a mesma `moveSquadWithTank`
-  do joystick do jogador, só que sem pointer events. Isso é independente
-  do `col` (slot fixo, usado pro alcance curto/longo e pro swap discreto)
-  -- o roam livre só mexe na posição `localPos`.
-- **Formação e Provocação (Taunt)**: cada lado forma um triângulo curto —
-  o Tanque nasce no **centro** (com um anel dourado pulsante marcando seu
-  raio de Provocação, `buildTauntRings`), e os outros 2 Axies flanqueiam
-  ele, um de cada lado, fixos nesses slots (só mudam via o botão
-  "Mover"). Não tem mais tile quadrado/losango debaixo de cada Axie como
-  na v1 — o chão de pedra do próprio Salão Lunacia já dá a base visual, e
-  os tiles individuais só poluíam a visão por cima dele. Quem ataca de
-  perto do Tanque inimigo — agora medido por **distância real** até a
-  posição atual dele, já que ele anda livre — é **obrigado** a mirar
-  nele, não importa o alcance da carta, igual à carta real "Provocar" do
-  Origin. Longe do raio, mira livre. Isso faz o joystick do Tanque ser
-  genuinamente tático: correr pra frente pra proteger a retaguarda
-  puxando os golpes pra si, ou recuar pra fugir da provocação e liberar
-  os aliados pra mirar em qualquer um.
+- **Mira: toca no alvo (fixo), depois segura e solta a carta**: toque em
+  **qualquer Axie no tabuleiro** (seu ou do rival, inclusive na barra de
+  vida) pra selecioná-lo — anel branco pulsante. A seleção é **fixa**:
+  continua depois de jogar cartas (dá pra encadear várias no mesmo alvo),
+  só muda quando você toca em outro Axie e some sozinha se o alvo morrer.
+  Aí você **segura** uma carta da mão: aparece no chão de neve o **raio de
+  alcance** dela em volta do Axie dono da carta, e uma faixa até quem ela
+  vai atingir (`board3d.js`'s `showAim`). **Verde** = alvo dentro do
+  alcance, **vermelho** = fora; os inimigos alcançáveis brilham em verde
+  (`.unit-chip.in-range`). A carta **dispara ao soltar** — um ataque solto
+  com o alvo fora do alcance **erra e a carta é gasta** ("MISS! Out of
+  range", `game.js`'s `playerPlayCard`/`result.missed`). Alvo de ataque: o
+  inimigo selecionado, senão o inimigo mais próximo (`nearestEnemy`);
+  quem está dentro do raio de Provocação do Tanque inimigo sempre mira no
+  Tanque. Cartas de **Defesa/Cura** não têm limite de alcance: aliado
+  selecionado = efeito normal, inimigo = **revertido** (Cura Reversa, igual
+  ao Origin — Guarda/Bulwark/Barreira/Evasão/Espinhos viram
+  **Vulnerável**, Cura/Regeneração viram **dano/DOT**); sem seleção, vai no
+  próprio Axie da carta.
+- **Alcance em distância real**: `game.js` converte a posição de cada
+  Axie pra coordenadas do tabuleiro (`worldPos`, com `ROW_Z` — o mesmo
+  sistema que o `board3d.js` usa pra desenhar) e mede distância de verdade:
+  curto alcance `2.3`, longo `6.0` (`RANGE`), Provocação `1.8`
+  (`TAUNT_RADIUS`). Antes a distância era comparada em coordenadas locais
+  espelhadas de cada lado, o que fazia andar **em direção** ao inimigo
+  parecer andar pra longe — era o motivo de cartas de curto alcance
+  "não funcionarem" quando você avançava.
+- **Movimento livre pelo tabuleiro todo**: o joystick move o esquadrão
+  inteiro (Tanque + os 2 que escoltam, em formação) por **toda a arena de
+  neve**, os dois lados do campo (`ARENA`, limites em unidades do
+  tabuleiro; o limite do lado da câmera é mais curto pra seu time não
+  ficar embaixo do HUD). Ninguém atravessa um Axie inimigo — o esquadrão é
+  empurrado de volta pra `MIN_SEPARATION`. O rival também anda: na maior
+  parte do tempo **se aproxima** do seu time (os ataques dele também
+  precisam de alcance), às vezes desvia ou para (`pickAiWanderMove`), e só
+  gasta cartas de ataque que alcançam alguém naquele momento (`ai.js`).
+  O anel dourado/vermelho de Provocação **segue** cada Tanque
+  (`setTauntRing`).
+- **Movimento discreto**: "Move" troca o slot de formação de dois dos seus
+  Axies (cooldown de 4s), mantendo o esquadrão onde ele está.
+- **Arquétipos pré-montados**: na tela de montar time há 4 times prontos,
+  cada um construído em volta de uma sinergia, com a explicação de como
+  funciona e as tags (`cards.js`'s `ARCHETYPES`) — **🩸 Savage Bleed**
+  (Xamã Tanque com Espinhos + Guerreiro e Mago aplicando Bleed de perto),
+  **☠️ Plague** (Ladino e Mago acumulando Poison de longe, Sacerdote Tanque
+  se curando e se protegendo), **⚔️ Steel Rain** (dano bruto de longe:
+  flechas do Arqueiro, Explosão Arcana, Investida Brutal do Guerreiro
+  Tanque) e **💚 Sanctuary** (Sacerdote curando, Xamã Tanque com
+  Regeneração e Espinhos, Arqueiro causando dano). "Use this team" carrega
+  o time inteiro (espécie, conjunto nativo, loadout, Tanque); dá pra
+  ajustar depois. Uma legenda explica **Bleed**, **Poison**, **Dano** e
+  **Cura**, e o modal "How to Play" também. O **rival sempre entra com um
+  arquétipo** (diferente do seu quando possível).
+- **Bleed acumula**: cada acerto de Bleed soma um acúmulo (máx. 3) e
+  renova a duração pra 3 tiques; cada tique (a cada 2s) causa 4 por
+  acúmulo. **Poison**: +3 acúmulos por acerto (máx. 9), cada tique causa 2
+  por acúmulo e perde 1 — um acúmulo cheio dá ~90 de dano no total.
 - **HUD dividido, dois dedos**: o joystick e a mão de cartas ficam em
   **zonas separadas lado a lado** (`.play-row`: `.stick-zone` na
   esquerda, `.hand-zone` na direita, com um divisor fino entre as duas) —
@@ -300,16 +297,18 @@ Ainda não implementado:
   nativeClassId`, e `defaultCounts` com o split de loadout pré-definido
   daquele conjunto), `buildLoadout(setId, classId, counts)` monta o pool
   real de uma Axie, fórmula de stats por contagem de cartas
-  (`computeLaneStats`)
-- `src/game.js` — estado do duelo (**tempo real, sem `turn`**): N linhas
-  por lado, cada uma com um `col` (slot fixo: 0 é o centro/Tanque, 1-2
-  flanqueiam ele, dita alcance curto e o swap discreto) e um `localPos`
-  ({x,z} ao vivo; o Tanque anda livre nele via `moveSquadWithTank`/
-  `ROAM_RADIUS`, e essa mesma função reposiciona os outros 2 relativo à
-  posição atual dele, formação de escolta), dano, cura, status effects
-  (inclui `applyBarrier`/`applyDodge`/`applyThorns` além dos antigos
-  Bulwark/Vulnerable/Regen), mira manual + Provocação por distância real
-  (`getLegalTargets`/`TAUNT_RADIUS`/`pickAutoTarget`), mira de defesa/cura
+  (`computeLaneStats`), e os times prontos (`ARCHETYPES`/
+  `copyArchetypePicks`)
+- `src/game.js` — estado do duelo (**tempo real, sem `turn`**): 3 linhas
+  por lado, cada uma com um `col` (slot de formação: 0 é o centro/Tanque,
+  1-2 flanqueiam) e um `localPos` ({x,z} ao vivo no espaço do próprio lado;
+  `worldPos`/`ROW_Z` convertem pra coordenadas do tabuleiro). O esquadrão
+  anda em bloco pela arena via `moveSquadWithTank` (`ARENA`,
+  `MIN_SEPARATION`), dano, cura, status effects (Bleed acumulável, Poison,
+  Barrier/Dodge/Thorns, Bulwark/Vulnerable/Regen), alcance e Provocação em
+  distância real (`RANGE`/`cardRange`/`TAUNT_RADIUS`/`tauntedBy`/
+  `getLegalTargets`/`nearestEnemy`/`pickAutoTarget`), ataque que erra fora
+  do alcance (`playerPlayCard` → `result.missed`), mira de defesa/cura
   nos dois lados (`getSupportTargets`), movimento discreto com cooldown
   (`moveLane`/`MOVE_COOLDOWN_SEC`), regen de energia e tick de status
   contínuos (`tickEnergyRealtime`/`tickStatusTimer`), `resolveCard` recebe
@@ -317,8 +316,9 @@ Ainda não implementado:
   bulwark_cleanse/barrier/dodge/thorns/regen) normal-vs-revertido,
   condição de vitória (Tanque)
 - `src/ai.js` — `aiMaybeAct`: chamado periodicamente pelo loop de
-  `main.js` (não mais "turno do rival") — tenta jogar 1 carta afordável,
-  mira automática via `pickAutoTarget`; não move lanes
+  `main.js` — joga 1 carta afordável; ataques só se alguém estiver no
+  alcance (mira via `pickAutoTarget`). O movimento do rival fica no
+  `main.js` (`pickAiWanderMove`, que se aproxima do seu time)
 - `src/sfx.js` — efeitos sonoros procedurais (Web Audio API): ataque por
   conjunto + impacto escalado pelo dano, cura, escudo, status, nocaute,
   vitória/derrota, e o mudo (`toggleMute`)

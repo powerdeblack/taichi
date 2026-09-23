@@ -6,6 +6,7 @@
 // Apeiron use for floating unit UI over a 3D battlefield.
 import * as THREE from 'three';
 import { createAxieMixer3D } from '@jaatster/threejs-axie-mixer3d-public';
+import { ROW_Z, TAUNT_RADIUS } from './game.js';
 
 const NEED_TYPES = ['eye', 'mouth', 'ear', 'horn', 'back', 'tail'];
 // Our roster uses 'Aqua'; the asset pack's class id is 'Aquatic'.
@@ -258,28 +259,107 @@ const FORMATION = [
   { x: -1.05, z: 0.65 },  // 1: left
   { x: 1.05,  z: 0.65 },  // 2: right
 ];
-const ROW_Z = { you: 1.5, rival: -1.5 };
 
 function laneWorldPos(side, localXZ){
   const faceSign = side === 'you' ? -1 : 1; // "forward" (+z offset) means toward the enemy
   return new THREE.Vector3(localXZ.x, 0, ROW_Z[side] + faceSign * localXZ.z);
 }
 
-// A pulsing ring under each Tank's default slot showing its taunt radius
-// (see game.js TAUNT_RADIUS/getLegalTargets) -- the only floor marking
-// left under the formation now that the Lunacia hall's own floor (see
-// buildHall) grounds the whole board; the old per-slot square/diamond
-// tiles were dropped for being visual clutter on top of it.
+// A ring under each Tank showing its taunt radius (game.js TAUNT_RADIUS),
+// kept under the Tank's live position by setTauntRing.
+const tauntRings = {};
 function buildTauntRings(){
-  const ringGeo = new THREE.RingGeometry(1.35, 1.5, 32);
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.28, side: THREE.DoubleSide });
+  const ringGeo = new THREE.RingGeometry(TAUNT_RADIUS - 0.08, TAUNT_RADIUS, 48);
   ['you','rival'].forEach(side => {
-    const pos = laneWorldPos(side, FORMATION[0]);
-    const ring = new THREE.Mesh(ringGeo, ringMat.clone());
-    ring.position.set(pos.x, -0.03, pos.z);
+    const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
+      color: side === 'you' ? 0xffd23f : 0xff7a5a, transparent: true, opacity: 0.45,
+      side: THREE.DoubleSide, depthWrite: false,
+    }));
     ring.rotation.x = -Math.PI / 2;
+    ring.position.set(0, -0.06, ROW_Z[side]);
     scene.add(ring);
+    tauntRings[side] = ring;
   });
+}
+
+export function setTauntRing(side, localXZ, visible){
+  const ring = tauntRings[side];
+  if (!ring) return;
+  ring.visible = visible;
+  if (!visible) return;
+  const p = laneWorldPos(side, localXZ);
+  ring.position.x = p.x;
+  ring.position.z = p.z;
+}
+
+// Shown while a card is held: a disc + edge ring of the card's reach around
+// the caster, and a line to whoever it would hit. Green = the aimed enemy
+// is inside the reach, red = it's outside (releasing now misses), gold =
+// support card (no range limit, just shows who it lands on).
+const AIM_COLORS = { ok: 0x5fe07a, out: 0xff4f4f, support: 0xffd23f };
+let aim = null;
+function ensureAim(){
+  if (aim) return aim;
+  const disc = new THREE.Mesh(
+    new THREE.CircleGeometry(1, 64),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.16, depthWrite: false }),
+  );
+  disc.rotation.x = -Math.PI / 2;
+  const edge = new THREE.Mesh(
+    new THREE.RingGeometry(0.965, 1, 96),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }),
+  );
+  edge.rotation.x = -Math.PI / 2;
+  // A flat ribbon on the snow (WebGL lines are always 1px -- too thin to read).
+  const ribbon = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 0.1),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }),
+  );
+  ribbon.rotation.x = -Math.PI / 2;
+  const line = new THREE.Group();
+  line.add(ribbon);
+  const marker = new THREE.Mesh(
+    new THREE.RingGeometry(0.32, 0.42, 32),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }),
+  );
+  marker.rotation.x = -Math.PI / 2;
+  [disc, edge, line, marker].forEach(o => { o.renderOrder = 5; scene.add(o); });
+  aim = { disc, edge, line, marker };
+  hideAim();
+  return aim;
+}
+
+export function showAim({ side, casterXZ, radius, state, targetSide, targetXZ }){
+  if (!scene) return;
+  const a = ensureAim();
+  const color = AIM_COLORS[state] ?? AIM_COLORS.support;
+  const c = laneWorldPos(side, casterXZ);
+  const hasRing = radius != null;
+  a.disc.visible = a.edge.visible = hasRing;
+  if (hasRing){
+    [a.disc, a.edge].forEach(o => {
+      o.position.set(c.x, -0.05, c.z);
+      o.scale.setScalar(radius);
+      o.material.color.setHex(color);
+    });
+  }
+  const hasTarget = targetXZ != null;
+  a.line.visible = a.marker.visible = hasTarget;
+  if (hasTarget){
+    const t = laneWorldPos(targetSide, targetXZ);
+    const dx = t.x - c.x, dz = t.z - c.z;
+    a.line.position.set((c.x + t.x) / 2, -0.03, (c.z + t.z) / 2);
+    a.line.rotation.y = -Math.atan2(dz, dx);
+    a.line.scale.set(Math.max(0.01, Math.hypot(dx, dz)), 1, 1);
+    a.line.children[0].material.color.setHex(color);
+    a.marker.position.set(t.x, -0.04, t.z);
+    a.marker.material.color.setHex(color);
+  }
+}
+
+export function hideAim(){
+  if (!aim) return;
+  Object.values(aim).forEach(o => { o.visible = false; });
 }
 
 // The Lunacia snowfield: a wide snowy clearing under a twilight sky, with

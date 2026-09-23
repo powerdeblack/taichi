@@ -180,6 +180,45 @@ h1{
 .roster-card.selected .card-pick-badge{ display:flex; }
 .roster-portrait{ width:56px; height:56px; margin:0 auto 6px; }
 
+/* ---------- Archetypes ---------- */
+.arch-row{
+  display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory;
+  padding:2px 2px 8px; margin:0 -2px 6px;
+}
+.arch-card{
+  flex:0 0 250px; scroll-snap-align:start;
+  background:linear-gradient(160deg, color-mix(in srgb, var(--arch-color) 22%, #251b12), #251b12 60%);
+  border:2px solid color-mix(in srgb, var(--arch-color) 55%, transparent);
+  border-radius:14px; padding:10px; display:flex; flex-direction:column; gap:7px;
+}
+.arch-card.active{ box-shadow:0 0 0 2px var(--arch-color), 0 0 14px -2px var(--arch-color); }
+.arch-head{ display:flex; align-items:center; gap:6px; }
+.arch-icon{ font-size:1.2rem; }
+.arch-name{ font-family:'Baloo 2',sans-serif; font-weight:800; font-size:.95rem; color:var(--text-light); }
+.arch-tags{ display:flex; gap:4px; flex-wrap:wrap; }
+.arch-tags span{
+  font-size:.58rem; font-weight:800; letter-spacing:.3px; text-transform:uppercase;
+  padding:2px 7px; border-radius:20px; background:color-mix(in srgb, var(--arch-color) 35%, transparent);
+  color:#fff;
+}
+.arch-members{ display:flex; gap:6px; justify-content:space-between; }
+.arch-member{ flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; text-align:center; }
+.arch-portrait{ width:40px; height:40px; }
+.arch-member-set{ font-size:.58rem; font-weight:800; line-height:1.1; }
+.arch-tank{ font-size:.55rem; font-weight:800; color:#fff; background:var(--danger); border-radius:10px; padding:1px 6px; }
+.arch-how{ font-size:.66rem; line-height:1.35; color:var(--text-dim); margin:0; flex:1; }
+.arch-use{
+  font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.78rem; cursor:pointer;
+  border:none; border-radius:20px; padding:7px; color:#fff; background:var(--arch-color);
+}
+.arch-use:active{ transform:scale(.97); }
+.effect-legend{
+  display:grid; grid-template-columns:1fr 1fr; gap:4px 10px;
+  font-size:.62rem; line-height:1.3; color:var(--text-dim);
+  background:#00000026; border-radius:10px; padding:8px 10px; margin-bottom:4px;
+}
+.effect-legend b{ color:var(--text-light); }
+
 /* ---------- Squad builder ---------- */
 .squad-list{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
 .squad-slot{
@@ -331,6 +370,9 @@ h1{
   50%{ box-shadow:0 0 0 2px #e8f2ff, 0 0 16px 4px #e8f2ffd0; }
 }
 .unit-chip.dead{ opacity:.35; filter:grayscale(1); }
+.unit-chip.in-range{
+  box-shadow:0 0 0 2px #5fe07a, 0 0 12px 3px #5fe07a90;
+}
 .unit-chip.lane-hit{ background:#b8452fcc; }
 .unit-chip.lane-heal{ background:#3f6b4acc; }
 .unit-chip.targetable{
@@ -492,6 +534,11 @@ h1{
 .hand{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; width:100%; }
 .hand .card{ padding:8px 6px 6px; }
 .hand .card:active:not(.disabled){ transform:scale(.95); }
+.hand .card{ touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+.hand .card.aiming{
+  transform:translateY(-6px) scale(1.03); border-color:var(--gold) !important;
+  box-shadow:0 0 0 2px #ffd23f, 0 8px 18px -6px #ffd23fa0;
+}
 .btn-row{display:flex; gap:10px; margin-top:14px; justify-content:center;}
 .reset-btn, .switch-deck-btn{
   font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.85rem;

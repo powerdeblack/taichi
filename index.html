@@ -24,6 +24,14 @@
       <canvas id="preview3dCanvas"></canvas>
       <div class="preview3d-label" id="preview3dLabel">Click an Axie to see it in 3D</div>
     </div>
+    <div class="section-label">Archetypes — ready-made synergies</div>
+    <div class="arch-row" id="archetypeRow"></div>
+    <div class="effect-legend">
+      <span><b>🩸 Bleed</b> each hit adds a stack (max 3); every 2s tick deals 4 per stack, for 3 ticks.</span>
+      <span><b>☠️ Poison</b> each hit adds 3 stacks (max 9); a tick deals 2 per stack, then fades by 1.</span>
+      <span><b>⚔️ Damage</b> attack cards: short reach 2.3, long reach 6 — hold a card to see it.</span>
+      <span><b>💚 Heal</b> instant heals scale with MP; Regen heals a bit every tick.</span>
+    </div>
     <div class="section-label">Your squad</div>
     <div class="squad-list" id="squadList"></div>
     <div class="section-label">Choose an Axie</div>
@@ -92,8 +100,14 @@
       <h3>2. Aiming and playing cards</h3>
       <p>The duel runs in real time — no turns, energy just keeps regenerating. Tap any Axie on the board (yours or the rival's), or its HP bar, to select it — a white ring shows the pick, and it stays selected until you tap a different Axie, so you can chain several cards on the same target — then tap a card in your hand to use it on that target. Attack cards need the target within range: short range only reaches an enemy within actual contact distance of your Axie right now, long range reaches anyone alive. Defense/Heal cards work on either side: cast on an ally for the normal effect, or on an enemy to reverse it (a shield becomes Vulnerable, a heal becomes damage).</p>
 
-      <h3>3. Tank, Taunt, and movement</h3>
-      <p>The Tank sits at the center and "taunts" — anyone attacking from close to it is forced to hit the Tank instead of picking freely, win or lose. Hold the joystick to roam the Tank around; the other 4 Axies escort it automatically, keeping formation around wherever it goes. Use "Move an Axie" (a short cooldown) to swap two of your own lanes instead — handy for ducking out of Taunt range or lining up a short-range hit.</p>
+      <h3>3. Holding a card: range and misses</h3>
+      <p>Press and hold a card to aim: a ring on the snow shows how far it reaches from the Axie that owns it, and a line shows who it will hit — your selected enemy, or the nearest one if you haven't picked. <b>Green</b> = in range, <b>red</b> = out of range. The card fires when you let go; an attack released out of range <b>misses and is spent</b>, so walk closer first. Defense/Heal cards have no range limit.</p>
+
+      <h3>4. Effects and archetypes</h3>
+      <p><b>🩸 Bleed</b> stacks up to 3 and deals 4 per stack every 2s tick for 3 ticks. <b>☠️ Poison</b> adds 3 stacks per hit (max 9), deals 2 per stack each tick and fades by one. <b>⚔️ Damage</b> is the direct hit of an attack card. <b>💚 Heal</b> restores HP right away (stronger with more MP); <b>Regen</b> heals a little every tick. The Archetypes on the team screen are ready-made squads built around one of these — tap "Use this team" to load one, then tweak it if you like.</p>
+
+      <h3>5. Tank, Taunt, and movement</h3>
+      <p>The Tank sits at the center and "taunts" — anyone attacking from close to it is forced to hit the Tank instead of picking freely, win or lose. Hold the joystick to walk the Tank anywhere on the snowfield; the other 2 Axies escort it automatically, keeping formation around wherever it goes. Use "Move an Axie" (a short cooldown) to swap two of your own lanes instead — handy for ducking out of Taunt range or lining up a short-range hit.</p>
     </div>
   </div>
 </div>

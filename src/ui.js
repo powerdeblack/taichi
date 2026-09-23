@@ -2,7 +2,8 @@
 // pips, pile counts, and the win/lose banner. No game rules live here.
 import { MAX_ENERGY, LOADOUT_SIZE, SQUAD_SIZE } from './game.js';
 import { portraitHTML } from './axieArt.js';
-import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive, moveLaneVisual, setLaneLivePosition, setLaneRoaming, spawnImpact as spawnImpact3D } from './board3d.js';
+import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive, moveLaneVisual, setLaneLivePosition, setLaneRoaming, spawnImpact as spawnImpact3D, setTauntRing, showAim, hideAim } from './board3d.js';
+export { setTauntRing, showAim, hideAim };
 
 const rosterGrid = document.getElementById('rosterGrid');
 const squadListEl = document.getElementById('squadList');
@@ -33,6 +34,34 @@ export function renderRoster(axies, squad, onAdd){
     `;
     div.addEventListener('click', () => onAdd(axie.classId));
     rosterGrid.appendChild(div);
+  });
+}
+
+const archetypeRow = document.getElementById('archetypeRow');
+export function renderArchetypes(archetypes, axies, sets, onUse, activeId){
+  archetypeRow.innerHTML = '';
+  archetypes.forEach(arch => {
+    const card = document.createElement('div');
+    card.className = 'arch-card' + (arch.id === activeId ? ' active' : '');
+    card.style.setProperty('--arch-color', arch.color);
+    const members = arch.picks.map(p => {
+      const axie = axies.find(a => a.classId === p.classId);
+      const set = sets.find(s => s.id === p.setId);
+      return `<div class="arch-member">
+        ${portraitHTML(p.classId, axie.color, 'arch-portrait')}
+        <div class="arch-member-set" style="color:${set.color}">${set.icon} ${set.name}</div>
+        ${p.isTank ? '<div class="arch-tank">🎯 Tank</div>' : ''}
+      </div>`;
+    }).join('');
+    card.innerHTML = `
+      <div class="arch-head"><span class="arch-icon">${arch.icon}</span><span class="arch-name">${arch.name}</span></div>
+      <div class="arch-tags">${arch.tags.map(t => `<span>${t}</span>`).join('')}</div>
+      <div class="arch-members">${members}</div>
+      <p class="arch-how">${arch.how}</p>
+      <button type="button" class="arch-use">${arch.id === activeId ? '✓ Loaded' : 'Use this team'}</button>
+    `;
+    card.querySelector('.arch-use').addEventListener('click', () => onUse(arch));
+    archetypeRow.appendChild(card);
   });
 }
 
@@ -136,7 +165,7 @@ let activeSelectable = []; // { ref, cssClass, handler } -- see setSelectable/cl
 
 // Numeric fields that ride along a status entry (e.g. dodgeChance next to
 // dodgeCharges) but aren't themselves a status to show a pill for.
-const STATUS_COMPANION_KEYS = new Set(['dodgeChance', 'thornsPct']);
+const STATUS_COMPANION_KEYS = new Set(['dodgeChance', 'thornsPct', 'bleedTicks']);
 
 const STATUS_LABELS = {
   bleed:'🩸 Bleed', poison:'☠️ Poison', deathmark:'💀 Mark', shield:'🛡️ Shield',
@@ -335,6 +364,16 @@ export function markSelectedTarget(side, laneIndex, on){
   if (ref) ref.chip.classList.toggle('selected-target', on);
 }
 
+// While a card is held: glow every lane on `side` whose index is in
+// `indices` (the ones the card would reach), clear the glow everywhere else.
+export function markInRange(side, indices){
+  ['you', 'rival'].forEach(sd => {
+    (unitRefs[sd] || []).forEach((ref, i) => {
+      if (ref) ref.chip.classList.toggle('in-range', sd === side && indices.includes(i));
+    });
+  });
+}
+
 // ================= Hand / energy / piles =================
 // Reconciles by card.uid instead of wiping+rebuilding the whole hand every
 // call -- renderHand runs on a fast fixed tick (energy is continuous, so
@@ -344,7 +383,7 @@ export function markSelectedTarget(side, laneIndex, on){
 // card visibly fail to respond. Keeping one persistent element per uid
 // means a click's target never gets pulled out from under it.
 const handNodes = new Map(); // card.uid -> element
-export function renderHand(state, { onPlay }){
+export function renderHand(state, { onPress, onRelease, onCancel, aimingUid }){
   const seen = new Set();
   state.hand.forEach((card, i) => {
     seen.add(card.uid);
@@ -360,7 +399,7 @@ export function renderHand(state, { onPlay }){
       div = document.createElement('div');
       handNodes.set(card.uid, div);
     }
-    div.className = 'card' + (!playable ? ' disabled' : '');
+    div.className = 'card' + (!playable ? ' disabled' : '') + (card.uid === aimingUid ? ' aiming' : '');
     div.style.borderColor = card.color + '55';
     div.innerHTML = `
       <div class="card-top">
@@ -370,7 +409,16 @@ export function renderHand(state, { onPlay }){
       <div class="card-class" style="color:${card.color}">${card.setIcon ? card.setIcon+' ' : ''}${card.setName || card.cls} · ${rangeLabel}</div>
       <div class="card-desc">${card.desc}${!laneAlive ? ' <b>(lane destroyed)</b>' : ''}</div>
     `;
-    div.onclick = playable ? () => onPlay(card) : null;
+    // Hold to aim (shows the card's reach on the board), release to fire.
+    // Pointer capture keeps the release on this card even if the finger
+    // drifts off it.
+    div.onpointerdown = playable ? (e) => {
+      e.preventDefault();
+      div.setPointerCapture(e.pointerId);
+      onPress(card);
+    } : null;
+    div.onpointerup = () => onRelease(card);
+    div.onpointercancel = () => onCancel(card);
     if (handEl.children[i] !== div) handEl.insertBefore(div, handEl.children[i] || null);
   });
   for (const [uid, div] of handNodes){

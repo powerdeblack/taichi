@@ -1,6 +1,6 @@
 // Entry point: DOM wiring for the team builder and the real-time board duel.
 import './style.css';
-import { AXIES, CARD_SETS, setById } from './cards.js';
+import { AXIES, CARD_SETS, setById, ARCHETYPES, copyArchetypePicks } from './cards.js';
 import * as game from './game.js';
 import * as ui from './ui.js';
 import * as render from './render.js';
@@ -33,7 +33,22 @@ let matchFinished = false;
 const koPlayed = new WeakSet();
 
 // ================= Team builder =================
+// Which archetype the current squad came from -- cleared by any manual
+// edit, since the squad is then the player's own.
+let loadedArchetype = null;
+function useArchetype(arch){
+  squad = copyArchetypePicks(arch);
+  loadedArchetype = arch.id;
+  renderTeamScreen();
+  previewClass(squad.find(p => p.isTank).classId);
+}
+
 function renderTeamScreen(){
+  if (loadedArchetype){
+    const arch = ARCHETYPES.find(a => a.id === loadedArchetype);
+    if (JSON.stringify(arch.picks) !== JSON.stringify(squad)) loadedArchetype = null;
+  }
+  ui.renderArchetypes(ARCHETYPES, AXIES, CARD_SETS, useArchetype, loadedArchetype);
   ui.renderRoster(AXIES, squad, addToSquad);
   ui.renderSquad(squad, AXIES, CARD_SETS, { onAdjust: adjustCount, onToggleTank: toggleTank, onToggleEvolve: toggleEvolve, onSetChange: changeSet, onRemove: removeFromSquad });
   ui.renderSquadHeader(squad, game.SQUAD_SIZE);
@@ -108,7 +123,11 @@ function previewClass(classId){
 startDuelBtn.addEventListener('click', () => {
   deckScreen.classList.add('hidden');
   duelScreen.classList.remove('hidden');
-  beginMatch(squad.slice(), game.randomSquad());
+  // The rival fields one of the archetypes too (a different one when
+  // possible), so every duel is a clash of two real synergies.
+  const pool = ARCHETYPES.filter(a => a.id !== loadedArchetype);
+  const rivalArch = pool[Math.floor(Math.random() * pool.length)];
+  beginMatch(squad.slice(), copyArchetypePicks(rivalArch));
 });
 switchDeckBtn.addEventListener('click', () => {
   duelScreen.classList.add('hidden');
@@ -164,7 +183,7 @@ function syncUI(){
   ui.updateBoard(state);
   ui.renderPips(state);
   ui.renderPiles(state);
-  ui.renderHand(state, { onPlay: onPlayerCardClick });
+  syncHand();
   updateMoveBtn();
   updateJoystick();
 }
@@ -187,6 +206,15 @@ function updateMoveBtn(){
 function applyResultFx(result){
   if (!result) return;
   const { side, card, casterIndex } = result;
+
+  if (result.missed){
+    const el = result.targetIndex >= 0
+      ? ui.getLaneSideEl(result.targetSide, result.targetIndex)
+      : ui.getLaneSideEl(side, casterIndex);
+    render.spawnFloatingText(el, 'MISS! Out of range', 'text-block');
+    sfx.playDodge();
+    return;
+  }
 
   if (card.role === 'defense' || card.role === 'heal'){
     if (result.targetIndex === -1){
@@ -223,7 +251,7 @@ function applyResultFx(result){
       playKOIfDied(result.targetSide, result.targetIndex);
     } else {
       render.flashHeal(el);
-      render.spawnFloatingText(el, card.effect === 'regen' ? 'REGEN!' : '+'+result.healed, 'text-heal');
+      render.spawnFloatingText(el, card.effect === 'regen' ? 'REGEN!' : (result.healed > 0 ? '+'+result.healed : 'FULL HP'), 'text-heal');
       ui.spawnImpact(result.targetSide, result.targetIndex, 'heal');
       sfx.playHeal();
     }
@@ -292,6 +320,7 @@ function applyBleedFx(side, statusResults){
 function setHintForResult(side, result){
   const who = side === 'you' ? 'You' : 'The rival';
   if (!result) return; // no card affordable right now -- not worth a hint, it happens constantly
+  if (result.missed){ ui.setHint(`${result.card.name} missed — the target was out of range.`); return; }
   if (result.card.role === 'defense' || result.card.role === 'heal'){
     if (result.targetIndex === -1){ ui.setHint(`${who}: no target available!`); return; }
     const onSelf = result.targetSide === side;
@@ -347,45 +376,95 @@ function dropDeadTarget(){
   if (!lanes[selectedTarget.laneIndex]?.alive) clearTargetSelection();
 }
 
-function onPlayerCardClick(card){
-  if (moveMode) return;
-  if (!selectedTarget){
-    ui.setHint('Tap an Axie (yours or the rival’s) first, then tap a card.');
-    return;
-  }
-  const { side: tSide, laneIndex: tIndex } = selectedTarget;
-  const tLanes = tSide === 'you' ? state.youLanes : state.rivalLanes;
-  if (!tLanes[tIndex] || !tLanes[tIndex].alive){
-    clearTargetSelection();
-    ui.setHint('That target is no longer available -- pick a new one.');
-    return;
-  }
+// ================= Hold a card to aim, release to fire =================
+// Pressing a card shows its reach on the board around the Axie that owns
+// it (ring + a line to whoever it would hit): green = the aimed enemy is
+// inside the reach, red = outside. Releasing fires the card no matter what
+// -- an attack released while its target is out of range misses and the
+// card is spent. Aim for an attack: the selected enemy if there is one,
+// otherwise the nearest enemy (a taunted caster always aims at the enemy
+// Tank). Aim for a defense/heal card: the selected Axie on either side,
+// otherwise the card's own Axie.
+let aiming = null; // the card currently held
 
+function aimFor(card){
+  const caster = card.laneIndex;
   if (card.role === 'attack'){
-    if (tSide !== 'rival'){
-      ui.setHint(`${card.name} is an attack card -- select an enemy Axie first.`);
-      return;
-    }
-    const legal = game.getLegalTargets(state, 'you', card, card.laneIndex);
-    if (!legal.length){
-      ui.setHint('No target available!');
-      return;
-    }
-    if (!legal.includes(tIndex)){
-      const taunted = legal.length === 1 && state.rivalLanes[legal[0]].isTank;
-      ui.setHint(taunted
-        ? `🎯 Taunted! You're too close to the enemy Tank — ${card.name} must hit it instead.`
-        : `${card.name} can't reach that target -- try a closer target or a long-range card.`);
-      return;
-    }
-    playCard(card, tIndex, 'rival');
-    return;
+    const taunt = game.tauntedBy(state, 'you', caster);
+    let targetIndex;
+    if (taunt !== -1) targetIndex = taunt;
+    else if (selectedTarget && selectedTarget.side === 'rival') targetIndex = selectedTarget.laneIndex;
+    else targetIndex = game.nearestEnemy(state, 'you', caster);
+    const legal = game.getLegalTargets(state, 'you', card, caster);
+    return { targetSide: 'rival', targetIndex, legal, taunted: taunt !== -1,
+      inRange: targetIndex >= 0 && legal.includes(targetIndex) };
   }
+  if (selectedTarget) return { targetSide: selectedTarget.side, targetIndex: selectedTarget.laneIndex, legal: [selectedTarget.laneIndex], inRange: true };
+  return { targetSide: 'you', targetIndex: caster, legal: [caster], inRange: true };
+}
 
-  // Defense/heal: any alive lane on either side is a legal target -- an
-  // ally gets the card's normal effect, an enemy gets it reversed
-  // (Guard/Bulwark -> Vulnerable, Heal/Regen -> damage/DOT).
-  playCard(card, tIndex, tSide);
+function onCardPress(card){
+  if (moveMode || state.gameOver) return;
+  aiming = card;
+  sfx.playSelect();
+  updateAim();
+  syncHand();
+}
+
+function updateAim(){
+  if (!aiming) return;
+  const card = aiming;
+  const casterLane = state.youLanes[card.laneIndex];
+  if (!casterLane || !casterLane.alive || !state.hand.includes(card)){ cancelAim(); return; }
+  const a = aimFor(card);
+  const targetLanes = a.targetSide === 'you' ? state.youLanes : state.rivalLanes;
+  const target = targetLanes[a.targetIndex];
+  const isAttack = card.role === 'attack';
+  ui.showAim({
+    side: 'you', casterXZ: casterLane.localPos,
+    radius: isAttack ? game.cardRange(card) : null,
+    state: isAttack ? (a.inRange ? 'ok' : 'out') : 'support',
+    targetSide: a.targetSide, targetXZ: target ? target.localPos : null,
+  });
+  ui.markInRange(a.targetSide, isAttack ? a.legal : []);
+  if (!isAttack){
+    const onSelf = a.targetSide === 'you';
+    ui.setHint(`${card.name} → ${onSelf ? 'your' : "the rival's"} ${target.name}${onSelf ? '' : ' (reversed!)'} — release to use.`);
+  } else if (a.taunted){
+    ui.setHint(`🎯 Taunted! ${card.name} can only hit the enemy Tank — release to strike.`);
+  } else if (a.inRange){
+    ui.setHint(`✅ ${target.name} is in range — release to strike!`);
+  } else {
+    ui.setHint(`❌ ${target ? target.name : 'Target'} is out of range — releasing now MISSES. Move closer!`);
+  }
+}
+
+function hideAimVisuals(){
+  ui.hideAim();
+  ui.markInRange('rival', []);
+}
+
+function cancelAim(){
+  aiming = null;
+  hideAimVisuals();
+  syncHand();
+}
+
+function onCardRelease(card){
+  if (aiming !== card) return;
+  const a = aimFor(card);
+  aiming = null;
+  hideAimVisuals();
+  if (state.gameOver || state.energyYou < card.cost){ syncHand(); return; }
+  playCard(card, a.targetIndex, a.targetSide);
+}
+
+function onCardCancel(card){
+  if (aiming === card) cancelAim();
+}
+
+function syncHand(){
+  ui.renderHand(state, { onPress: onCardPress, onRelease: onCardRelease, onCancel: onCardCancel, aimingUid: aiming && aiming.uid });
 }
 
 function playCard(card, targetIndex, targetSide){
@@ -524,14 +603,25 @@ let aiMoveTimer = 1 + Math.random() * 1.5;
 let aiMoveDirX = 0, aiMoveDirZ = 0;
 let aiWandering = false;
 
+// Mostly closes in on the player's squad (its attacks need range too), now
+// and then drifts sideways or holds still so it isn't a straight charge.
+// The rival faces +world z toward the player, so its local offsets equal
+// world offsets.
 function pickAiWanderMove(){
   const wasWandering = aiWandering;
-  aiWandering = Math.random() < 0.65; // mostly on the move, sometimes holds still
+  aiWandering = Math.random() < 0.7;
   if (aiWandering){
-    const angle = Math.random() * Math.PI * 2;
+    const rivalTank = state.rivalLanes.findIndex(l => l.isTank && l.alive);
+    const youTank = state.youLanes.findIndex(l => l.isTank && l.alive);
+    let angle = Math.random() * Math.PI * 2;
+    if (rivalTank !== -1 && youTank !== -1 && Math.random() < 0.65){
+      const r = game.worldPos('rival', state.rivalLanes[rivalTank]);
+      const y = game.worldPos('you', state.youLanes[youTank]);
+      if (Math.hypot(y.x - r.x, y.z - r.z) > 2.2) angle = Math.atan2(y.z - r.z, y.x - r.x) + (Math.random() - 0.5) * 0.8;
+    }
     aiMoveDirX = Math.cos(angle);
     aiMoveDirZ = Math.sin(angle);
-    aiMoveTimer = 1.2 + Math.random() * 1.6;
+    aiMoveTimer = 1.0 + Math.random() * 1.4;
   } else {
     aiMoveTimer = 0.6 + Math.random() * 1.0;
     if (wasWandering) state.rivalLanes.forEach((lane, i) => { if (lane.alive) ui.endLiveLanePosition('rival', i); });
@@ -597,13 +687,18 @@ function gameLoop(nowMs){
   }
 
   ui.updateBoard(state);
+  updateAim();
+  ['you', 'rival'].forEach(side => {
+    const tank = (side === 'you' ? state.youLanes : state.rivalLanes).find(l => l.isTank);
+    ui.setTauntRing(side, tank.localPos, tank.alive);
+  });
 
   uiRefreshTimer += dt;
   if (uiRefreshTimer >= UI_REFRESH_INTERVAL){
     uiRefreshTimer = 0;
     ui.renderPips(state);
     ui.renderPiles(state);
-    ui.renderHand(state, { onPlay: onPlayerCardClick });
+    syncHand();
     updateMoveBtn();
     updateJoystick();
   }
