@@ -309,7 +309,13 @@ Ainda não implementado:
   discreto (`moveLaneVisual`, com lerp), e o Tanque é posicionado
   diretamente frame a frame enquanto o joystick é segurado
   (`setLaneLivePosition`/`setLaneRoaming`, sem lerp/patrulha nesse
-  momento). HP/nome/status ficam em HTML posicionado por cima via
+  momento). Todo Axie que anda de verdade -- joystick, vagar do rival,
+  entrada caminhando, swap discreto -- **gira pra encarar a direção do
+  movimento** (`faceDirection`/`lerpAngle`, interpolação de ângulo pelo
+  caminho mais curto, deriva a direção pela diferença de posição frame a
+  frame mesmo pras lanes "ao vivo" que não são donas da própria posição),
+  e volta suavemente a encarar o inimigo quando fica parado de novo
+  (`baseRotation`). HP/nome/status ficam em HTML posicionado por cima via
   projeção de câmera (`projectLane`) — não são modelos 3D
 - `src/main.js` — entrada: wiring de DOM (incluindo o modal de ajuda) e o
   **loop de tempo real** (`requestAnimationFrame`) que regenera energia,

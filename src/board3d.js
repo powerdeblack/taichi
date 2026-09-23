@@ -24,19 +24,43 @@ let renderer, scene, camera, clock, canvasEl;
 let mixerPromise = null;
 let loopStarted = false;
 let elapsedTime = 0;
-// side:laneIndex -> { axie, side, laneIndex, targetPos, basePos, phase, introWalk }
+// side:laneIndex -> { axie, side, laneIndex, targetPos, basePos, phase,
+// introWalk, baseRotation, lastPos } -- baseRotation is the default
+// "facing the enemy" orientation it settles back to while idle; lastPos
+// tracks where it was last frame so animate() can infer a facing
+// direction from movement (see faceDirection) even for live-driven slots
+// whose position it doesn't own.
 const slots = new Map();
 const slotKey = (side, laneIndex) => side + ':' + laneIndex;
 const MOVE_LERP_SPEED = 6; // higher = snappier slide into the new slot
 const INTRO_LERP_SPEED = 1.8; // slower -- the opening "walk into the hall" entrance (~2.5-3s)
 const PATROL_AMPLITUDE = 0.07; // how far idle units wander from their spot
 const INTRO_SPAWN_OFFSET = 2.0; // extra distance back from the formation at match start
+const ROTATE_LERP_SPEED = 8; // higher = snaps to face its movement direction faster
 const impacts = []; // short-lived hit/heal burst effects -- see spawnImpact
 
 // Some rigs may not expose every named locomotion clip -- never let a
 // missing 'walk' state break the entrance.
 function trySetLocomotion(axie, state){
   try { axie.setLocomotion(state); } catch (e) { /* unsupported locomotion state -- ignore */ }
+}
+
+// Shortest-path angle interpolation (plain lerp would spin the long way
+// round across the +-PI wrap) -- used to smoothly turn a wrapper's
+// rotation.y to face wherever it's currently moving.
+function lerpAngle(a, b, t){
+  let diff = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
+  if (diff < -Math.PI) diff += Math.PI * 2;
+  return a + diff * t;
+}
+
+// wrapper.rotation.y = 0 faces world +Z (see laneWorldPos/spawn: 'rival'
+// starts at 0 and is already facing 'you' across the hall); turning by
+// atan2(dx, dz) points the model at a given world-space {dx,dz} direction.
+function faceDirection(s, dx, dz, dt){
+  if (dx * dx + dz * dz < 0.0004) return; // too small to be real movement -- ignore patrol-wobble-scale noise
+  const targetAngle = Math.atan2(dx, dz);
+  s.axie.wrapper.rotation.y = lerpAngle(s.axie.wrapper.rotation.y, targetAngle, Math.min(1, dt * ROTATE_LERP_SPEED));
 }
 
 function ensureMixer(){
@@ -104,8 +128,21 @@ function animate(){
   elapsedTime += dt;
   slots.forEach(s => {
     if (s.axie && !s.axie.disposed) s.axie.update(dt);
-    if (s.live) return; // continuously driven from outside (the Tank while roaming) -- animate() shouldn't fight it
+    if (s.live){
+      // Position is driven from outside (setLaneLivePosition, every frame
+      // while the joystick/AI wander holds it) -- animate() shouldn't
+      // fight the position, but it can still infer a facing direction
+      // from how far it moved since the last tick.
+      const dx = s.axie.wrapper.position.x - s.lastPos.x;
+      const dz = s.axie.wrapper.position.z - s.lastPos.z;
+      faceDirection(s, dx, dz, dt);
+      s.lastPos.copy(s.axie.wrapper.position);
+      return;
+    }
     if (s.targetPos){
+      const dx = s.targetPos.x - s.axie.wrapper.position.x;
+      const dz = s.targetPos.z - s.axie.wrapper.position.z;
+      faceDirection(s, dx, dz, dt);
       const speed = s.introWalk ? INTRO_LERP_SPEED : MOVE_LERP_SPEED;
       s.axie.wrapper.position.lerp(s.targetPos, Math.min(1, dt * speed));
       if (s.axie.wrapper.position.distanceTo(s.targetPos) < 0.01){
@@ -117,6 +154,7 @@ function animate(){
           trySetLocomotion(s.axie, 'idle');
         }
       }
+      s.lastPos.copy(s.axie.wrapper.position);
     } else if (s.basePos){
       // Idle "patrol": a small sway around the assigned slot so the board
       // doesn't look frozen when nothing's happening -- purely cosmetic,
@@ -124,6 +162,10 @@ function animate(){
       const t = elapsedTime + s.phase;
       s.axie.wrapper.position.x = s.basePos.x + Math.sin(t * 0.6) * PATROL_AMPLITUDE;
       s.axie.wrapper.position.z = s.basePos.z + Math.cos(t * 0.5) * PATROL_AMPLITUDE * 0.8;
+      // Nothing to chase while idle -- gently settle back to facing the
+      // enemy instead of freezing wherever the last real move left it.
+      s.axie.wrapper.rotation.y = lerpAngle(s.axie.wrapper.rotation.y, s.baseRotation, Math.min(1, dt * ROTATE_LERP_SPEED * 0.4));
+      s.lastPos.copy(s.axie.wrapper.position);
     }
   });
   tickImpacts(dt);
@@ -380,15 +422,17 @@ export async function syncBoardAxies(youLanes, rivalLanes){
     const introOffset = new THREE.Vector3(0, 0, side === 'you' ? INTRO_SPAWN_OFFSET : -INTRO_SPAWN_OFFSET);
     const spawnPos = basePos.clone().add(introOffset);
     const walking = lane.alive;
+    const baseRotation = side === 'you' ? Math.PI : 0;
     axie.wrapper.position.copy(spawnPos);
     axie.wrapper.scale.setScalar(0.62);
-    axie.wrapper.rotation.y = side === 'you' ? Math.PI : 0;
+    axie.wrapper.rotation.y = baseRotation;
     axie.wrapper.visible = lane.alive;
     scene.add(axie.wrapper);
     trySetLocomotion(axie, walking ? 'walk' : 'idle');
     slots.set(slotKey(side, i), {
       axie, side, laneIndex: i, targetPos: walking ? basePos.clone() : null, live: false,
       basePos: spawnPos.clone(), phase: Math.random() * Math.PI * 2, introWalk: walking,
+      baseRotation, lastPos: spawnPos.clone(),
     });
   })();
   const jobs = [
