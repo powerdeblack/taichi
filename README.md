@@ -1,8 +1,8 @@
 # Axie Duel
 
 Protótipo de duelo em tabuleiro 3D pro Axie Vibeathon (Sky Mavis / Axie
-Infinity), ambientado num **Salão Lunacia** (chão de pedra, colunas e um
-emblema lunar brilhante no centro, estilo arena 3x3 de WoW): esquadrão
+Infinity), ambientado num **campo de neve Lunacia** (neve caindo, céu de
+crepúsculo e o símbolo Lunacia grande e brilhante no chão): esquadrão
 livre de 3 Axies, cada um com um **loadout de 5 cartas** que você monta
 (ataque/defesa/cura, na proporção que quiser) — é essa composição, não um
 papel fixo, que determina o quão forte, tanque ou curador cada Axie fica.
