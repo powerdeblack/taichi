@@ -2,7 +2,7 @@
 // pips, pile counts, and the win/lose banner. No game rules live here.
 import { MAX_ENERGY, LOADOUT_SIZE } from './game.js';
 import { portraitHTML } from './axieArt.js';
-import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive, moveLaneVisual, setLaneLivePosition, setLaneRoaming } from './board3d.js';
+import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive, moveLaneVisual, setLaneLivePosition, setLaneRoaming, spawnImpact as spawnImpact3D } from './board3d.js';
 
 const rosterGrid = document.getElementById('rosterGrid');
 const squadListEl = document.getElementById('squadList');
@@ -303,6 +303,12 @@ function updateUnit(ref, lane, side, laneIndex){
 export function getLaneSideEl(side, laneIndex){
   const ref = unitRefs[side] && unitRefs[side][laneIndex];
   return ref ? ref.chip : null;
+}
+
+// A brief 3D burst (ring + sparks) at a lane's current position -- real
+// visual impact on attacks/heals, alongside the DOM flash/floating text.
+export function spawnImpact(side, laneIndex, kind){
+  spawnImpact3D(side, laneIndex, kind);
 }
 
 // A persistent highlight for "this is the currently selected target" (the

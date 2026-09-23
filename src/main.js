@@ -149,7 +149,6 @@ function updateMoveBtn(){
 function applyResultFx(result){
   if (!result) return;
   const { side, card, casterIndex } = result;
-  render.spawnCardPopup(card, side);
 
   if (card.role === 'defense' || card.role === 'heal'){
     if (result.targetIndex === -1){
@@ -177,9 +176,11 @@ function applyResultFx(result){
       render.flashHit(el);
       render.shakeBoard(boardEl);
       render.spawnFloatingText(el, (card.effect === 'regen' ? 'ROT! -' : 'REVERSE HEAL! -')+result.dmg, 'text-dmg');
+      ui.spawnImpact(result.targetSide, result.targetIndex, 'hit');
     } else {
       render.flashHeal(el);
       render.spawnFloatingText(el, card.effect === 'regen' ? 'REGEN!' : '+'+result.healed, 'text-heal');
+      ui.spawnImpact(result.targetSide, result.targetIndex, 'heal');
     }
     return;
   }
@@ -196,6 +197,7 @@ function applyResultFx(result){
     render.flashHit(el);
     render.shakeBoard(boardEl);
     render.spawnFloatingText(el, '-'+result.dmg, 'text-dmg');
+    ui.spawnImpact(result.targetSide, result.targetIndex, 'hit');
     if (result.ambush) render.spawnFloatingText(el, 'AMBUSH! x2', 'text-ambush');
     if (result.shielded) render.spawnFloatingText(el, 'BLOCKED!', 'text-block');
     if (result.bulwarked) render.spawnFloatingText(el, 'BULWARK!', 'text-block');
@@ -206,6 +208,7 @@ function applyResultFx(result){
     const casterEl = ui.getLaneSideEl(result.side, result.casterIndex);
     render.flashHit(casterEl);
     render.spawnFloatingText(casterEl, '-'+result.thornReflected+' 🌵', 'text-dmg');
+    ui.spawnImpact(result.side, result.casterIndex, 'hit');
   }
 }
 

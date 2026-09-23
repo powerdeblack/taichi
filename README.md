@@ -137,23 +137,30 @@ npm run preview
   correr pra frente pra proteger a retaguarda puxando os golpes pra si, ou
   recuar pra fugir da provocação e liberar os aliados pra mirar em
   qualquer um.
-- **Salão Lunacia**: o tabuleiro é um grande salão circular (chão de
-  pedra, anel de colunas na borda, `board3d.js`'s `buildHall`) com um
-  **emblema lunar brilhante** (`buildLunaciaSigilTexture`, desenhado via
-  canvas em runtime — não é um asset importado) no centro, entre as duas
-  fileiras. Ao começar o duelo, os dois esquadrões nascem afastados (atrás
+- **Salão Lunacia**: o tabuleiro é um salão circular grande (raio 11,
+  chão de pedra, 12 colunas de ~4.8 de altura num anel bem mais perto do
+  centro que a borda do salão — pra ficarem legíveis como pilares
+  individuais em vez de se misturar com o aro distante — `board3d.js`'s
+  `buildHall`) com um **emblema lunar brilhante** (`buildLunaciaSigilTexture`,
+  desenhado via canvas em runtime — não é um asset importado) no centro,
+  entre as duas fileiras, e névoa (`scene.fog`) escurecendo a distância
+  pra reforçar a sensação de um salão vasto. A câmera foi recuada/alargada
+  (FOV 28→34, mais longe) pra esse tamanho maior realmente aparecer, não só
+  o chão. Ao começar o duelo, os dois esquadrões nascem afastados (atrás
   da própria formação) e **caminham** até a posição real (`introWalk`,
   reaproveitando o sistema de lerp que já existia pro swap discreto, só
   que mais lento) — a etiqueta de nome/vida de cada Axie só aparece
   (fade-in) depois que essa entrada termina, pra não ficar destacada numa
   posição que o modelo 3D ainda não alcançou.
-- **Feedback de jogada**: toda carta jogada — sua ou do rival — mostra um
-  popup com o ícone do conjunto e o nome da carta perto da respectiva
-  fileira (`render.spawnCardPopup`, a "arte" da carta nesse protótipo, já
-  que não há ilustração própria). Números flutuantes de dano/cura,
-  flashes de acerto/cura e o shake do tabuleiro agora duram bem mais
-  (~1.7s o texto, ~0.65-0.75s os flashes) do que a v1 (~0.4-0.9s) — as
-  ativações estavam rápidas demais pra acompanhar.
+- **Feedback de jogada**: todo acerto ou cura estoura um efeito de
+  impacto **em 3D de verdade** na posição do alvo (`board3d.js`'s
+  `spawnImpact`: um anel que se expande e faíscas que saltam e caem,
+  cor laranja no dano e verde na cura), não só o flash/texto de DOM de
+  antes — que ainda existem, e também duram bem mais (~1.7s o texto
+  flutuante, ~0.65-0.75s os flashes) do que a v1 (~0.4-0.9s), já que as
+  ativações estavam rápidas demais pra acompanhar. (Um popup de
+  ícone+nome da carta foi tentado aqui e removido de novo — atrapalhava
+  a visão do tabuleiro.)
 - Status effects em cartas de Ataque: Bleed, **Poison** (empilha, bate 2x a
   stack atual e decai 1 stack por tick — mais forte no início, some
   sozinho), Deathmark, Retain, Ambush (2x dano no 1º acerto) e o combo de
@@ -250,7 +257,8 @@ Ainda não implementado:
   mira automática via `pickAutoTarget`; não move lanes
 - `src/render.js` — feedback visual via DOM: números flutuantes, flash de
   acerto/cura, shake do tabuleiro (durações alongadas de propósito, ver
-  seção acima) e `spawnCardPopup` (o popup de ícone+nome da carta jogada)
+  seção acima); o burst de impacto em 3D é `board3d.js`'s `spawnImpact`,
+  chamado via `ui.spawnImpact`
 - `src/ui.js` — HUD/DOM (montagem de esquadrão com steppers de loadout +
   seletor de conjunto por Axie (`renderSquad`), overlay de HP/nome/status
   sobre o tabuleiro 3D, clique persistente em qualquer unit chip pro fluxo
@@ -268,20 +276,23 @@ Ainda não implementado:
 - `src/board3d.js` — o tabuleiro de duelo em si: uma cena three.js
   **compartilhada** (1 renderer/câmera só) com até 10 Axies 3D reais (5 de
   cada lado). O **Salão Lunacia** (`buildHall`) é o piso circular de
-  pedra + anel de 8 colunas + o emblema lunar central desenhado via canvas
-  em runtime (`buildLunaciaSigilTexture`) por cima do qual ficam os tiles
-  em losango (laranja/azul, estilo Apeiron) numa **formação centrada no
+  pedra (raio 11) + anel de 12 colunas de ~4.8 de altura + o emblema lunar
+  central desenhado via canvas em runtime (`buildLunaciaSigilTexture`) +
+  névoa de distância (`scene.fog`), por cima do qual ficam os tiles em
+  losango (laranja/azul, estilo Apeiron) numa **formação centrada no
   Tanque** (`FORMATION`: centro + frente/trás), com um tile maior e anel
-  pulsante no slot do Tanque marcando o raio de Provocação. No início da
-  partida cada Axie nasce afastado da sua posição real e **caminha** até
-  ela (`syncBoardAxies`'s `introWalk`, lerp mais lento que o normal +
-  `setLocomotion('walk')` até chegar). Fora disso, cada Axie balança
-  sutilmente perto da sua posição quando ocioso ("patrulha"), desliza
-  suavemente pra novo slot no movimento discreto (`moveLaneVisual`, com
-  lerp), e o Tanque é posicionado diretamente frame a frame enquanto o
-  joystick é segurado (`setLaneLivePosition`/`setLaneRoaming`, sem
-  lerp/patrulha nesse momento). HP/nome/status ficam em HTML posicionado
-  por cima via projeção de câmera (`projectLane`) — não são modelos 3D
+  pulsante no slot do Tanque marcando o raio de Provocação. `spawnImpact`
+  estoura um anel + faíscas em 3D na posição de um lane quando um golpe
+  acerta ou cura. No início da partida cada Axie nasce afastado da sua
+  posição real e **caminha** até ela (`syncBoardAxies`'s `introWalk`,
+  lerp mais lento que o normal + `setLocomotion('walk')` até chegar).
+  Fora disso, cada Axie balança sutilmente perto da sua posição quando
+  ocioso ("patrulha"), desliza suavemente pra novo slot no movimento
+  discreto (`moveLaneVisual`, com lerp), e o Tanque é posicionado
+  diretamente frame a frame enquanto o joystick é segurado
+  (`setLaneLivePosition`/`setLaneRoaming`, sem lerp/patrulha nesse
+  momento). HP/nome/status ficam em HTML posicionado por cima via
+  projeção de câmera (`projectLane`) — não são modelos 3D
 - `src/main.js` — entrada: wiring de DOM e o **loop de tempo real**
   (`requestAnimationFrame`) que regenera energia, tica status effects,
   chama a IA periodicamente e atualiza a UI — nada de handoff de turno

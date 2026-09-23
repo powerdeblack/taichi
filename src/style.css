@@ -329,36 +329,6 @@ h1{
   100%{ opacity:0; top:-56px; }
 }
 
-/* ---------- Card-face popup (the card's "art": icon + name) ---------- */
-.card-popup-layer{ position:absolute; inset:0; pointer-events:none; z-index:6; }
-.card-popup{
-  position:absolute; left:50%; top:50%;
-  width:104px; padding:8px 6px; border-radius:12px;
-  background:#1c130cf0; border:2px solid #ffffff40;
-  display:flex; flex-direction:column; align-items:center; gap:4px;
-  text-align:center;
-}
-.card-popup-you{ animation:card-popup-you 1.8s ease forwards; }
-.card-popup-rival{ animation:card-popup-rival 1.8s ease forwards; }
-.card-popup-icon{ font-size:1.7rem; line-height:1; }
-.card-popup-name{
-  font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.68rem;
-  color:var(--text-light);
-}
-@keyframes card-popup-you{
-  0%{ opacity:0; transform:translate(-50%,20%) scale(.6); }
-  15%{ opacity:1; transform:translate(-50%,55%) scale(1.05); }
-  25%{ transform:translate(-50%,55%) scale(1); }
-  75%{ opacity:1; transform:translate(-50%,55%) scale(1); }
-  100%{ opacity:0; transform:translate(-50%,40%) scale(.9); }
-}
-@keyframes card-popup-rival{
-  0%{ opacity:0; transform:translate(-50%,-120%) scale(.6); }
-  15%{ opacity:1; transform:translate(-50%,-155%) scale(1.05); }
-  25%{ transform:translate(-50%,-155%) scale(1); }
-  75%{ opacity:1; transform:translate(-50%,-155%) scale(1); }
-  100%{ opacity:0; transform:translate(-50%,-140%) scale(.9); }
-}
 
 .banner{
   position:absolute; top:44%; left:50%; transform:translate(-50%,-50%);

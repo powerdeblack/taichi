@@ -31,6 +31,7 @@ const MOVE_LERP_SPEED = 6; // higher = snappier slide into the new slot
 const INTRO_LERP_SPEED = 1.8; // slower -- the opening "walk into the hall" entrance (~2.5-3s)
 const PATROL_AMPLITUDE = 0.07; // how far idle units wander from their spot
 const INTRO_SPAWN_OFFSET = 2.0; // extra distance back from the formation at match start
+const impacts = []; // short-lived hit/heal burst effects -- see spawnImpact
 
 // Some rigs may not expose every named locomotion clip -- never let a
 // missing 'walk' state break the entrance.
@@ -68,15 +69,21 @@ export function initBoard3D(canvas){
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(28, 1, 0.1, 30);
-  camera.position.set(0, 5.6, 5.4);
+  // Pulled back and slightly wider than the original tiles-only framing so
+  // the much bigger hall (see buildHall) actually reads as a big room
+  // instead of just a slightly larger floor color.
+  camera = new THREE.PerspectiveCamera(34, 1, 0.1, 60);
+  camera.position.set(0, 7.4, 7.8);
   camera.lookAt(0, 0, -0.3);
   // matrixWorldInverse (needed by Vector3.project, used for overlay
   // positioning) is normally only refreshed during a render() pass -- force
   // it now so projectLane() works before the first animation frame ticks.
   camera.updateMatrixWorld(true);
-  scene.add(new THREE.HemisphereLight(0xfff3d6, 0x241a10, 1.5));
-  const dir = new THREE.DirectionalLight(0xffffff, 1.5);
+  // Fog so the hall fades into darkness at the edges instead of the floor
+  // just hard-cutting -- sells the sense of a vast dim room.
+  scene.fog = new THREE.Fog(0x120c08, 9, 26);
+  scene.add(new THREE.HemisphereLight(0xfff3d6, 0x241a10, 1.6));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.6);
   dir.position.set(3, 6, 3);
   scene.add(dir);
   clock = new THREE.Clock();
@@ -119,7 +126,67 @@ function animate(){
       s.axie.wrapper.position.z = s.basePos.z + Math.cos(t * 0.5) * PATROL_AMPLITUDE * 0.8;
     }
   });
+  tickImpacts(dt);
   if (renderer && scene && camera) renderer.render(scene, camera);
+}
+
+// Short-lived 3D "hit" feedback at a lane's current position: an
+// expanding, fading ring plus a handful of sparks that pop outward and
+// fall -- real visual impact on attacks (and a softer version on heals),
+// instead of just DOM flash/shake/floating text.
+function tickImpacts(dt){
+  for (let i = impacts.length - 1; i >= 0; i--){
+    const im = impacts[i];
+    im.age += dt;
+    const t = Math.min(1, im.age / im.life);
+    im.ring.scale.setScalar(1 + t * 7);
+    im.ring.material.opacity = im.ringOpacity * (1 - t);
+    im.sparks.forEach(sp => {
+      sp.position.addScaledVector(sp.userData.vel, dt);
+      sp.userData.vel.y -= dt * 2.4; // gravity
+      sp.material.opacity = 1 - t;
+    });
+    if (t >= 1){
+      scene.remove(im.ring); im.ring.geometry.dispose(); im.ring.material.dispose();
+      im.sparks.forEach(sp => { scene.remove(sp); sp.geometry.dispose(); sp.material.dispose(); });
+      impacts.splice(i, 1);
+    }
+  }
+}
+
+const IMPACT_COLORS = { hit: 0xff7a4d, heal: 0x8fe6a0, shield: 0x8fd0ff };
+
+export function spawnImpact(side, laneIndex, kind = 'hit'){
+  if (!scene) return;
+  const s = slots.get(slotKey(side, laneIndex));
+  const pos = s ? s.axie.wrapper.position.clone() : laneWorldPos(side, { x: 0, z: 0 });
+  pos.y += 0.9;
+  const color = IMPACT_COLORS[kind] || IMPACT_COLORS.hit;
+
+  const ringGeo = new THREE.RingGeometry(0.06, 0.16, 24);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false,
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.position.copy(pos);
+  ring.rotation.x = -Math.PI / 2 + (Math.random() - 0.5) * 0.3;
+  scene.add(ring);
+
+  const sparks = [];
+  const sparkCount = kind === 'heal' ? 5 : 8;
+  for (let i = 0; i < sparkCount; i++){
+    const sparkMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1, depthWrite: false });
+    const spark = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), sparkMat);
+    spark.position.copy(pos);
+    const angle = Math.random() * Math.PI * 2;
+    const speed = kind === 'heal' ? 0.5 + Math.random() * 0.4 : 0.9 + Math.random() * 0.9;
+    const upBias = kind === 'heal' ? 1.4 + Math.random() * 0.6 : Math.random() * 0.6;
+    spark.userData.vel = new THREE.Vector3(Math.cos(angle) * speed, upBias, Math.sin(angle) * speed * 0.6);
+    scene.add(spark);
+    sparks.push(spark);
+  }
+
+  impacts.push({ ring, sparks, age: 0, life: kind === 'heal' ? 0.6 : 0.45, ringOpacity: 0.95 });
 }
 
 // Formation slots, col 0..4: the Tank always starts at 0 (center); 1/2 are
@@ -192,9 +259,9 @@ function buildTiles(){
 // emblem at the center, between the two rows -- an arena backdrop closer
 // to a 3x3-style dueling hall than bare tiles floating in space. Purely
 // cosmetic, built once and never touched again.
-const HALL_RADIUS = 4.0;
-const COLUMN_RADIUS = 3.6;
-const COLUMN_COUNT = 8;
+const HALL_RADIUS = 11.0;
+const COLUMN_RADIUS = 6.4;
+const COLUMN_COUNT = 12;
 
 function buildHall(){
   const floorGeo = new THREE.CircleGeometry(HALL_RADIUS, 48);
@@ -204,34 +271,39 @@ function buildHall(){
   floor.position.y = -0.1;
   scene.add(floor);
 
-  const trimGeo = new THREE.RingGeometry(HALL_RADIUS - 0.25, HALL_RADIUS - 0.05, 48);
+  // Kept thin and dim -- it's a distant edge marker, not meant to compete
+  // visually with the columns (which are the actual "big room" landmarks).
+  const trimGeo = new THREE.RingGeometry(HALL_RADIUS - 0.15, HALL_RADIUS - 0.05, 48);
   const trimMat = new THREE.MeshStandardMaterial({
-    color: 0xd9b44a, roughness: 0.5, metalness: 0.3,
-    emissive: 0xd9b44a, emissiveIntensity: 0.15,
+    color: 0x8a6a30, roughness: 0.6, metalness: 0.2,
+    emissive: 0x8a6a30, emissiveIntensity: 0.08,
   });
   const trim = new THREE.Mesh(trimGeo, trimMat);
   trim.rotation.x = -Math.PI / 2;
   trim.position.y = -0.095;
   scene.add(trim);
 
-  const colGeo = new THREE.CylinderGeometry(0.16, 0.19, 2.2, 12);
-  const capGeo = new THREE.CylinderGeometry(0.3, 0.24, 0.18, 12);
-  const colMat = new THREE.MeshStandardMaterial({ color: 0x4a3824, roughness: 0.85, metalness: 0.1 });
+  // Columns sit much closer than the outer trim so they read as distinct
+  // pillars framing the play area, not a blur merging with the far ring.
+  const colHeight = 4.8;
+  const colGeo = new THREE.CylinderGeometry(0.3, 0.38, colHeight, 12);
+  const capGeo = new THREE.CylinderGeometry(0.58, 0.46, 0.32, 12);
+  const colMat = new THREE.MeshStandardMaterial({ color: 0x5c4530, roughness: 0.8, metalness: 0.1 });
   const capMat = new THREE.MeshStandardMaterial({
-    color: 0xd9b44a, roughness: 0.4, metalness: 0.4,
-    emissive: 0xd9b44a, emissiveIntensity: 0.2,
+    color: 0xffcf5c, roughness: 0.35, metalness: 0.45,
+    emissive: 0xffcf5c, emissiveIntensity: 0.5,
   });
   for (let i = 0; i < COLUMN_COUNT; i++){
     const angle = (i / COLUMN_COUNT) * Math.PI * 2;
     const x = Math.cos(angle) * COLUMN_RADIUS, z = Math.sin(angle) * COLUMN_RADIUS;
     const col = new THREE.Mesh(colGeo, colMat);
-    col.position.set(x, 1.0, z);
+    col.position.set(x, colHeight / 2, z);
     scene.add(col);
     const cap = new THREE.Mesh(capGeo, capMat);
-    cap.position.set(x, 2.15, z);
+    cap.position.set(x, colHeight + 0.15, z);
     scene.add(cap);
     const base = new THREE.Mesh(capGeo, capMat);
-    base.position.set(x, -0.02, z);
+    base.position.set(x, -0.03, z);
     scene.add(base);
   }
 

@@ -36,24 +36,3 @@ export function shakeBoard(boardEl){
   boardEl.classList.add('board-shake');
   setTimeout(() => boardEl.classList.remove('board-shake'), 320);
 }
-
-const cardPopupLayer = document.getElementById('cardPopupLayer');
-
-// A brief "card face" popup (icon + name, matching the hand card's own
-// colors/set icon -- there's no illustrated card art in this prototype, so
-// this IS the card's "drawing") that pops up near the caster's row when
-// a card resolves, alongside the floating damage/heal text. `side` is
-// whoever CAST the card ('you' plays near the bottom, 'rival' near the top).
-export function spawnCardPopup(card, side){
-  if (!cardPopupLayer) return;
-  const el = document.createElement('div');
-  el.className = 'card-popup ' + (side === 'you' ? 'card-popup-you' : 'card-popup-rival');
-  el.style.borderColor = card.color;
-  el.style.boxShadow = `0 0 18px 2px ${card.color}80`;
-  el.innerHTML = `
-    <div class="card-popup-icon">${card.setIcon || '🃏'}</div>
-    <div class="card-popup-name">${card.name}</div>
-  `;
-  cardPopupLayer.appendChild(el);
-  setTimeout(() => el.remove(), 1800);
-}
