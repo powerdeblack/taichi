@@ -536,7 +536,7 @@ h1{
     position:absolute; left:8px; right:8px; bottom:8px; z-index:6;
     align-items:flex-end; justify-content:space-between;
   }
-  .stick-zone{ align-self:auto; }
+  .stick-zone{ align-self:auto; background:#1c130cc8; backdrop-filter:blur(4px); }
   .zone-divider{ display:none; }
   .hand-zone{ flex:0 1 auto; max-width:58%; align-items:flex-end; }
   .hand{ grid-template-columns:repeat(3, minmax(74px,104px)); }

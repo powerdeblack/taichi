@@ -103,11 +103,9 @@ export function initBoard3D(canvas){
   // positioning) is normally only refreshed during a render() pass -- force
   // it now so projectLane() works before the first animation frame ticks.
   camera.updateMatrixWorld(true);
-  // Fog so the hall fades into darkness at the edges instead of the floor
-  // just hard-cutting -- sells the sense of a vast dim room.
-  scene.fog = new THREE.Fog(0x120c08, 14, 32);
-  scene.add(new THREE.HemisphereLight(0xfff3d6, 0x241a10, 1.6));
-  const dir = new THREE.DirectionalLight(0xffffff, 1.6);
+  // Cool sky light off the snow plus a warm low sun for contrast.
+  scene.add(new THREE.HemisphereLight(0xdcefff, 0x9ab8d6, 1.5));
+  const dir = new THREE.DirectionalLight(0xffe6c4, 1.5);
   dir.position.set(3, 6, 3);
   scene.add(dir);
   clock = new THREE.Clock();
@@ -169,6 +167,7 @@ function animate(){
     }
   });
   tickImpacts(dt);
+  tickScenery(dt);
   if (renderer && scene && camera) renderer.render(scene, camera);
 }
 
@@ -283,45 +282,99 @@ function buildTauntRings(){
   });
 }
 
-// The Lunacia hall: a big stone floor with a ring of columns and a glowing
-// emblem at the center, between the two rows -- an arena backdrop closer
-// to a 3x3-style dueling hall than bare tiles floating in space. Purely
-// cosmetic, built once and never touched again.
-const HALL_RADIUS = 11.0;
+// The Lunacia snowfield: a wide snowy clearing under a twilight sky, with
+// the Lunacia sigil carved glowing into the snow between the two squads,
+// frosted pillars and pines on the far arc as a backdrop, and snow
+// drifting down the whole time. Everything that could block the view
+// (pillars, trees, drifts) stays on the far arc or well out on the flanks
+// -- nothing stands between the camera and the fight.
+const SNOW_RADIUS = 30;
 const COLUMN_RADIUS = 8.5;
 const COLUMN_COUNT = 16;
-// Only the far arc (behind the rival) gets columns: anything on the near
-// half or the sides stands between the camera and the fight and blocks it.
-const COLUMN_MAX_SIN = -0.35;
+const COLUMN_MAX_SIN = -0.35; // far arc only
+const SIGIL_RADIUS = 2.8;
+const SNOWFLAKE_COUNT = 700;
+const SNOW_BOX = { x: 13, yTop: 9, zMin: -13, zMax: 9 };
+
+let sigilGlow = null;
+let sigilRing = null;
+let sigilLight = null;
+let snowPoints = null;
+let snowDrift = null;
 
 function buildHall(){
-  const floorGeo = new THREE.CircleGeometry(HALL_RADIUS, 48);
-  const floorMat = new THREE.MeshStandardMaterial({ color: 0x241a10, roughness: 0.92, metalness: 0.05 });
+  scene.background = buildSkyTexture();
+  scene.fog = new THREE.Fog(0xb9d3ea, 15, 34);
+
+  const floorGeo = new THREE.CircleGeometry(SNOW_RADIUS, 64);
+  const floorMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff, map: buildSnowTexture(), roughness: 0.95, metalness: 0,
+  });
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -0.1;
   scene.add(floor);
 
-  // Kept thin and dim -- it's a distant edge marker, not meant to compete
-  // visually with the columns (which are the actual "big room" landmarks).
-  const trimGeo = new THREE.RingGeometry(HALL_RADIUS - 0.15, HALL_RADIUS - 0.05, 48);
-  const trimMat = new THREE.MeshStandardMaterial({
-    color: 0x8a6a30, roughness: 0.6, metalness: 0.2,
-    emissive: 0x8a6a30, emissiveIntensity: 0.08,
-  });
-  const trim = new THREE.Mesh(trimGeo, trimMat);
-  trim.rotation.x = -Math.PI / 2;
-  trim.position.y = -0.095;
-  scene.add(trim);
+  buildSigil();
+  buildIcePillars();
+  buildPines();
+  buildDrifts();
+  buildSnowfall();
+}
 
+function buildSigil(){
+  const tex = buildLunaciaSigilTexture();
+  const base = new THREE.Mesh(
+    new THREE.CircleGeometry(SIGIL_RADIUS, 64),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
+  );
+  base.rotation.x = -Math.PI / 2;
+  base.position.y = -0.085;
+  scene.add(base);
+
+  // Additive copy on top that pulses -- the sigil "breathes" light.
+  sigilGlow = new THREE.Mesh(
+    new THREE.CircleGeometry(SIGIL_RADIUS * 1.04, 64),
+    new THREE.MeshBasicMaterial({
+      map: tex, transparent: true, depthWrite: false, opacity: 0.5,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  sigilGlow.rotation.x = -Math.PI / 2;
+  sigilGlow.position.y = -0.08;
+  scene.add(sigilGlow);
+
+  // Outer rune ring turning slowly around the sigil.
+  sigilRing = new THREE.Mesh(
+    new THREE.RingGeometry(SIGIL_RADIUS * 1.08, SIGIL_RADIUS * 1.16, 96, 1),
+    new THREE.MeshBasicMaterial({
+      map: buildRuneRingTexture(), transparent: true, depthWrite: false,
+      blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    }),
+  );
+  sigilRing.rotation.x = -Math.PI / 2;
+  sigilRing.position.y = -0.075;
+  scene.add(sigilRing);
+
+  sigilLight = new THREE.PointLight(0x6fc3ff, 2, 7, 1.6);
+  sigilLight.position.set(0, 0.6, 0);
+  scene.add(sigilLight);
+}
+
+function buildIcePillars(){
   const colHeight = 4.8;
   const colGeo = new THREE.CylinderGeometry(0.3, 0.38, colHeight, 12);
   const capGeo = new THREE.CylinderGeometry(0.58, 0.46, 0.32, 12);
-  const colMat = new THREE.MeshStandardMaterial({ color: 0x5c4530, roughness: 0.8, metalness: 0.1 });
+  const snowCapGeo = new THREE.SphereGeometry(0.6, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+  const colMat = new THREE.MeshStandardMaterial({
+    color: 0x9fd4f5, roughness: 0.25, metalness: 0.1,
+    emissive: 0x2a7fc0, emissiveIntensity: 0.35, transparent: true, opacity: 0.92,
+  });
   const capMat = new THREE.MeshStandardMaterial({
     color: 0xffcf5c, roughness: 0.35, metalness: 0.45,
-    emissive: 0xffcf5c, emissiveIntensity: 0.5,
+    emissive: 0xffb830, emissiveIntensity: 0.45,
   });
+  const snowMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 });
   for (let i = 0; i < COLUMN_COUNT; i++){
     const angle = (i / COLUMN_COUNT) * Math.PI * 2;
     if (Math.sin(angle) > COLUMN_MAX_SIN) continue;
@@ -332,66 +385,238 @@ function buildHall(){
     const cap = new THREE.Mesh(capGeo, capMat);
     cap.position.set(x, colHeight + 0.15, z);
     scene.add(cap);
+    const snowCap = new THREE.Mesh(snowCapGeo, snowMat);
+    snowCap.scale.set(1, 0.45, 1);
+    snowCap.position.set(x, colHeight + 0.3, z);
+    scene.add(snowCap);
     const base = new THREE.Mesh(capGeo, capMat);
     base.position.set(x, -0.03, z);
     scene.add(base);
   }
-
-  const sigilGeo = new THREE.CircleGeometry(1.0, 48);
-  const sigilMat = new THREE.MeshBasicMaterial({
-    map: buildLunaciaSigilTexture(), transparent: true, opacity: 0.9, depthWrite: false,
-  });
-  const sigil = new THREE.Mesh(sigilGeo, sigilMat);
-  sigil.rotation.x = -Math.PI / 2;
-  sigil.position.y = -0.085;
-  scene.add(sigil);
 }
 
-// Draws a stylized Lunacia sigil (a rune circle with a crescent moon and
-// orbiting land-plot dots) onto a canvas at runtime -- there's no
-// illustrated emblem asset in this prototype, so it's generated instead.
-function buildLunaciaSigilTexture(){
+// Snow-dusted pines: only behind the pillars and far out on the flanks.
+function buildPines(){
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3b24, roughness: 0.9 });
+  const leafMats = [0x1f6b4a, 0x2a7d52, 0x185c44].map(c =>
+    new THREE.MeshStandardMaterial({ color: c, roughness: 0.85 }));
+  const snowMat = new THREE.MeshStandardMaterial({ color: 0xf6fbff, roughness: 1 });
+  const spots = [];
+  for (let i = 0; i < 14; i++){
+    const a = Math.PI * (1.08 + (i / 13) * 0.84); // back arc
+    const r = 11 + (i % 3) * 1.4;
+    spots.push([Math.cos(a) * r, Math.sin(a) * r]);
+  }
+  for (const side of [-1, 1]){
+    for (let i = 0; i < 4; i++) spots.push([side * (10.5 + (i % 2) * 1.6), -4 + i * 1.7]);
+  }
+  spots.forEach(([x, z], i) => {
+    const s = 0.8 + ((i * 37) % 10) / 16;
+    const tree = new THREE.Group();
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.6, 8), trunkMat);
+    trunk.position.y = 0.3;
+    tree.add(trunk);
+    for (let k = 0; k < 3; k++){
+      const rad = 1.0 - k * 0.25, h = 1.2 - k * 0.2, y = 0.8 + k * 0.62;
+      const leaf = new THREE.Mesh(new THREE.ConeGeometry(rad, h, 10), leafMats[(i + k) % 3]);
+      leaf.position.y = y;
+      tree.add(leaf);
+      const snow = new THREE.Mesh(new THREE.ConeGeometry(rad * 0.55, h * 0.4, 10), snowMat);
+      snow.position.y = y + h * 0.32;
+      tree.add(snow);
+    }
+    tree.position.set(x, -0.1, z);
+    tree.scale.setScalar(s);
+    scene.add(tree);
+  });
+}
+
+function buildDrifts(){
+  const mat = new THREE.MeshStandardMaterial({ color: 0xf4f9ff, roughness: 1 });
+  const geo = new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+  const drifts = [[-7.5, -6, 1.2], [7, -6.5, 1.0], [-11.5, -1, 1.0], [11.5, -2.5, 1.1], [-4, -10, 1.4], [3.5, -10.5, 1.1]];
+  drifts.forEach(([x, z, r]) => {
+    const d = new THREE.Mesh(geo, mat);
+    d.scale.set(r * 1.3, r * 0.25, r);
+    d.position.set(x, -0.1, z);
+    scene.add(d);
+  });
+}
+
+function buildSnowfall(){
+  const pos = new Float32Array(SNOWFLAKE_COUNT * 3);
+  snowDrift = new Float32Array(SNOWFLAKE_COUNT);
+  for (let i = 0; i < SNOWFLAKE_COUNT; i++){
+    pos[i * 3] = (Math.random() * 2 - 1) * SNOW_BOX.x;
+    pos[i * 3 + 1] = Math.random() * SNOW_BOX.yTop;
+    pos[i * 3 + 2] = SNOW_BOX.zMin + Math.random() * (SNOW_BOX.zMax - SNOW_BOX.zMin);
+    snowDrift[i] = Math.random() * Math.PI * 2;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({
+    size: 0.24, map: buildFlakeTexture(), transparent: true, depthWrite: false,
+    color: 0xffffff, opacity: 0.9,
+  });
+  snowPoints = new THREE.Points(geo, mat);
+  scene.add(snowPoints);
+}
+
+function tickScenery(dt){
+  if (snowPoints){
+    const attr = snowPoints.geometry.getAttribute('position');
+    const arr = attr.array;
+    for (let i = 0; i < SNOWFLAKE_COUNT; i++){
+      const iy = i * 3 + 1;
+      arr[iy] -= dt * (0.6 + (i % 5) * 0.12);
+      arr[i * 3] += Math.sin(elapsedTime * 0.8 + snowDrift[i]) * dt * 0.25;
+      if (arr[iy] < -0.1){
+        arr[iy] = SNOW_BOX.yTop;
+        arr[i * 3] = (Math.random() * 2 - 1) * SNOW_BOX.x;
+      }
+    }
+    attr.needsUpdate = true;
+  }
+  const pulse = 0.5 + 0.5 * Math.sin(elapsedTime * 1.6);
+  if (sigilGlow) sigilGlow.material.opacity = 0.08 + pulse * 0.22;
+  if (sigilRing) sigilRing.rotation.z += dt * 0.15;
+  if (sigilLight) sigilLight.intensity = 1.2 + pulse * 1.6;
+}
+
+function makeCanvas(w, h){
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return [c, c.getContext('2d')];
+}
+
+function canvasTex(c){
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// Twilight: deep violet overhead fading to a warm pink/peach glow at the
+// horizon, where the fog's pale blue takes over.
+function buildSkyTexture(){
+  const [c, ctx] = makeCanvas(4, 256);
+  const g = ctx.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0, '#2b2466');
+  g.addColorStop(0.45, '#6b5aa8');
+  g.addColorStop(0.75, '#e7a6c0');
+  g.addColorStop(1, '#b9d3ea');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 4, 256);
+  return canvasTex(c);
+}
+
+// Soft blue shading and sparkle specks so the snow reads as snow, not a
+// flat white disc.
+function buildSnowTexture(){
   const size = 512;
-  const canvas = document.createElement('canvas');
-  canvas.width = size; canvas.height = size;
-  const ctx = canvas.getContext('2d');
+  const [c, ctx] = makeCanvas(size, size);
+  ctx.fillStyle = '#eef5fc';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 90; i++){
+    const x = Math.random() * size, y = Math.random() * size, r = 20 + Math.random() * 70;
+    // Drawn at every wrapped offset so the texture tiles without seams.
+    for (const ox of [-size, 0, size]) for (const oy of [-size, 0, size]){
+      const g = ctx.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+      g.addColorStop(0, 'rgba(160,195,230,0.22)');
+      g.addColorStop(1, 'rgba(160,195,230,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+    }
+  }
+  for (let i = 0; i < 900; i++){
+    ctx.fillStyle = Math.random() < 0.5 ? 'rgba(255,255,255,0.9)' : 'rgba(190,225,255,0.8)';
+    ctx.fillRect(Math.random() * size, Math.random() * size, 1.5, 1.5);
+  }
+  const tex = canvasTex(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(6, 6);
+  return tex;
+}
+
+function buildFlakeTexture(){
+  const [c, ctx] = makeCanvas(32, 32);
+  const g = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.4, 'rgba(255,255,255,0.8)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 32, 32);
+  return canvasTex(c);
+}
+
+// Draws a stylized Lunacia sigil (rune circle, crescent moon, orbiting
+// land-plot dots) onto a canvas at runtime -- there's no illustrated
+// emblem asset in this prototype, so it's generated instead. Colored to
+// glow against snow: icy cyan runes, a gold crescent, violet/pink plots.
+function buildLunaciaSigilTexture(){
+  const size = 1024;
+  const [c, ctx] = makeCanvas(size, size);
   const cx = size / 2, cy = size / 2;
 
-  ctx.strokeStyle = '#ffd23f';
-  ctx.globalAlpha = 0.85;
-  ctx.lineWidth = 5;
-  ctx.beginPath(); ctx.arc(cx, cy, size * 0.46, 0, Math.PI * 2); ctx.stroke();
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(cx, cy, size * 0.4, 0, Math.PI * 2); ctx.stroke();
+  const halo = ctx.createRadialGradient(cx, cy, size * 0.1, cx, cy, size * 0.5);
+  halo.addColorStop(0, 'rgba(111,195,255,0.18)');
+  halo.addColorStop(0.7, 'rgba(111,195,255,0.12)');
+  halo.addColorStop(1, 'rgba(111,195,255,0)');
+  ctx.fillStyle = halo;
+  ctx.fillRect(0, 0, size, size);
 
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#2f9bff';
+  ctx.lineWidth = 12;
+  ctx.beginPath(); ctx.arc(cx, cy, size * 0.46, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.arc(cx, cy, size * 0.4, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = 6;
   for (let i = 0; i < 24; i++){
     const a = (i / 24) * Math.PI * 2;
-    const r1 = size * 0.4, r2 = size * 0.46;
     ctx.beginPath();
-    ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
-    ctx.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2);
+    ctx.moveTo(cx + Math.cos(a) * size * 0.4, cy + Math.sin(a) * size * 0.4);
+    ctx.lineTo(cx + Math.cos(a) * size * 0.46, cy + Math.sin(a) * size * 0.46);
     ctx.stroke();
   }
 
-  ctx.globalAlpha = 0.95;
-  ctx.fillStyle = '#f4e6c1';
-  ctx.beginPath(); ctx.arc(cx, cy, size * 0.22, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#1c130c';
-  ctx.beginPath(); ctx.arc(cx + size * 0.09, cy, size * 0.2, 0, Math.PI * 2); ctx.fill();
+  // Four-point star behind the moon.
+  ctx.fillStyle = 'rgba(159,122,234,0.55)';
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++){
+    const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
+    const r = i % 2 === 0 ? size * 0.34 : size * 0.1;
+    const px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
 
-  ctx.fillStyle = '#8fd0ff';
+  // Crescent: gold disc with an offset cut-out.
+  ctx.fillStyle = '#ffc233';
+  ctx.beginPath(); ctx.arc(cx, cy, size * 0.22, 0, Math.PI * 2); ctx.fill();
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.beginPath(); ctx.arc(cx + size * 0.09, cy - size * 0.02, size * 0.19, 0, Math.PI * 2); ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+
+  const plotColors = ['#ff7eb6', '#9f7aea', '#6fe3ff', '#ffd23f', '#7ee08a', '#ff9f5a'];
   for (let i = 0; i < 6; i++){
     const a = (i / 6) * Math.PI * 2 + 0.3;
-    const r = size * 0.33;
+    ctx.fillStyle = plotColors[i];
     ctx.beginPath();
-    ctx.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, size * 0.014, 0, Math.PI * 2);
+    ctx.arc(cx + Math.cos(a) * size * 0.33, cy + Math.sin(a) * size * 0.33, size * 0.022, 0, Math.PI * 2);
     ctx.fill();
   }
+  return canvasTex(c);
+}
 
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+function buildRuneRingTexture(){
+  const [c, ctx] = makeCanvas(512, 32);
+  ctx.fillStyle = 'rgba(111,195,255,0.15)';
+  ctx.fillRect(0, 0, 512, 32);
+  for (let i = 0; i < 32; i++){
+    ctx.fillStyle = i % 2 ? 'rgba(255,194,51,0.9)' : 'rgba(111,195,255,0.95)';
+    ctx.fillRect(i * 16 + 4, 10, 8, 12);
+  }
+  return canvasTex(c);
 }
 
 // Projects a lane's local {x,z} position to a [0..1] screen-space

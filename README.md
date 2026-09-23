@@ -177,22 +177,22 @@ npm run preview
   time (`#deckScreen`) só reduz o que não é essencial (título, "How to
   Play", o preview 3D some no aperto) e mantém rolagem normal -- montar
   time não é tão sensível ao tempo quanto mirar no meio do duelo.
-- **Salão Lunacia**: o tabuleiro é um salão circular grande (raio 11,
-  chão de pedra, colunas de ~4.8 de altura **só no arco do fundo**, atrás
-  do rival, raio 8.5 — `board3d.js`'s `buildHall`/`COLUMN_MAX_SIN`; as
-  colunas da frente e das laterais foram removidas porque ficavam entre a
-  câmera e a luta, tapando a jogabilidade) com um **emblema lunar brilhante** (`buildLunaciaSigilTexture`,
-  desenhado via canvas em runtime — não é um asset importado) no centro,
-  entre as duas fileiras, e névoa (`scene.fog`) escurecendo a distância
-  pra reforçar a sensação de um salão vasto. A câmera foi recuada/alargada
-  (FOV 28→34, mais longe) pra esse tamanho maior realmente aparecer, não só
-  o chão -- e depois ajustada de novo pra um **FOV bem mais fechado (26) e
-  bem mais recuada** (era muito próxima, o Tanque do seu próprio time,
-  por ficar mais perto da câmera, aparecia como um "domo" gigante
-  cobrindo metade da tela): FOV mais teleobjetiva + mais distância
-  comprime a diferença de tamanho entre quem tá perto e longe da câmera,
-  então os dois lados ficam em escala parecida em vez do time mais
-  próximo dominando o quadro. Ao começar o duelo, os dois esquadrões nascem afastados (atrás
+- **Campo de neve Lunacia**: o duelo acontece numa clareira de neve sob um
+  céu de crepúsculo (violeta → rosa → azul-gelo, `buildSkyTexture`), com
+  **neve caindo** o tempo todo (`buildSnowfall`/`tickScenery`, ~700
+  flocos em `THREE.Points` que descem balançando e renascem no topo). No
+  chão, entre os dois esquadrões, o **símbolo Lunacia** grande
+  (`SIGIL_RADIUS` 2.8, `buildLunaciaSigilTexture` desenhado em canvas):
+  runas azul-gelo, lua crescente dourada, estrela violeta e os lotes
+  coloridos em volta — com uma cópia aditiva que **pulsa**, um anel de
+  runas girando devagar e uma luz azul que respira sobre a neve. Chão de
+  neve com sombreado azulado e brilhos (`buildSnowTexture`, textura
+  tileável sem emenda). Pilares de gelo com capitel dourado e neve no
+  topo, pinheiros nevados e montes de neve ficam **só no arco do fundo e
+  bem afastados nas laterais** (`COLUMN_MAX_SIN`) — nada fica entre a
+  câmera e a luta. A câmera usa um **FOV fechado (26) e bem recuada**, o
+  que comprime a diferença de tamanho entre o time perto e o longe da
+  câmera (antes o próprio Tanque aparecia como um "domo" gigante). Ao começar o duelo, os dois esquadrões nascem afastados (atrás
   da própria formação) e **caminham** até a posição real (`introWalk`,
   reaproveitando o sistema de lerp que já existia pro swap discreto, só
   que mais lento) — a etiqueta de nome/vida de cada Axie só aparece
