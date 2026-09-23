@@ -17,6 +17,9 @@ const moveBtn = document.getElementById('moveBtn');
 const joystickWrap = document.getElementById('joystickWrap');
 const joystickBase = document.getElementById('joystickBase');
 const joystickKnob = document.getElementById('joystickKnob');
+const helpBtn = document.getElementById('helpBtn');
+const helpModal = document.getElementById('helpModal');
+const helpCloseBtn = document.getElementById('helpCloseBtn');
 
 let squad = []; // [{ classId, setId, isTank, counts:{attack,defense,heal} }] -- up to SQUAD_SIZE
 let state = null;
@@ -107,6 +110,11 @@ switchDeckBtn.addEventListener('click', () => {
 });
 resetBtn.addEventListener('click', () => beginMatch(lastYouSquad, lastRivalSquad));
 
+// ================= Help modal =================
+helpBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
+helpCloseBtn.addEventListener('click', () => helpModal.classList.add('hidden'));
+helpModal.addEventListener('click', (e) => { if (e.target === helpModal) helpModal.classList.add('hidden'); });
+
 // ================= Match lifecycle =================
 function beginMatch(youSquad, rivalSquad){
   lastYouSquad = youSquad;
@@ -116,6 +124,8 @@ function beginMatch(youSquad, rivalSquad){
   moveMode = false;
   moveSource = null;
   matchFinished = false;
+  aiMoveTimer = 1 + Math.random() * 1.5;
+  aiWandering = false;
   ui.hideBanner();
   ui.buildBoard(state, onUnitClick);
   syncUI();
@@ -443,6 +453,30 @@ function endJoystickDrag(){
 joystickBase.addEventListener('pointerup', endJoystickDrag);
 joystickBase.addEventListener('pointercancel', endJoystickDrag);
 
+// ================= Rival wander (autonomous Tank+escort movement) =================
+// The rival's Tank -- and its escort, same as the player's -- roams the
+// hall on its own timer instead of standing still: drives the exact same
+// game.moveSquadWithTank the player's joystick uses, just picking a
+// random direction/hold period instead of reading a pointer.
+const AI_MOVE_SPEED = 1.3; // a bit slower than the player's own joystick
+let aiMoveTimer = 1 + Math.random() * 1.5;
+let aiMoveDirX = 0, aiMoveDirZ = 0;
+let aiWandering = false;
+
+function pickAiWanderMove(){
+  const wasWandering = aiWandering;
+  aiWandering = Math.random() < 0.65; // mostly on the move, sometimes holds still
+  if (aiWandering){
+    const angle = Math.random() * Math.PI * 2;
+    aiMoveDirX = Math.cos(angle);
+    aiMoveDirZ = Math.sin(angle);
+    aiMoveTimer = 1.2 + Math.random() * 1.6;
+  } else {
+    aiMoveTimer = 0.6 + Math.random() * 1.0;
+    if (wasWandering) state.rivalLanes.forEach((lane, i) => { if (lane.alive) ui.endLiveLanePosition('rival', i); });
+  }
+}
+
 // ================= Real-time game loop =================
 // No turns: both sides regenerate energy and can play cards continuously;
 // the rival AI just acts on its own timer. One requestAnimationFrame loop
@@ -478,6 +512,16 @@ function gameLoop(nowMs){
     if (tankIdx !== -1 && state.youLanes[tankIdx].alive){
       game.moveSquadWithTank(state, 'you', joyDirX * UNIT_MOVE_SPEED * dt, joyDirZ * UNIT_MOVE_SPEED * dt);
       state.youLanes.forEach((lane, i) => { if (lane.alive) ui.setLiveLanePosition('you', i, lane.localPos); });
+    }
+  }
+
+  aiMoveTimer -= dt;
+  if (aiMoveTimer <= 0) pickAiWanderMove();
+  if (aiWandering){
+    const rivalTankIdx = state.rivalLanes.findIndex(l => l.isTank);
+    if (rivalTankIdx !== -1 && state.rivalLanes[rivalTankIdx].alive){
+      game.moveSquadWithTank(state, 'rival', aiMoveDirX * AI_MOVE_SPEED * dt, aiMoveDirZ * AI_MOVE_SPEED * dt);
+      state.rivalLanes.forEach((lane, i) => { if (lane.alive) ui.setLiveLanePosition('rival', i, lane.localPos); });
     }
   }
 

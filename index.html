@@ -11,6 +11,7 @@
 <div class="stage">
   <h1>Axie Duel</h1>
   <p class="subtitle">Build your squad of 5 — kill the enemy Tank to win</p>
+  <button class="help-btn" id="helpBtn" type="button">❓ How to Play</button>
 
   <!-- ===================== TEAM PICKER SCREEN ===================== -->
   <div id="deckScreen" class="deck-panel">
@@ -69,6 +70,22 @@
     <div class="btn-row">
       <button class="reset-btn" id="resetBtn">Rematch (same team)</button>
       <button class="switch-deck-btn" id="switchDeckBtn">Change team</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="helpModal">
+    <div class="modal-box">
+      <button class="modal-close" id="helpCloseBtn" type="button" aria-label="Close">×</button>
+      <h2>How to Play</h2>
+
+      <h3>1. Build your squad</h3>
+      <p>Pick 5 Axies from the roster (species can repeat). A species only decides the 3D model and the class triangle bonus (Beast&gt;Plant&gt;Aqua&gt;Beast, Bird&gt;Bug&gt;Reptile&gt;Bird) — it's the <b>card set</b> (Warrior/Priest/Mage/Ranger/Rogue/Shaman) you assign each Axie that decides its real cards. Pairing a species with its own native set (⭐, e.g. Bird+Ranger) unlocks a bonus signature card, but any pairing is playable. Give each Axie a 5-card loadout split across Attack/Defense/Heal however you like — that split is what makes it hit hard, tank, or heal. Mark exactly 1 Axie as Tank, then hit Start Duel.</p>
+
+      <h3>2. Aiming and playing cards</h3>
+      <p>The duel runs in real time — no turns, energy just keeps regenerating. Tap any Axie on the board (yours or the rival's), or its HP bar, to select it — a white ring shows the pick — then tap a card in your hand to use it on that target. Attack cards need the target within range: short range only reaches an enemy within actual contact distance of your Axie right now, long range reaches anyone alive. Defense/Heal cards work on either side: cast on an ally for the normal effect, or on an enemy to reverse it (a shield becomes Vulnerable, a heal becomes damage).</p>
+
+      <h3>3. Tank, Taunt, and movement</h3>
+      <p>The Tank sits at the center and "taunts" — anyone attacking from close to it is forced to hit the Tank instead of picking freely, win or lose. Hold the joystick to roam the Tank around; the other 4 Axies escort it automatically, keeping formation around wherever it goes. Use "Move an Axie" (a short cooldown) to swap two of your own lanes instead — handy for ducking out of Taunt range or lining up a short-range hit.</p>
     </div>
   </div>
 

@@ -98,34 +98,44 @@ npm run preview
   (`.unit-chip.selected-target`), independente de qual carta você vai
   usar. Toca de novo no mesmo Axie pra desselecionar. Só então você toca
   numa carta da mão: cartas de **Ataque** só resolvem se o alvo
-  selecionado for um inimigo dentro do alcance daquela carta (curto =
-  mesma coluna, cai pra qualquer um vivo se não houver ninguém lá; longo =
-  qualquer inimigo vivo) — senão a carta não é gasta e o hint explica por
-  quê (fora de alcance, ou "Provocado" se o Tanque inimigo estiver
-  puxando). Cartas de **Defesa/Cura** aceitam qualquer alvo vivo dos dois
-  lados: aliado = efeito normal, inimigo = **revertido** (Cura Reversa,
-  igual ao Origin) — Guarda/Bulwark/Barreira/Evasão/Espinhos viram
-  **Vulnerável**, Cura/Regeneração viram **dano/DOT**. O clique é sempre
-  ativo em cada unit chip (não é mais um modo que abre/fecha por carta) —
-  ver `ui.js`'s `buildBoard(state, onUnitClick)`. O rival ainda mira
-  automático (curto = mesma coluna, longo = o mais fraco).
+  selecionado for um inimigo dentro do alcance daquela carta. Curto
+  alcance agora é um **raio de contato real** (`SHORT_RANGE_RADIUS`,
+  distância entre as posições `localPos` ao vivo dos dois lados, não mais
+  "mesma coluna") — se ninguém inimigo estiver fisicamente perto o
+  suficiente agora, a carta simplesmente não tem alvo, sem cair pra
+  "qualquer um" como no sistema antigo; longo alcance continua acertando
+  qualquer inimigo vivo, não importa a distância. Como o Tanque (e agora
+  também o rival, ver abaixo) andam de verdade pelo salão, esse raio muda
+  a cada momento — sai da carta o hint explica por quê (fora de alcance,
+  ou "Provocado" se o Tanque inimigo estiver puxando). Cartas de
+  **Defesa/Cura** aceitam qualquer alvo vivo dos dois lados: aliado =
+  efeito normal, inimigo = **revertido** (Cura Reversa, igual ao Origin)
+  — Guarda/Bulwark/Barreira/Evasão/Espinhos viram **Vulnerável**, Cura/
+  Regeneração viram **dano/DOT**. O clique é sempre ativo em cada unit
+  chip (não é mais um modo que abre/fecha por carta) — ver `ui.js`'s
+  `buildBoard(state, onUnitClick)`. O rival ainda mira automático (curto
+  = dentro do mesmo raio de contato, longo = o mais fraco).
 - **Movimento discreto**: dá pra trocar a coluna de um dos seus próprios
   Axies com outra (toca "Mover", toca o Axie, toca o destino) — sem turno
-  pra esperar, só um cooldown curto (4s) depois de usar. Tira um Axie da
-  coluna de um atacante de curto alcance inimigo, ou reposiciona pra
-  alinhar seu próprio curto alcance num alvo específico.
-- **Joystick do Tanque + escolta (posição livre, em tempo real)**: ao lado
-  do botão de mover, um joystick **só do Tanque** — **segura e arrasta**
-  pra ele andar continuamente na direção empurrada (sem cooldown, sem
-  encaixar em slot fixo), até um raio máximo ao redor do centro da
-  formação. Os outros 4 Axies **escoltam**: seguem automaticamente,
-  mantendo seu deslocamento de formação relativo à posição atual do
-  Tanque (`moveSquadWithTank`), então o esquadrão inteiro avança/recua
-  junto. Solta e todo mundo para onde estiver. "Pra cima" no joystick =
-  rumo ao inimigo (mais perto do raio de Provocação do Tanque inimigo);
-  "pra baixo" = recuar pra linha de trás. Isso é independente do `col`
-  (slot fixo, usado pro alcance curto/longo e pro swap discreto) -- o
-  roam livre só mexe na posição `localPos`.
+  pra esperar, só um cooldown curto (4s) depois de usar. Tira um Axie do
+  raio de contato de um atacante inimigo, ou reposiciona pra entrar no
+  alcance do seu próprio curto alcance num alvo específico.
+- **Joystick do Tanque + escolta (posição livre, em tempo real) — dos dois
+  lados**: ao lado do botão de mover, um joystick **só do Tanque** —
+  **segura e arrasta** pra ele andar continuamente na direção empurrada
+  (sem cooldown, sem encaixar em slot fixo), até um raio máximo ao redor
+  do centro da formação. Os outros 4 Axies **escoltam**: seguem
+  automaticamente, mantendo seu deslocamento de formação relativo à
+  posição atual do Tanque (`moveSquadWithTank`), então o esquadrão
+  inteiro avança/recua junto. Solta e todo mundo para onde estiver. "Pra
+  cima" no joystick = rumo ao inimigo (mais perto do raio de Provocação
+  do Tanque inimigo); "pra baixo" = recuar pra linha de trás. O **rival
+  também anda sozinho**, num timer que alterna entre vagar numa direção
+  aleatória por 1-3s e ficar parado por um instante (`main.js`'s
+  `pickAiWanderMove`/`aiMoveTimer`) — chama a mesma `moveSquadWithTank`
+  do joystick do jogador, só que sem pointer events. Isso é independente
+  do `col` (slot fixo, usado pro alcance curto/longo e pro swap discreto)
+  -- o roam livre só mexe na posição `localPos`.
 - **Formação e Provocação (Taunt)**: cada lado forma um losango — o Tanque
   nasce no **centro** (tile dourado brilhante, com um anel de raio), e os
   outros 4 Axies ficam 2 na frente/2 atrás ao redor dele, fixos nesses
@@ -230,7 +240,9 @@ Ainda não implementado:
 
 ## Estrutura
 
-- `index.html` — telas de montagem de esquadrão e tabuleiro
+- `index.html` — telas de montagem de esquadrão e tabuleiro, mais o modal
+  "❓ How to Play" (`#helpModal`, acessível nas duas telas) explicando
+  montagem de time, mira e Tanque/movimento em 3 seções curtas
 - `src/cards.js` — roster de 6 espécies (`AXIES`, só visual + triângulo) e
   6 conjuntos de cartas (`CARD_SETS`, a função real: 2 ataque + 1 defesa +
   1 cura cada, mais `signatureCard`/`signatureHealCard`/
@@ -293,9 +305,11 @@ Ainda não implementado:
   (`setLaneLivePosition`/`setLaneRoaming`, sem lerp/patrulha nesse
   momento). HP/nome/status ficam em HTML posicionado por cima via
   projeção de câmera (`projectLane`) — não são modelos 3D
-- `src/main.js` — entrada: wiring de DOM e o **loop de tempo real**
-  (`requestAnimationFrame`) que regenera energia, tica status effects,
-  chama a IA periodicamente e atualiza a UI — nada de handoff de turno
+- `src/main.js` — entrada: wiring de DOM (incluindo o modal de ajuda) e o
+  **loop de tempo real** (`requestAnimationFrame`) que regenera energia,
+  tica status effects, chama a IA de cartas e o vagar autônomo do rival
+  (`pickAiWanderMove`) periodicamente, e atualiza a UI — nada de handoff
+  de turno
 
 `axie-duel-prototype.html` na raiz é o protótipo original (mira física de
 estilingue), mantido como referência histórica — não é mais o jogo atual.

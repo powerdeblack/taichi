@@ -34,6 +34,39 @@ h1{
 .subtitle{font-size:.85rem; color:var(--text-dim); margin:0 0 14px;}
 .hidden{display:none !important;}
 
+.help-btn{
+  font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.78rem;
+  color:var(--text-light); background:#4a382480; border:1px solid #ffffff25;
+  padding:6px 14px; border-radius:20px; cursor:pointer; margin-bottom:14px;
+}
+.help-btn:hover{ background:#4a3824c0; }
+
+.modal-overlay{
+  position:fixed; inset:0; background:#0c0805cc; z-index:20;
+  display:flex; align-items:center; justify-content:center; padding:16px;
+}
+.modal-box{
+  position:relative; width:100%; max-width:480px; max-height:85vh; overflow-y:auto;
+  background:var(--bg-panel); border:1px solid #ffffff25; border-radius:16px;
+  padding:20px 20px 16px;
+}
+.modal-box h2{
+  font-family:'Baloo 2',sans-serif; font-weight:800; color:var(--sand);
+  margin:0 0 12px; font-size:1.15rem;
+}
+.modal-box h3{
+  font-family:'Baloo 2',sans-serif; font-weight:700; color:var(--gold);
+  margin:14px 0 4px; font-size:.9rem;
+}
+.modal-box h3:first-of-type{ margin-top:0; }
+.modal-box p{ font-size:.8rem; line-height:1.45; color:var(--text-dim); margin:0; }
+.modal-box b{ color:var(--text-light); }
+.modal-close{
+  position:absolute; top:12px; right:12px; width:28px; height:28px;
+  border-radius:50%; border:1px solid #ffffff30; background:#1c130c;
+  color:var(--text-light); font-size:1rem; cursor:pointer; line-height:1;
+}
+
 /* ---------- Team picker / deck panel ---------- */
 .deck-panel{
   background:var(--bg-panel);

@@ -194,10 +194,10 @@ export function spawnImpact(side, laneIndex, kind = 'hit'){
 // taunt radius), 3/4 are the back line (farther back, safer). These mirror
 // game.js's FORMATION_XZ exactly -- keep both in sync if you tune one.
 // Local {x,z} offsets are in the side's own facing space -- laneWorldPos
-// flips z for the far side so both formations face each other. Only
-// non-Tank lanes stay pinned to a slot; the Tank roams this same local
-// space freely (see game.js moveTankFreely) and its live {x,z} is passed
-// straight through instead of a slot lookup.
+// flips z for the far side so both formations face each other. The Tank
+// roams this same local space freely (see game.js moveSquadWithTank) and
+// the other 4 lanes escort it, keeping this same offset relative to
+// wherever it currently stands, instead of a fixed slot lookup.
 const FORMATION = [
   { x: 0,     z: 0 },     // 0: center (Tank's default)
   { x: -1.05, z: 0.65 },  // 1: front-left

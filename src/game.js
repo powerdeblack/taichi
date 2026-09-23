@@ -149,18 +149,29 @@ function localPosOf(lane){
 // space radius of the Tank is forced to hit it instead of picking freely,
 // regardless of the card's range. Mirrors the real Origin Taunt/"Provocar"
 // card: the Tank soaks hits for whoever's standing near it. Since the Tank
-// can now roam continuously (see moveTankFreely), this is a real distance
-// check against its live position, not a fixed-slot lookup.
+// (and its escort, see moveSquadWithTank) roam continuously, this is a
+// real distance check against its live position, not a fixed-slot lookup.
 export const TAUNT_RADIUS = 1.15;
+
+// Short range needs an actual "contact radius" now that lanes really move
+// around the hall (Tank roam + escort, rival wander) instead of being
+// pinned to a column -- it's no longer "same column", it's "close enough
+// right now". Distances are compared directly in each side's own local
+// {x,z} space (the same trick TAUNT_RADIUS uses): a lane's default
+// formation slot and its mirror-image enemy slot sit at the same local
+// coordinates, so an untouched matchup in the same column is distance 0
+// (always in range) -- moving away from that spot is what actually
+// changes who's reachable.
+export const SHORT_RANGE_RADIUS = 1.3;
 
 // Legal enemy targets for an attack card. If the caster is within the
 // enemy Tank's taunt radius, the Tank is the ONLY legal target. Otherwise:
-// 'short' can only reach a non-Tank enemy sharing the caster's board
-// column (falls back to any alive enemy if nobody's there -- e.g. that
-// column's Axie already died, or the only option left is a roaming Tank
-// outside taunt range); 'long' can reach any alive enemy. The player
-// picks among these; see pickAutoTarget for the rival AI's automatic
-// choice (which goes through this same taunt check).
+// 'short' can only reach an alive enemy within SHORT_RANGE_RADIUS of the
+// caster's current position (no fallback -- if nothing's close enough,
+// the card simply has no target right now); 'long' can reach any alive
+// enemy regardless of distance. The player picks among these; see
+// pickAutoTarget for the rival AI's automatic choice (which goes through
+// this same taunt check).
 export function getLegalTargets(state, side, card, casterIndex){
   const ownLanes = side === 'you' ? state.youLanes : state.rivalLanes;
   const enemyLanes = side === 'you' ? state.rivalLanes : state.youLanes;
@@ -174,8 +185,11 @@ export function getLegalTargets(state, side, card, casterIndex){
   }
 
   if (card.range === 'short'){
-    const sameCol = alive.filter(i => !enemyLanes[i].isTank && enemyLanes[i].col === casterLane.col);
-    return sameCol.length ? sameCol : alive;
+    const a = localPosOf(casterLane);
+    return alive.filter(i => {
+      const b = localPosOf(enemyLanes[i]);
+      return Math.hypot(a.x - b.x, a.z - b.z) <= SHORT_RANGE_RADIUS;
+    });
   }
   if (card.range === 'long') return alive;
   return [];
@@ -208,14 +222,14 @@ export function pickAutoTarget(state, side, card, casterIndex){
   return legal[0];
 }
 
-// Swaps two of a side's own lanes' board columns -- the tactical payoff of
-// manual targeting: move a lane out of a short-range attacker's column, or
-// line up your own short-range attacker on a juicy target. Cooldown-gated
+// Swaps two of a side's own lanes' board columns -- repositions a lane
+// relative to wherever its own Tank currently stands (see moveSquadWithTank),
+// which changes who's within SHORT_RANGE_RADIUS of it. Cooldown-gated
 // instead of once-per-turn now that there are no turns; the rival AI
-// doesn't move (kept simple on purpose). Snaps both lanes' localPos back
-// to their new slot's formation position -- the Tank's free-roam offset
-// is reset if it gets moved this way (moveTankFreely is the live-roam
-// alternative).
+// doesn't use this discrete swap (it wanders its whole Tank+escort
+// instead, kept simple on purpose). Snaps the Tank itself back to the raw
+// formation slot if it's the one being moved this way, losing its live
+// roam offset.
 export const MOVE_COOLDOWN_SEC = 4;
 export function moveLane(state, side, sourceIndex, destIndex){
   if (side === 'you' && state.moveCooldown > 0) return false;
