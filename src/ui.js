@@ -13,6 +13,8 @@ const pipsEl = document.getElementById('pips');
 const hintEl = document.getElementById('hint');
 const bannerEl = document.getElementById('banner');
 const bannerSubEl = document.getElementById('bannerSub');
+const joystickUnitPicker = document.getElementById('joystickUnitPicker');
+const joystickLabel = document.getElementById('joystickLabel');
 
 // ================= Team builder =================
 export function renderRoster(axies, squad, onAdd){
@@ -27,7 +29,7 @@ export function renderRoster(axies, squad, onAdd){
       ${portraitHTML(axie.classId, axie.color, 'roster-portrait')}
       <div class="card-top"><div class="card-name">${axie.name}</div></div>
       <div class="card-class" style="color:${axie.color}">${axie.classId}</div>
-      <div class="card-desc">${axie.attackCards.map(c => `<b>${c.name}</b>: ${c.desc}`).join('<br>')}</div>
+      <div class="card-desc">${axie.desc}</div>
     `;
     div.addEventListener('click', () => onAdd(axie.classId));
     rosterGrid.appendChild(div);
@@ -40,10 +42,15 @@ const CATS = [
   { key:'heal', label:'💚 Heal' },
 ];
 
-export function renderSquad(squad, axies, { onAdjust, onToggleTank, onToggleEvolve, onRemove }){
+// The set picker: a row of small icon buttons (one per card set), one per
+// squad slot. A set whose color matches the Axie's own species color is
+// the "native" combo (see cards.js CARD_SETS) -- gets a small star so the
+// pairing that unlocks bonus signature cards is obvious at a glance.
+export function renderSquad(squad, axies, sets, { onAdjust, onToggleTank, onToggleEvolve, onSetChange, onRemove }){
   squadListEl.innerHTML = '';
   squad.forEach((pick, idx) => {
     const axie = axies.find(a => a.classId === pick.classId);
+    const set = sets.find(s => s.id === pick.setId) || sets[0];
     const total = pick.counts.attack + pick.counts.defense + pick.counts.heal;
     const row = document.createElement('div');
     row.className = 'squad-slot' + (pick.isTank ? ' is-tank' : '');
@@ -52,8 +59,12 @@ export function renderSquad(squad, axies, { onAdjust, onToggleTank, onToggleEvol
       <div class="squad-slot-info">
         <div class="squad-slot-name">
           ${axie.name}${pick.evolved ? '<span class="role-badge evolved">+</span>' : ''}
+          <span class="set-tag" style="color:${set.color}">${set.icon} ${set.name}${set.nativeClassId===pick.classId ? ' ⭐' : ''}</span>
           <button type="button" class="tank-toggle${pick.isTank?' active':''}" title="Mark as Tank">${pick.isTank ? '🎯 TANK' : 'mark as Tank'}</button>
           <button type="button" class="evolve-toggle${pick.evolved?' active':''}" title="Evolve this Axie's loadout (+15% power/HP/MP)">${pick.evolved ? '✦ Evolved' : 'evolve (+)'}</button>
+        </div>
+        <div class="set-picker">
+          ${sets.map(s => `<button type="button" class="set-btn${pick.setId===s.id?' active':''}" data-set="${s.id}" title="${s.name}${s.nativeClassId===pick.classId ? ' (native -- bonus card!)' : ''}" style="--set-color:${s.color}">${s.icon}${s.nativeClassId===pick.classId ? '⭐' : ''}</button>`).join('')}
         </div>
         <div class="stat-steppers">
           ${CATS.map(c => `
@@ -71,6 +82,9 @@ export function renderSquad(squad, axies, { onAdjust, onToggleTank, onToggleEvol
     `;
     row.querySelectorAll('.stepper-btn').forEach(btn => {
       btn.addEventListener('click', () => onAdjust(idx, btn.dataset.cat, Number(btn.dataset.delta)));
+    });
+    row.querySelectorAll('.set-btn').forEach(btn => {
+      btn.addEventListener('click', () => onSetChange(idx, btn.dataset.set));
     });
     row.querySelector('.tank-toggle').addEventListener('click', () => onToggleTank(idx));
     row.querySelector('.evolve-toggle').addEventListener('click', () => onToggleEvolve(idx));
@@ -107,8 +121,21 @@ let resizeListenerBound = false;
 let currentState = null;
 let activeSelectable = []; // { ref, cssClass, handler } -- see setSelectable/clearSelectable
 
-function statusLabel(key){
-  return {bleed:'🩸 Bleed', poison:'☠️ Poison', deathmark:'💀 Mark', shield:'🛡️ Shield'}[key] || key;
+// Numeric fields that ride along a status entry (e.g. dodgeChance next to
+// dodgeCharges) but aren't themselves a status to show a pill for.
+const STATUS_COMPANION_KEYS = new Set(['dodgeChance', 'thornsPct']);
+
+const STATUS_LABELS = {
+  bleed:'🩸 Bleed', poison:'☠️ Poison', deathmark:'💀 Mark', shield:'🛡️ Shield',
+  bulwark:'🛡️+ Bulwark', vulnerable:'⚡ Vulnerable', barrier:'🔵 Barrier',
+  dodgeCharges:'💨 Evasion', thornsHits:'🌵 Thorns', regen:'🌿 Regen', regenRot:'🥀 Rot',
+};
+
+function statusLabel(key, value){
+  const label = STATUS_LABELS[key] || key;
+  if (key === 'barrier') return `${label} ${value}`;
+  if (typeof value === 'number' && value > 1) return `${label} x${value}`;
+  return label;
 }
 
 function buildUnitTag(){
@@ -249,8 +276,9 @@ function updateUnit(ref, lane, side, laneIndex){
   ref.nameEl.innerHTML = `${lane.name}${lane.evolved ? '<span class="role-badge evolved">+</span>' : ''}${lane.isTank ? '<span class="role-badge tank">🎯</span>' : ''}`;
   ref.hpFill.style.width = Math.max(0, lane.hp/lane.maxHp*100) + '%';
   ref.mpEl.textContent = `MP ${lane.mp} · ⚔️${attack} 🛡️${defense} 💚${heal}`;
-  ref.statusEl.innerHTML = Object.keys(lane.status).filter(k => lane.status[k]>0 || lane.status[k]===true)
-    .map(k => `<span class="status-pill">${statusLabel(k)}</span>`).join('');
+  ref.statusEl.innerHTML = Object.keys(lane.status)
+    .filter(k => !STATUS_COMPANION_KEYS.has(k) && (lane.status[k]>0 || lane.status[k]===true))
+    .map(k => `<span class="status-pill">${statusLabel(k, lane.status[k])}</span>`).join('');
   ref.chip.classList.toggle('dead', !lane.alive);
   setLaneAlive(side, laneIndex, lane.alive);
 }
@@ -258,6 +286,27 @@ function updateUnit(ref, lane, side, laneIndex){
 export function getLaneSideEl(side, laneIndex){
   const ref = unitRefs[side] && unitRefs[side][laneIndex];
   return ref ? ref.chip : null;
+}
+
+// Small icon-button row next to the joystick: picks which of the player's
+// own lanes the joystick currently drives (any lane can roam freely now,
+// not just the Tank -- see game.js moveLaneFreely).
+export function renderUnitPicker(state, selectedIndex, onSelect){
+  if (!joystickUnitPicker) return;
+  joystickUnitPicker.innerHTML = '';
+  state.youLanes.forEach((lane, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'unit-picker-btn' + (i === selectedIndex ? ' active' : '') + (!lane.alive ? ' dead' : '');
+    btn.style.borderColor = lane.color;
+    btn.textContent = lane.isTank ? '🎯' : (lane.name[0] || '?');
+    btn.title = lane.name + (lane.isTank ? ' (Tank)' : '');
+    btn.disabled = !lane.alive;
+    btn.addEventListener('click', () => onSelect(i));
+    joystickUnitPicker.appendChild(btn);
+  });
+  const selLane = state.youLanes[selectedIndex];
+  if (joystickLabel) joystickLabel.textContent = selLane ? `🕹️ ${selLane.name}${selLane.isTank ? ' 🎯' : ''}` : '🕹️';
 }
 
 // ================= Hand / energy / piles =================
@@ -278,7 +327,7 @@ export function renderHand(state, { onPlay }){
         <div class="card-name">${card.name}</div>
         <div class="card-cost">${card.cost}</div>
       </div>
-      <div class="card-class" style="color:${card.color}">${card.cls} · ${rangeLabel}</div>
+      <div class="card-class" style="color:${card.color}">${card.setIcon ? card.setIcon+' ' : ''}${card.setName || card.cls} · ${rangeLabel}</div>
       <div class="card-desc">${card.desc}${!laneAlive ? ' <b>(lane destroyed)</b>' : ''}</div>
     `;
     if (playable) div.addEventListener('click', () => onPlay(card));

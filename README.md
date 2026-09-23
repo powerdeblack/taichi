@@ -4,13 +4,22 @@ Protótipo de duelo em tabuleiro 3D pro Axie Vibeathon (Sky Mavis / Axie
 Infinity): esquadrão livre de 5 Axies, cada um com um **loadout de 5
 cartas** que você monta (ataque/defesa/cura, na proporção que quiser) — é
 essa composição, não um papel fixo, que determina o quão forte, tanque ou
-curador cada Axie fica. O duelo é **em tempo real, sem turnos**: os dois
-lados regeneram energia continuamente e podem jogar cartas a qualquer
-momento, com mira manual (você escolhe o alvo) e um Tanque que provoca
-(taunt) e pode ser movido livremente com um joystick. Tudo baseado no core
-do Axie Origin (energia, classes, status effects). Vence quem matar o
-Tanque do adversário primeiro. No team picker, cada Axie aparece como um
-modelo 3D real (Axie Mixer 3D oficial), não placeholder.
+curador cada Axie fica. A **espécie** de um Axie (Beast/Aqua/Plant/Bird/
+Bug/Reptile) e sua **função em combate** são desacopladas: qualquer espécie
+pode equipar qualquer **conjunto de cartas** (Guerreiro/Sacerdote/Mago/
+Arqueiro/Ladino/Xamã) — é o conjunto, não a espécie, que decide as cartas
+de ataque/defesa/cura reais daquele Axie. Cada espécie tem um conjunto
+"nativo" (Bird↔Arqueiro, Beast↔Guerreiro...) que desbloqueia uma carta-
+assinatura bônus quando combinados, recompensando a combinação natural sem
+travar as outras. O duelo é **em tempo real, sem turnos**: os dois lados
+regeneram energia continuamente e podem jogar cartas a qualquer momento,
+com mira manual (você escolhe o alvo, inclusive pra reverter cartas de
+defesa/cura no inimigo) e movimento livre em tempo real pra **qualquer**
+Axie via joystick (não só o Tanque), que também provoca (taunt) por perto.
+Tudo baseado no core do Axie Origin (energia, classes, status effects).
+Vence quem matar o Tanque do adversário primeiro. No team picker, cada
+Axie aparece como um modelo 3D real (Axie Mixer 3D oficial), não
+placeholder.
 
 ## Rodando localmente
 
@@ -58,10 +67,17 @@ npm run preview
     investimento em cura que usa uma carta de cura emprestada cura bem menos.
   - Ter 5 cartas de defesa não impede ter 1 carta de ataque misturada: cada
     carta continua individual e jogável, os bônus são só a soma dos tipos.
-- Cartas de Ataque têm a identidade/triângulo de classe de cada Axie (Beast >
-  Plant > Aqua > Beast, Bird > Bug > Reptile > Bird — ainda influencia o
-  dano). Cartas de Defesa e Cura são **universais**: qualquer classe pode
-  equipar.
+- **Espécie vs. conjunto de cartas (desacoplados)**: a espécie de um Axie
+  (Beast/Aqua/Plant/Bird/Bug/Reptile) só define visual (modelo 3D real) e o
+  **triângulo de classe** pro cálculo de dano (Beast > Plant > Aqua > Beast,
+  Bird > Bug > Reptile > Bird) — nada mais. Quem decide as cartas de
+  ataque/defesa/cura que aquele Axie realmente joga é o **conjunto**
+  escolhido no montador (Guerreiro/Sacerdote/Mago/Arqueiro/Ladino/Xamã, ver
+  seção abaixo) — qualquer espécie pode equipar qualquer conjunto. Cada
+  conjunto tem uma espécie **nativa** (ex.: Arqueiro↔Bird, Guerreiro↔Beast);
+  combinar as duas desbloqueia uma **carta-assinatura** bônus (geralmente
+  de ataque, mas Sacerdote↔Plant ganha uma 2ª carta de cura) — o
+  off-species continua 100% jogável, só com o pool base, menor.
 - **Tempo real, sem turnos**: `energyYou`/`energyRival` regeneram
   continuamente (~0.6/s cada), e qualquer carta afordável pode ser jogada a
   qualquer momento, dos dois lados — não existe handoff "sua vez/vez do
@@ -89,13 +105,18 @@ npm run preview
   pro sistema de mira acima — tira um Axie da coluna de um atacante de
   curto alcance inimigo, ou reposiciona pra alinhar seu próprio curto
   alcance num alvo específico.
-- **Joystick do Tanque (posição livre, em tempo real)**: ao lado do botão
-  de mover, um joystick dedicado só pro Tanque — **segura e arrasta** pra
-  ele andar continuamente na direção empurrada (sem cooldown, sem
-  encaixar em slot fixo), até um raio máximo ao redor do centro da
-  formação. Solta e ele para onde estiver. "Pra cima" no joystick = rumo
-  ao inimigo (linha de frente, mais perto do próprio raio de Provocação);
-  "pra baixo" = recuar pra linha de trás.
+- **Joystick de qualquer Axie (posição livre, em tempo real)**: ao lado do
+  botão de mover, um joystick com uma fileira de ícones em cima — toca um
+  dos seus 5 Axies pra "empunhar" ele (padrão: o Tanque), depois **segura e
+  arrasta** o manche pra ele andar continuamente na direção empurrada (sem
+  cooldown, sem encaixar em slot fixo), até um raio máximo ao redor do
+  centro da formação. Solta e ele para onde estiver. "Pra cima" no
+  joystick = rumo ao inimigo (linha de frente, mais perto do raio de
+  Provocação do Tanque inimigo); "pra baixo" = recuar pra linha de trás.
+  Isso é independente do `col` (slot fixo, usado pro alcance curto/longo e
+  pro swap discreto) -- o roam livre só mexe na posição `localPos`, então
+  qualquer Axie pode fugir/entrar na Provocação sem perder sua coluna de
+  mira.
 - **Formação e Provocação (Taunt)**: cada lado forma um losango — o Tanque
   nasce no **centro** (tile dourado brilhante, com um anel de raio), e os
   outros 4 Axies ficam 2 na frente/2 atrás ao redor dele, fixos nesses
@@ -107,63 +128,104 @@ npm run preview
   correr pra frente pra proteger a retaguarda puxando os golpes pra si, ou
   recuar pra fugir da provocação e liberar os aliados pra mirar em
   qualquer um.
-- Status effects: Bleed, **Poison** (empilha, bate 2x a stack atual e decai 1
-  stack por tick — mais forte no início, some sozinho), Deathmark, Retain,
-  Ambush (2x dano no 1º acerto) e o combo da Pena. As cartas universais de
-  defesa/cura têm mecânicas nomeadas próprias, cada uma com sua versão
-  revertida (ver mira de Defesa/Cura acima):
-  - **Ornitorrinco** (Guarda): bloqueia 50% do próximo golpe. Revertido:
-    aplica **Vulnerável**.
-  - **Guardião Tropical** (Limpeza + Bastião): remove Bleed/Poison/
-    Deathmark e depois reduz os próximos 2 golpes recebidos em 25% cada.
-    Revertido: aplica **Vulnerável** direto (sem limpar nada).
-  - **Cachorrinho** (Cura instantânea): cura na hora, escalado pelo MP do
-    conjurador. Revertido: **Cura Reversa** — a mesma quantidade vira dano.
-  - **Trevo** (Regeneração): cura um pouco a cada tick por 3 ticks, em vez
-    de um valor único maior. Revertido: aplica o equivalente em dano ao
-    longo do tempo.
+- Status effects em cartas de Ataque: Bleed, **Poison** (empilha, bate 2x a
+  stack atual e decai 1 stack por tick — mais forte no início, some
+  sozinho), Deathmark, Retain, Ambush (2x dano no 1º acerto) e o combo de
+  flechas. Toda carta de Defesa/Cura, de qualquer conjunto, tem uma
+  mecânica nomeada própria — normal num aliado, **revertida** num inimigo
+  (ver mira de Defesa/Cura acima). No inimigo, **toda** carta de Defesa vira
+  **Vulnerável** (independente da mecânica normal), e toda carta de Cura
+  vira dano/DOT equivalente (Cura Reversa):
+  - **Guarda** (Sacerdote): bloqueia 50% do próximo golpe.
+  - **Bastião** (Guerreiro): reduz os próximos 3 golpes recebidos em 25%
+    cada, sem limpar status (mais golpes que o Limpeza+Bastião antigo, sem
+    a limpeza).
+  - **Barreira** (Mago): absorve os próximos N de dano recebido de uma vez
+    só, não importa quantos golpes até acabar — diferente de reduzir um
+    número fixo de hits.
+  - **Evasão** (Arqueiro/Ladino): chance de esquivar **totalmente** do
+    próximo golpe (Arqueiro: 50% de chance, 2 cargas; Ladino: 100%
+    garantido, 1 carga) — dano zero, não reduzido, e nenhum outro status
+    (shield/bulwark/deathmark) é consumido nessa esquiva.
+  - **Espinhos** (Xamã): reflete 40% do dano dos próximos 2 golpes de volta
+    em quem bateu — pode até matar o atacante.
+  - **Cura instantânea** (a maioria dos conjuntos): cura na hora, escalado
+    pelo MP do conjurador.
+  - **Regeneração** (Ladino/Xamã/Sacerdote-nativo): cura um pouco a cada
+    tick (2 a 4 ticks dependendo da carta) em vez de um valor único maior;
+    revertida vira dano ao longo do tempo em vez de instantâneo.
 - Cada Axie pode ser marcado como **Evoluído (+)** no montador de esquadrão:
   dá +15% flat em poder/HP/MP daquele loadout inteiro — nossa versão do
   padrão de evolução de carta do Origin (α → base → **+**), sem reintroduzir
   o sistema de breeding (a Sky Mavis já resolve isso).
 
-### Cartas reskinadas com nomes reais do Axie Origin
+### Os 6 conjuntos de cartas (classes funcionais)
 
-Os nomes e o flavor das cartas de ataque e das cartas universais de
-defesa/cura vêm de cartas reais do Axie Origin (Beast: Besta Perigosa /
-Quebra-Nozes; Aqua: Koi / Ranchu; Plant: Cenoura / Melancia; Bird: Corvo /
-Melodia das Penas; Bug: Broca de Nariz / Cupins; Reptile: Dinossaurinho /
-Garra Venenosa; suporte universal: Ornitorrinco, Guardião Tropical,
-Cachorrinho, Trevo). Os **números** (dano, HP, custo) são calibrados pra
-escala própria deste jogo, não são um port 1:1 do Origin — lá as cartas são
-calibradas pra pools de HP de centenas de pontos, aqui pra ~100-150.
+Diferente da v1 (cartas de ataque presas à espécie), os conjuntos são
+arquétipos **originais**, não portados 1:1 do Origin — mas seguem a mesma
+convenção visual: a **cor de um conjunto é a cor da sua espécie nativa**
+(igual no Origin, onde a cor da carta é a cor da classe), então no
+montador um ícone de conjunto cuja cor bate com a cor do Axie é a
+combinação nativa (⭐, cartas-assinatura bônus); cor diferente = combinação
+livre, sem bônus.
+
+| Conjunto | Espécie nativa | Identidade |
+|---|---|---|
+| ⚔️ Guerreiro | Beast | dano bruto corpo-a-corpo, Bastião |
+| 🙏 Sacerdote | Plant | maior cura instantânea, Retain/Deathmark |
+| 🔮 Mago | Aqua | nuke + status, Barreira (absorção) |
+| 🏹 Arqueiro | Bird | chuva de flechas (combo), Evasão probabilística |
+| 🗡️ Ladino | Bug | Veneno, Evasão garantida, Regeneração rápida |
+| 🪶 Xamã | Reptile | Espinhos (reflete dano), a Regeneração mais longa |
+
+Cada conjunto tem exatamente 4 cartas base (2 ataque + 1 defesa + 1 cura) e
+uma **carta-assinatura** extra que só entra no pool quando a espécie do
+Axie bate com a nativa do conjunto — normalmente uma 3ª carta de ataque
+(ex.: Arqueiro+Bird ganha uma 2ª chuva de flechas), exceto Sacerdote+Plant,
+que ganha uma 2ª carta de **cura** (Regeneração) em vez de ataque. Os
+**números** (dano, HP, custo) são calibrados pra escala própria deste jogo
+(~100-150 HP), não pra escala do Origin.
+
+### Próximo passo: rotação sazonal de meta
+
+Ainda não implementado (fica pro próximo passo): uma "temporada" que
+buffa/vaulta conjuntos periodicamente, trazendo o mesmo tipo de movimento
+de meta que motiva o mercado de Axies real — sem mexer no sistema de
+conjuntos em si, só numa camada de multiplicadores temporários por cima.
 
 ## Estrutura
 
 - `index.html` — telas de montagem de esquadrão e tabuleiro
-- `src/cards.js` — roster de 6 Axies (2 cartas de ataque cada), cartas de
-  defesa/cura universais, triângulo de classes, fórmula de stats por
-  contagem de cartas (`computeLaneStats`)
-- `src/game.js` — estado do duelo (**tempo real, sem `turn`**): N linhas por
-  lado, cada uma com um `col` (slot fixo: 0 é o centro/Tanque, 1-4 são
-  frente/trás) e um `localPos` ({x,z} ao vivo — igual ao slot pra não-
-  Tanque, livre e contínuo só pro Tanque via `moveTankFreely`), dano, cura,
-  status effects, mira manual + Provocação por distância real
-  (`getLegalTargets`/`TAUNT_RADIUS`/`pickAutoTarget`), mira de defesa/cura
-  nos dois lados (`getSupportTargets`), movimento discreto com cooldown
-  (`moveLane`/`MOVE_COOLDOWN_SEC`), regen de energia e tick de status
-  contínuos (`tickEnergyRealtime`/`tickStatusTimer`), `resolveCard` recebe
-  `targetSide` e decide normal-vs-revertido (Bulwark/Vulnerable/Regen/Cura
-  Reversa), condição de vitória (Tanque)
+- `src/cards.js` — roster de 6 espécies (`AXIES`, só visual + triângulo) e
+  6 conjuntos de cartas (`CARD_SETS`, a função real: 2 ataque + 1 defesa +
+  1 cura cada, mais `signatureCard`/`signatureHealCard`/
+  `signatureDefenseCard` que só entram no pool se `classId === set.
+  nativeClassId`), `buildLoadout(setId, classId, counts)` monta o pool real
+  de uma Axie, fórmula de stats por contagem de cartas (`computeLaneStats`)
+- `src/game.js` — estado do duelo (**tempo real, sem `turn`**): N linhas
+  por lado, cada uma com um `col` (slot fixo: 0 é o centro/Tanque, 1-4 são
+  frente/trás, dita alcance curto e o swap discreto) e um `localPos`
+  ({x,z} ao vivo, **qualquer lane** pode andar livre nele via
+  `moveLaneFreely`/`ROAM_RADIUS`, não só o Tanque), dano, cura, status
+  effects (inclui `applyBarrier`/`applyDodge`/`applyThorns` além dos
+  antigos Bulwark/Vulnerable/Regen), mira manual + Provocação por
+  distância real (`getLegalTargets`/`TAUNT_RADIUS`/`pickAutoTarget`), mira
+  de defesa/cura nos dois lados (`getSupportTargets`), movimento discreto
+  com cooldown (`moveLane`/`MOVE_COOLDOWN_SEC`), regen de energia e tick de
+  status contínuos (`tickEnergyRealtime`/`tickStatusTimer`), `resolveCard`
+  recebe `targetSide` e despacha por `card.effect` (shield/bulwark/
+  bulwark_cleanse/barrier/dodge/thorns/regen) normal-vs-revertido,
+  condição de vitória (Tanque)
 - `src/ai.js` — `aiMaybeAct`: chamado periodicamente pelo loop de
   `main.js` (não mais "turno do rival") — tenta jogar 1 carta afordável,
   mira automática via `pickAutoTarget`; não move lanes
 - `src/render.js` — feedback visual via DOM (números flutuantes, flash, shake)
-- `src/ui.js` — HUD/DOM (montagem de esquadrão com steppers de loadout,
-  overlay de HP/nome/status sobre o tabuleiro 3D, destaque de alvo/movimento
-  clicável (`setSelectable`), posicionamento ao vivo do Tanque durante o
-  joystick (`setLiveLanePosition`/`endLiveLanePosition`), mão, energia,
-  banner)
+- `src/ui.js` — HUD/DOM (montagem de esquadrão com steppers de loadout +
+  seletor de conjunto por Axie (`renderSquad`), overlay de HP/nome/status
+  sobre o tabuleiro 3D, destaque de alvo/movimento clicável
+  (`setSelectable`), posicionamento ao vivo de qualquer lane durante o
+  joystick (`setLiveLanePosition`/`endLiveLanePosition`), seletor de qual
+  Axie o joystick controla (`renderUnitPicker`), mão, energia, banner)
 - `src/axieArt.js` — arte SVG original por classe, usada só no team picker
   (roster/esquadrão) como fallback quando o 3D não carrega
 - `src/axie3d.js` — preview 3D real (Axie Mixer 3D) no team picker (1 Axie

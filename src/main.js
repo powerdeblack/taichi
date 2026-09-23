@@ -1,6 +1,6 @@
 // Entry point: DOM wiring for the team builder and the real-time board duel.
 import './style.css';
-import { AXIES } from './cards.js';
+import { AXIES, CARD_SETS } from './cards.js';
 import * as game from './game.js';
 import * as ui from './ui.js';
 import * as render from './render.js';
@@ -18,7 +18,7 @@ const joystickWrap = document.getElementById('joystickWrap');
 const joystickBase = document.getElementById('joystickBase');
 const joystickKnob = document.getElementById('joystickKnob');
 
-let squad = []; // [{ classId, isTank, counts:{attack,defense,heal} }] -- up to SQUAD_SIZE
+let squad = []; // [{ classId, setId, isTank, counts:{attack,defense,heal} }] -- up to SQUAD_SIZE
 let state = null;
 let lastYouSquad = [];
 let lastRivalSquad = [];
@@ -30,19 +30,30 @@ let matchFinished = false;
 // ================= Team builder =================
 function renderTeamScreen(){
   ui.renderRoster(AXIES, squad, addToSquad);
-  ui.renderSquad(squad, AXIES, { onAdjust: adjustCount, onToggleTank: toggleTank, onToggleEvolve: toggleEvolve, onRemove: removeFromSquad });
+  ui.renderSquad(squad, AXIES, CARD_SETS, { onAdjust: adjustCount, onToggleTank: toggleTank, onToggleEvolve: toggleEvolve, onSetChange: changeSet, onRemove: removeFromSquad });
   ui.renderSquadHeader(squad, game.SQUAD_SIZE);
+}
+// Defaults a freshly-added Axie to its species' native card set (see
+// cards.js CARD_SETS) -- the player can still change it via the set picker.
+function nativeSetFor(classId){
+  const set = CARD_SETS.find(s => s.nativeClassId === classId);
+  return set ? set.id : CARD_SETS[0].id;
 }
 function addToSquad(classId){
   if (squad.length >= game.SQUAD_SIZE) return;
   squad.push({
     classId,
+    setId: nativeSetFor(classId),
     isTank: !squad.some(p => p.isTank),
     evolved: false,
     counts: { attack: game.LOADOUT_SIZE, defense: 0, heal: 0 },
   });
   renderTeamScreen();
   previewClass(classId);
+}
+function changeSet(idx, setId){
+  squad[idx].setId = setId;
+  renderTeamScreen();
 }
 function adjustCount(idx, cat, delta){
   const counts = squad[idx].counts;
@@ -105,6 +116,7 @@ function beginMatch(youSquad, rivalSquad){
   moveMode = false;
   moveSource = null;
   matchFinished = false;
+  selectedLaneIndex = null;
   ui.hideBanner();
   ui.buildBoard(state);
   syncUI();
@@ -120,10 +132,32 @@ function syncUI(){
   updateJoystick();
 }
 
+// Which of the player's own lanes the joystick currently drives -- any
+// lane can roam freely now, not just the Tank (see game.js
+// moveLaneFreely). Falls back to the Tank, then to any alive lane, if the
+// previously-selected one died or nothing's selected yet.
+let selectedLaneIndex = null;
+function ensureValidSelectedLane(){
+  if (selectedLaneIndex != null && state.youLanes[selectedLaneIndex] && state.youLanes[selectedLaneIndex].alive) return;
+  const tankIdx = state.youLanes.findIndex(l => l.isTank && l.alive);
+  selectedLaneIndex = tankIdx !== -1 ? tankIdx : state.youLanes.findIndex(l => l.alive);
+}
+function selectJoystickUnit(i){
+  if (!state.youLanes[i] || !state.youLanes[i].alive) return;
+  if (joyHolding) endJoystickDrag();
+  cancelMoveMode();
+  pendingAttack = null;
+  ui.clearSelectable();
+  selectedLaneIndex = i;
+  updateJoystick();
+}
+
 function updateJoystick(){
-  const tankIdx = state.youLanes.findIndex(l => l.isTank);
-  const canMove = !state.gameOver && tankIdx !== -1 && state.youLanes[tankIdx].alive;
+  ensureValidSelectedLane();
+  const lane = state.youLanes[selectedLaneIndex];
+  const canMove = !state.gameOver && lane && lane.alive;
   joystickWrap.classList.toggle('disabled', !canMove);
+  ui.renderUnitPicker(state, selectedLaneIndex, selectJoystickUnit);
 }
 
 function updateMoveBtn(){
@@ -150,12 +184,13 @@ function applyResultFx(result){
       if (result.reversed){
         render.flashHit(el);
         render.spawnFloatingText(el, 'VULNERABLE!', 'text-block');
-      } else if (card.effect === 'bulwark_cleanse'){
-        render.flashHeal(el);
-        render.spawnFloatingText(el, 'CLEANSE + BULWARK!', 'text-shield');
       } else {
         render.flashHeal(el);
-        render.spawnFloatingText(el, 'GUARD!', 'text-shield');
+        const labels = {
+          bulwark_cleanse: 'CLEANSE + BULWARK!', bulwark: 'BULWARK!',
+          barrier: 'BARRIER!', dodge: 'EVASION!', thorns: 'THORNS!',
+        };
+        render.spawnFloatingText(el, labels[card.effect] || 'GUARD!', 'text-shield');
       }
       return;
     }
@@ -177,14 +212,23 @@ function applyResultFx(result){
     return;
   }
   const el = ui.getLaneSideEl(result.targetSide, result.targetIndex);
-  render.flashHit(el);
-  render.shakeBoard(boardEl);
-  render.spawnFloatingText(el, '-'+result.dmg, 'text-dmg');
-  if (result.ambush) render.spawnFloatingText(el, 'AMBUSH! x2', 'text-ambush');
-  if (result.shielded) render.spawnFloatingText(el, 'BLOCKED!', 'text-block');
-  if (result.bulwarked) render.spawnFloatingText(el, 'BULWARK!', 'text-block');
-  if (result.deathmarked) render.spawnFloatingText(el, '+10 MARK', 'text-mark');
-  if (result.comboBonus) render.spawnFloatingText(el, 'COMBO! -'+result.comboBonus, 'text-combo');
+  if (result.dodged){
+    render.spawnFloatingText(el, 'DODGED!', 'text-block');
+  } else {
+    render.flashHit(el);
+    render.shakeBoard(boardEl);
+    render.spawnFloatingText(el, '-'+result.dmg, 'text-dmg');
+    if (result.ambush) render.spawnFloatingText(el, 'AMBUSH! x2', 'text-ambush');
+    if (result.shielded) render.spawnFloatingText(el, 'BLOCKED!', 'text-block');
+    if (result.bulwarked) render.spawnFloatingText(el, 'BULWARK!', 'text-block');
+    if (result.deathmarked) render.spawnFloatingText(el, '+10 MARK', 'text-mark');
+    if (result.comboBonus) render.spawnFloatingText(el, 'COMBO! -'+result.comboBonus, 'text-combo');
+  }
+  if (result.thornReflected > 0){
+    const casterEl = ui.getLaneSideEl(result.side, result.casterIndex);
+    render.flashHit(casterEl);
+    render.spawnFloatingText(casterEl, '-'+result.thornReflected+' 🌵', 'text-dmg');
+  }
 }
 
 function applyBleedFx(side, statusResults){
@@ -347,14 +391,15 @@ function cancelMoveMode(){
   updateMoveBtn();
 }
 
-// ================= Tank joystick (continuous free-roam, no cooldown) =================
-// Holding the stick nudges the Tank around the formation's local space
-// every frame (see the game loop below) -- releasing just stops it where
-// it is. "Up" on the stick = toward the enemy (the rival row renders
-// above yours), since that's also the direction that brings it closer to
-// its own taunt radius against attackers.
+// ================= Unit joystick (continuous free-roam, no cooldown) =================
+// Holding the stick nudges whichever lane is currently selected (see
+// selectJoystickUnit/renderUnitPicker -- any lane can roam now, not just
+// the Tank) around the formation's local space every frame (see the game
+// loop below) -- releasing just stops it where it is. "Up" on the stick =
+// toward the enemy (the rival row renders above yours), since that's also
+// the direction that brings a unit closer to the enemy Tank's taunt radius.
 const JOY_MAX_PX = 24;
-const TANK_MOVE_SPEED = 1.8; // local units/sec at full stick deflection
+const UNIT_MOVE_SPEED = 1.8; // local units/sec at full stick deflection
 let joyHolding = false;
 let joyDirX = 0, joyDirZ = 0;
 let joyStartX = 0, joyStartY = 0;
@@ -383,8 +428,7 @@ function endJoystickDrag(){
   joyHolding = false;
   joyDirX = 0; joyDirZ = 0;
   joystickKnob.style.transform = '';
-  const tankIdx = state.youLanes.findIndex(l => l.isTank);
-  if (tankIdx !== -1) ui.endLiveLanePosition('you', tankIdx);
+  if (state.youLanes[selectedLaneIndex]) ui.endLiveLanePosition('you', selectedLaneIndex);
 }
 joystickBase.addEventListener('pointerup', endJoystickDrag);
 joystickBase.addEventListener('pointercancel', endJoystickDrag);
@@ -420,10 +464,10 @@ function gameLoop(nowMs){
   game.cullDeadHand(state);
 
   if (joyHolding){
-    const tankIdx = state.youLanes.findIndex(l => l.isTank);
-    if (tankIdx !== -1 && state.youLanes[tankIdx].alive){
-      game.moveTankFreely(state, 'you', joyDirX * TANK_MOVE_SPEED * dt, joyDirZ * TANK_MOVE_SPEED * dt);
-      ui.setLiveLanePosition('you', tankIdx, state.youLanes[tankIdx].localPos);
+    const lane = state.youLanes[selectedLaneIndex];
+    if (lane && lane.alive){
+      game.moveLaneFreely(state, 'you', selectedLaneIndex, joyDirX * UNIT_MOVE_SPEED * dt, joyDirZ * UNIT_MOVE_SPEED * dt);
+      ui.setLiveLanePosition('you', selectedLaneIndex, lane.localPos);
     }
   }
 

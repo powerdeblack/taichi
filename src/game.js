@@ -1,29 +1,39 @@
 // Core board-duel rules: a real-time (not turn-based) 5-Axie squad per
-// side, each Axie's power/toughness/heal-strength computed from its own
-// 5-card loadout (attack/defense/heal counts -- see cards.js
-// computeLaneStats), the classic class triangle, and status effects
-// (Bleed, Deathmark, Retain, Shield/Cleanse, Ambush, the Pena combo).
+// side. Each lane has TWO independent identities: its `classId` (species --
+// Beast/Aqua/Plant/Bird/Bug/Reptile, purely biological: 3D model, portrait
+// color, class-triangle damage bonus) and its `setId` (card set -- Warrior/
+// Priest/Mage/Ranger/Rogue/Shaman, purely functional: which attack/defense/
+// heal cards its loadout actually draws from, see cards.js buildLoadout).
+// A lane's power/toughness/heal-strength is computed from its own 5-card
+// loadout's attack/defense/heal COUNTS (see cards.js computeLaneStats), not
+// from a fixed role. Status effects: Bleed, Poison, Deathmark, Retain,
+// Guard/Bulwark/Barrier/Dodge/Thorns (defense), instant Heal/Regeneration
+// (heal), Ambush, the arrow-rain combo.
 // Both sides regenerate energy continuously and can play any affordable
 // card at any time -- there's no turn handoff; the rival AI just acts on
-// its own timer (see ai.js). Targeting is manual: the player picks which
-// enemy to hit among the legal targets for that card's range ('short' can
-// only reach an enemy sharing your board column, 'long' can reach anyone
-// alive); 'own' support cards act on the caster's own lane. Every lane has
-// a `localPos` ({x,z}, in the same local space as FORMATION_XZ) -- for
-// non-Tank lanes it's just derived from their `col` slot and only changes
-// via the discrete moveLane swap (cooldown-gated); the Tank instead roams
-// that space freely and continuously (see moveTankFreely), which is what
-// the taunt radius below actually measures. Win condition: a team loses
-// the instant its designated Tank lane dies.
-import { axieById, classMultiplier, shuffle, buildLoadout, computeLaneStats, ALL_CLASSES, LOADOUT_SIZE, BASE_HP, BASE_MP } from './cards.js';
+// its own timer (see ai.js). Targeting is manual: attack cards pick among
+// the legal enemy targets for that card's range ('short' can only reach an
+// enemy sharing your board column, 'long' can reach anyone alive); defense/
+// heal cards can go on any living lane on EITHER side (see
+// getSupportTargets) -- an ally gets the card's normal effect, an enemy
+// gets its reversed form instead. Every lane has a `localPos` ({x,z}, in
+// the same local space as FORMATION_XZ) that ANY lane can roam through
+// freely and continuously (see moveLaneFreely) -- that live position is
+// what the Tank's taunt radius measures, regardless of who's roaming near
+// it. `col` (the formation slot) is separate and only changes via the
+// discrete moveLane swap (cooldown-gated); it's what still drives
+// short-range column-matching, independent of live roaming. Win condition:
+// a team loses the instant its designated Tank lane dies.
+import { axieById, setById, classMultiplier, shuffle, buildLoadout, computeLaneStats, ALL_CLASSES, ALL_SETS, LOADOUT_SIZE, BASE_HP, BASE_MP } from './cards.js';
 
 export const MAX_ENERGY = 10;
 export const HAND_SIZE = 3;
 export const SQUAD_SIZE = 5;
 export { LOADOUT_SIZE };
 
-// Auto-builds a valid rival squad: random classes, random attack/defense/
-// heal split per Axie (summing to LOADOUT_SIZE), one random Tank.
+// Auto-builds a valid rival squad: random species, random card set,
+// random attack/defense/heal split per Axie (summing to LOADOUT_SIZE), one
+// random Tank.
 export function randomSquad(){
   const picks = [];
   for (let i=0; i<SQUAD_SIZE; i++){
@@ -32,6 +42,7 @@ export function randomSquad(){
     let h = LOADOUT_SIZE - a - d;
     picks.push({
       classId: ALL_CLASSES[Math.floor(Math.random()*ALL_CLASSES.length)],
+      setId: ALL_SETS[Math.floor(Math.random()*ALL_SETS.length)],
       isTank: false,
       evolved: Math.random() < 0.3,
       counts: { attack: a, defense: d, heal: h },
@@ -55,28 +66,34 @@ export const FORMATION_XZ = [
 ];
 
 // The Tank always starts in the center formation slot (col 0); everyone
-// else fills the 4 surrounding slots in pick order.
+// else fills the 4 surrounding slots in pick order. `classId` (species)
+// drives name/color/visuals; `setId` (card set) drives the actual cardPool.
 function createLanes(picks){
   let nextCol = 1;
-  return picks.map(({ classId, isTank, evolved, counts }) => {
+  return picks.map(({ classId, setId, isTank, evolved, counts }) => {
     const axie = axieById(classId);
     const stats = computeLaneStats(counts, evolved);
     const col = isTank ? 0 : nextCol++;
     return {
-      classId, isTank, evolved: !!evolved, counts, name: axie.name, color: axie.color,
+      classId, setId, isTank, evolved: !!evolved, counts, name: axie.name, color: axie.color,
       maxHp: stats.maxHp, hp: stats.maxHp, mp: stats.mp,
       powerMult: stats.powerMult, damageReduction: stats.damageReduction,
       status: {}, alive: true, col, localPos: { ...FORMATION_XZ[col] },
-      cardPool: buildLoadout(classId, counts),
+      cardPool: buildLoadout(setId, classId, counts),
     };
   });
 }
 
 function buildDeck(picks){
   const lanes = createLanes(picks);
-  return lanes.flatMap((lane, laneIndex) =>
-    lane.cardPool.map(c => ({ ...c, cls: lane.classId, laneIndex, color: lane.color, uid: `${lane.classId}:${c.id}:${laneIndex}:${Math.random()}` }))
-  );
+  return lanes.flatMap((lane, laneIndex) => {
+    const set = setById(lane.setId);
+    return lane.cardPool.map(c => ({
+      ...c, cls: lane.classId, laneIndex, color: lane.color,
+      setId: lane.setId, setName: set.name, setIcon: set.icon,
+      uid: `${lane.classId}:${lane.setId}:${c.id}:${laneIndex}:${Math.random()}`,
+    }));
+  });
 }
 
 export function freshState(youPicks, rivalPicks){
@@ -123,7 +140,7 @@ export function aliveIndices(lanes){
 }
 
 function localPosOf(lane){
-  return lane.isTank ? lane.localPos : FORMATION_XZ[lane.col];
+  return lane.localPos;
 }
 
 // The Tank "taunts" -- any attacker whose position is within this local-
@@ -214,32 +231,52 @@ export function tickMoveCooldown(state, dt){
   if (state.moveCooldown > 0) state.moveCooldown = Math.max(0, state.moveCooldown - dt);
 }
 
-// The Tank's dedicated free-roam control (the joystick): nudges it by
-// (dx,dz) in local space, clamped to a radius around the formation center
-// so it can't wander into the enemy's half of the board. Unlike moveLane
-// this has no cooldown -- it's continuous positioning, not a discrete
-// action -- and only ever targets whichever lane is marked Tank.
-export const TANK_ROAM_RADIUS = 1.6;
-export function moveTankFreely(state, side, dx, dz){
+// Free-roam control (the joystick): nudges any one lane by (dx,dz) in
+// local space, clamped to a radius around the formation center so it can't
+// wander into the enemy's half of the board. Unlike moveLane this has no
+// cooldown -- it's continuous positioning, not a discrete action -- and it
+// only ever moves `localPos`, never `col` (short-range column-matching and
+// the discrete move-swap stay based on col, untouched by roaming). Every
+// lane can be the one under joystick control now, not just the Tank --
+// main.js lets the player pick which of their units it currently drives.
+export const ROAM_RADIUS = 1.6;
+export function moveLaneFreely(state, side, laneIndex, dx, dz){
   const lanes = side === 'you' ? state.youLanes : state.rivalLanes;
-  const tank = lanes.find(l => l.isTank && l.alive);
-  if (!tank) return;
-  let x = tank.localPos.x + dx, z = tank.localPos.z + dz;
+  const lane = lanes[laneIndex];
+  if (!lane || !lane.alive) return;
+  let x = lane.localPos.x + dx, z = lane.localPos.z + dz;
   const dist = Math.hypot(x, z);
-  if (dist > TANK_ROAM_RADIUS){
-    const s = TANK_ROAM_RADIUS / dist;
+  if (dist > ROAM_RADIUS){
+    const s = ROAM_RADIUS / dist;
     x *= s; z *= s;
   }
-  tank.localPos = { x, z };
+  lane.localPos = { x, z };
 }
 
 const BULWARK_REDUCTION = 0.25;
 const VULNERABLE_BONUS = 0.3;
 
+// Dodge is checked FIRST and short-circuits everything else: a dodged hit
+// deals 0 damage and doesn't consume shield/bulwark/vulnerable or trigger
+// Thorns -- a true miss, not a mitigated hit. Barrier (a flat absorb pool)
+// is applied last, against the fully-mitigated final number. Thorns
+// reflects a % of that same final number back onto whoever landed the hit
+// (`casterLane`) -- which can kill an attacker that hits a thorned target
+// with a lethal blow of their own, so callers must checkGameOver after.
 function applyDamage(lane, amount, attackerClassId, casterLane){
   const mult = classMultiplier(attackerClassId, lane.classId);
   let dmg = amount * mult * casterLane.powerMult;
-  let deathmarked = false, shielded = false, bulwarked = false;
+  let deathmarked = false, shielded = false, bulwarked = false, dodged = false, thornReflected = 0;
+
+  if (lane.status.dodgeCharges && lane.status.dodgeCharges > 0){
+    const chance = lane.status.dodgeChance != null ? lane.status.dodgeChance : 1;
+    lane.status.dodgeCharges -= 1;
+    if (lane.status.dodgeCharges <= 0){ delete lane.status.dodgeCharges; delete lane.status.dodgeChance; }
+    if (Math.random() < chance){
+      return { dmg: 0, deathmarked, shielded, bulwarked, dodged: true, thornReflected: 0 };
+    }
+  }
+
   if (lane.status.deathmark){ dmg += 10; delete lane.status.deathmark; deathmarked = true; }
   if (lane.status.shield){ dmg *= 0.5; delete lane.status.shield; shielded = true; }
   if (lane.status.bulwark && lane.status.bulwark > 0){
@@ -255,9 +292,29 @@ function applyDamage(lane, amount, attackerClassId, casterLane){
   }
   dmg *= (1 - lane.damageReduction);
   dmg = Math.max(0, Math.round(dmg));
+
+  if (lane.status.barrier && lane.status.barrier > 0){
+    const absorbed = Math.min(dmg, lane.status.barrier);
+    dmg -= absorbed;
+    lane.status.barrier -= absorbed;
+    if (lane.status.barrier <= 0) delete lane.status.barrier;
+  }
+
   lane.hp = Math.max(0, lane.hp - dmg);
   if (lane.hp <= 0) lane.alive = false;
-  return { dmg, deathmarked, shielded, bulwarked };
+
+  if (lane.status.thornsHits && lane.status.thornsHits > 0 && dmg > 0){
+    const pct = lane.status.thornsPct != null ? lane.status.thornsPct : 0.4;
+    thornReflected = Math.round(dmg * pct);
+    lane.status.thornsHits -= 1;
+    if (lane.status.thornsHits <= 0){ delete lane.status.thornsHits; delete lane.status.thornsPct; }
+    if (thornReflected > 0){
+      casterLane.hp = Math.max(0, casterLane.hp - thornReflected);
+      if (casterLane.hp <= 0) casterLane.alive = false;
+    }
+  }
+
+  return { dmg, deathmarked, shielded, bulwarked, dodged, thornReflected };
 }
 
 function applyBleed(lane){ lane.status.bleed = 2; }
@@ -327,6 +384,31 @@ function applyVulnerable(lane, hits = VULNERABLE_HITS){
   lane.status.vulnerable = Math.max(lane.status.vulnerable || 0, hits);
 }
 
+// Barrier: a flat absorb pool that eats incoming damage (post-mitigation)
+// no matter how many hits it takes to burn through, instead of reducing a
+// fixed number of hits by a percentage. Stacks additively if reapplied.
+function applyBarrier(lane, amount){
+  lane.status.barrier = (lane.status.barrier || 0) + amount;
+}
+
+// Dodge: a chance (0..1) to fully negate each of the next `charges` hits
+// taken -- a total miss, not a mitigated one (see applyDamage). 100%
+// chance + 1 charge is a guaranteed single dodge (Cortina de Fumaça); lower
+// chance + more charges is a probabilistic multi-hit evasion (Reflexos
+// Ágeis).
+function applyDodge(lane, charges, chance){
+  lane.status.dodgeCharges = Math.max(lane.status.dodgeCharges || 0, charges);
+  lane.status.dodgeChance = chance;
+}
+
+// Thorns: reflects a % of the damage from the next `hits` taken back onto
+// whoever landed them (see applyDamage) -- retaliation instead of
+// mitigation, the defender still takes full damage.
+function applyThorns(lane, hits, pct){
+  lane.status.thornsHits = Math.max(lane.status.thornsHits || 0, hits);
+  lane.status.thornsPct = pct;
+}
+
 // Cleanse: strips the DOTs/debuffs Guardião Tropical is meant to counter.
 function applyGuardianCleanse(lane){
   delete lane.status.bleed;
@@ -387,7 +469,9 @@ export function resolveCard(state, side, card, casterIndex, targetIndex, targetS
   const result = {
     side, card, casterIndex, targetIndex: -1, targetSide: side, reversed: false,
     dmg: 0, healed: 0,
-    ambush: false, shielded: false, deathmarked: false, bulwarked: false, comboBonus: 0,
+    ambush: false, shielded: false, deathmarked: false, bulwarked: false,
+    barrierApplied: false, dodgeApplied: false, thornsApplied: false,
+    dodged: false, thornReflected: 0, comboBonus: 0,
   };
 
   if (card.role === 'defense' || card.role === 'heal'){
@@ -404,8 +488,32 @@ export function resolveCard(state, side, card, casterIndex, targetIndex, targetS
 
     if (card.role === 'defense'){
       if (!reversed){
-        if (card.effect === 'bulwark_cleanse'){ applyGuardianCleanse(targetLane); applyBulwark(targetLane); result.bulwarked = true; }
-        else { applyShield(targetLane); result.shielded = true; }
+        switch (card.effect){
+          case 'bulwark_cleanse':
+            applyGuardianCleanse(targetLane);
+            applyBulwark(targetLane, card.hits || BULWARK_HITS);
+            result.bulwarked = true;
+            break;
+          case 'bulwark':
+            applyBulwark(targetLane, card.hits || BULWARK_HITS);
+            result.bulwarked = true;
+            break;
+          case 'barrier':
+            applyBarrier(targetLane, card.amount || 20);
+            result.barrierApplied = true;
+            break;
+          case 'dodge':
+            applyDodge(targetLane, card.charges || 1, card.chance != null ? card.chance : 1);
+            result.dodgeApplied = true;
+            break;
+          case 'thorns':
+            applyThorns(targetLane, card.hits || 2, card.pct != null ? card.pct : 0.4);
+            result.thornsApplied = true;
+            break;
+          default:
+            applyShield(targetLane);
+            result.shielded = true;
+        }
       } else {
         applyVulnerable(targetLane);
       }
@@ -435,15 +543,15 @@ export function resolveCard(state, side, card, casterIndex, targetIndex, targetS
 
   const ambush = !state.firstHitDone && card.effect === 'ambush';
   const dmgToApply = card.dmg * (ambush ? 2 : 1);
-  const { dmg, deathmarked, shielded, bulwarked } = applyDamage(targetLane, dmgToApply, card.cls, casterLane);
+  const { dmg, deathmarked, shielded, bulwarked, dodged, thornReflected } = applyDamage(targetLane, dmgToApply, card.cls, casterLane);
   if (dmg > 0) state.firstHitDone = true;
-  if (card.effect === 'bleed') applyBleed(targetLane);
-  if (card.effect === 'poison') applyPoison(targetLane);
-  if (card.effect === 'deathmark') targetLane.status.deathmark = true;
+  if (card.effect === 'bleed' && !dodged) applyBleed(targetLane);
+  if (card.effect === 'poison' && !dodged) applyPoison(targetLane);
+  if (card.effect === 'deathmark' && !dodged) targetLane.status.deathmark = true;
 
-  Object.assign(result, { targetIndex, dmg, ambush, deathmarked, shielded, bulwarked });
+  Object.assign(result, { targetIndex, dmg, ambush, deathmarked, shielded, bulwarked, dodged, thornReflected });
 
-  if (card.effect === 'multi' && targetLane.alive){
+  if (card.effect === 'multi' && targetLane.alive && !dodged){
     const bonus = Math.round(card.dmg * 0.5 * casterLane.powerMult);
     targetLane.hp = Math.max(0, targetLane.hp - bonus);
     if (targetLane.hp <= 0) targetLane.alive = false;

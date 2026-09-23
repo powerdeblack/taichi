@@ -18,7 +18,7 @@
       <div class="deck-title">Build your team</div>
       <div class="deck-count" id="deckCount">0 / 5 Axies picked</div>
     </div>
-    <p class="deck-hint">Freely pick 5 Axies (classes can repeat) and give each one a 5-card loadout of Attack/Defense/Heal — exactly 1 must be marked as Tank. The duel's goal is to kill the rival's Tank.</p>
+    <p class="deck-hint">Freely pick 5 Axies (classes can repeat) and give each one a 5-card loadout of Attack/Defense/Heal — exactly 1 must be marked as Tank. Each Axie also picks a card set (Warrior, Priest, Mage, Ranger, Rogue, Shaman): that's what actually decides its cards, not its species. Pairing a species with its own native set (⭐, e.g. Bird+Ranger) unlocks a bonus signature card. The duel's goal is to kill the rival's Tank.</p>
     <div class="preview3d-wrap">
       <canvas id="preview3dCanvas"></canvas>
       <div class="preview3d-label" id="preview3dLabel">Click an Axie to see it in 3D</div>
@@ -56,7 +56,8 @@
       <div class="action-row">
         <button class="move-btn" id="moveBtn">🔀 Move an Axie</button>
         <div class="joystick-wrap" id="joystickWrap">
-          <div class="joystick-label">🎯 Tank</div>
+          <div class="joystick-unit-picker" id="joystickUnitPicker"></div>
+          <div class="joystick-label" id="joystickLabel">🕹️</div>
           <div class="joystick-base" id="joystickBase">
             <div class="joystick-knob" id="joystickKnob"></div>
           </div>
@@ -72,7 +73,7 @@
     </div>
   </div>
 
-  <p class="note">Concept prototype for the Vibeathon — real-time, no turns: both sides regenerate energy continuously and can play cards anytime. Pick an attack card, then tap the enemy you want to hit. Defense/heal cards can go on an ally (green glow: Guard, Cleanse+Bulwark, instant Heal, Regeneration) or be aimed at an enemy instead (pink glow) for a reversed effect — Vulnerable instead of a shield, damage instead of healing. The Tank sits in the center with a taunt radius: attack from the front line and you're forced to hit it. Hold the Tank joystick to roam it freely, or use "Move an Axie" (a few seconds' cooldown) to swap any two of your own.</p>
+  <p class="note">Concept prototype for the Vibeathon — real-time, no turns: both sides regenerate energy continuously and can play cards anytime. Pick an attack card, then tap the enemy you want to hit. Defense/heal cards can go on an ally (green glow: Guard, Bulwark, Barrier, Evasion, Thorns, instant Heal, Regeneration) or be aimed at an enemy instead (pink glow) for a reversed effect — Vulnerable instead of a shield, damage instead of healing. The Tank sits in the center with a taunt radius: attack from the front line and you're forced to hit it. Any of your Axies can roam freely now — tap one in the joystick's picker row to grab it, then hold the stick — or use "Move an Axie" (a few seconds' cooldown) to swap any two of your own.</p>
 </div>
 
 <script type="module" src="/src/main.js"></script>
