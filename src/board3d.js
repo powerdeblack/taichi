@@ -288,8 +288,11 @@ function buildTauntRings(){
 // to a 3x3-style dueling hall than bare tiles floating in space. Purely
 // cosmetic, built once and never touched again.
 const HALL_RADIUS = 11.0;
-const COLUMN_RADIUS = 6.4;
-const COLUMN_COUNT = 12;
+const COLUMN_RADIUS = 8.5;
+const COLUMN_COUNT = 16;
+// Only the far arc (behind the rival) gets columns: anything on the near
+// half or the sides stands between the camera and the fight and blocks it.
+const COLUMN_MAX_SIN = -0.35;
 
 function buildHall(){
   const floorGeo = new THREE.CircleGeometry(HALL_RADIUS, 48);
@@ -311,8 +314,6 @@ function buildHall(){
   trim.position.y = -0.095;
   scene.add(trim);
 
-  // Columns sit much closer than the outer trim so they read as distinct
-  // pillars framing the play area, not a blur merging with the far ring.
   const colHeight = 4.8;
   const colGeo = new THREE.CylinderGeometry(0.3, 0.38, colHeight, 12);
   const capGeo = new THREE.CylinderGeometry(0.58, 0.46, 0.32, 12);
@@ -323,6 +324,7 @@ function buildHall(){
   });
   for (let i = 0; i < COLUMN_COUNT; i++){
     const angle = (i / COLUMN_COUNT) * Math.PI * 2;
+    if (Math.sin(angle) > COLUMN_MAX_SIN) continue;
     const x = Math.cos(angle) * COLUMN_RADIUS, z = Math.sin(angle) * COLUMN_RADIUS;
     const col = new THREE.Mesh(colGeo, colMat);
     col.position.set(x, colHeight / 2, z);

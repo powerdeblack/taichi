@@ -178,10 +178,10 @@ npm run preview
   Play", o preview 3D some no aperto) e mantém rolagem normal -- montar
   time não é tão sensível ao tempo quanto mirar no meio do duelo.
 - **Salão Lunacia**: o tabuleiro é um salão circular grande (raio 11,
-  chão de pedra, 12 colunas de ~4.8 de altura num anel bem mais perto do
-  centro que a borda do salão — pra ficarem legíveis como pilares
-  individuais em vez de se misturar com o aro distante — `board3d.js`'s
-  `buildHall`) com um **emblema lunar brilhante** (`buildLunaciaSigilTexture`,
+  chão de pedra, colunas de ~4.8 de altura **só no arco do fundo**, atrás
+  do rival, raio 8.5 — `board3d.js`'s `buildHall`/`COLUMN_MAX_SIN`; as
+  colunas da frente e das laterais foram removidas porque ficavam entre a
+  câmera e a luta, tapando a jogabilidade) com um **emblema lunar brilhante** (`buildLunaciaSigilTexture`,
   desenhado via canvas em runtime — não é um asset importado) no centro,
   entre as duas fileiras, e névoa (`scene.fog`) escurecendo a distância
   pra reforçar a sensação de um salão vasto. A câmera foi recuada/alargada
