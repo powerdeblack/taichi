@@ -42,9 +42,17 @@ export const AXIES = [
 // uses: a card's color band IS its class) -- so in the squad builder, a
 // set icon whose color matches the Axie's own species color is the native
 // combo; a mismatched color is an off-species (still fully playable) pick.
+// `defaultCounts` is the attack/defense/heal split (always summing to
+// LOADOUT_SIZE) a freshly-picked Axie starts with when it's given this
+// set -- a preset loadout matching that set's own identity (Warrior hits
+// hard, Priest heals big, etc.) instead of the same generic split for
+// everyone. The player can still tweak it with the steppers afterward;
+// picking a different set re-applies THAT set's own preset (see main.js's
+// addToSquad/changeSet).
 export const CARD_SETS = [
   {
     id: 'warrior', name: 'Guerreiro', icon: '⚔️', color: '#c97b3d', nativeClassId: 'Beast',
+    defaultCounts: { attack: 4, defense: 1, heal: 0 },
     attackCards: [
       { id:'corte_selvagem', name:'Corte Selvagem', range:'short', role:'attack', cost:0, dmg:14, effect:'ambush',
         desc:'Short range. Ambush: doubles damage on the match’s first hit.' },
@@ -60,6 +68,7 @@ export const CARD_SETS = [
   },
   {
     id: 'priest', name: 'Sacerdote', icon: '🙏', color: '#3f6b4a', nativeClassId: 'Plant',
+    defaultCounts: { attack: 1, defense: 0, heal: 4 },
     attackCards: [
       { id:'punicao_sagrada', name:'Punição Sagrada', range:'short', role:'attack', cost:0, dmg:8, effect:'retain',
         desc:'Short range. Retain: never leaves your hand, hit or miss.' },
@@ -77,6 +86,7 @@ export const CARD_SETS = [
   },
   {
     id: 'mage', name: 'Mago', icon: '🔮', color: '#4c8fb0', nativeClassId: 'Aqua',
+    defaultCounts: { attack: 3, defense: 2, heal: 0 },
     attackCards: [
       { id:'centelha_arcana', name:'Centelha Arcana', range:'short', role:'attack', cost:0, dmg:9, effect:'bleed',
         desc:'Short range. Applies Bleed: arcane burns that linger for 2 rounds.' },
@@ -92,6 +102,7 @@ export const CARD_SETS = [
   },
   {
     id: 'ranger', name: 'Arqueiro', icon: '🏹', color: '#d9b44a', nativeClassId: 'Bird',
+    defaultCounts: { attack: 3, defense: 1, heal: 1 },
     attackCards: [
       { id:'tiro_certeiro', name:'Tiro Certeiro', range:'short', role:'attack', cost:0, dmg:10, effect:'none',
         desc:'Short range. A precise, direct shot.' },
@@ -107,6 +118,7 @@ export const CARD_SETS = [
   },
   {
     id: 'rogue', name: 'Ladino', icon: '🗡️', color: '#7a5c9e', nativeClassId: 'Bug',
+    defaultCounts: { attack: 3, defense: 1, heal: 1 },
     attackCards: [
       { id:'facada_nas_costas', name:'Facada nas Costas', range:'short', role:'attack', cost:0, dmg:7, effect:'none',
         desc:'Short range. Cheap and direct.' },
@@ -122,6 +134,7 @@ export const CARD_SETS = [
   },
   {
     id: 'shaman', name: 'Xamã', icon: '🪶', color: '#8a8f5c', nativeClassId: 'Reptile',
+    defaultCounts: { attack: 2, defense: 2, heal: 1 },
     attackCards: [
       { id:'toque_espiritual', name:'Toque Espiritual', range:'short', role:'attack', cost:0, dmg:9, effect:'none',
         desc:'Short range. A direct spiritual strike.' },

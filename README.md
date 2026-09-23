@@ -86,6 +86,15 @@ npm run preview
   combinar as duas desbloqueia uma **carta-assinatura** bônus (geralmente
   de ataque, mas Sacerdote↔Plant ganha uma 2ª carta de cura) — o
   off-species continua 100% jogável, só com o pool base, menor.
+- **Loadout pré-definido por conjunto**: cada `CARD_SET` tem um
+  `defaultCounts` (`{attack, defense, heal}`, sempre somando `LOADOUT_SIZE`)
+  que já reflete a identidade daquele conjunto — Guerreiro `4/1/0` (quase
+  tudo ataque), Sacerdote `1/0/4` (curador puro), Mago `3/2/0` (ataque +
+  defesa arcana), Arqueiro/Ladino `3/1/1`, Xamã `2/2/1` (equilibrado). Ao
+  adicionar um Axie no time, ele já entra com o preset do seu conjunto
+  nativo em vez de um split genérico; trocar de conjunto no montador
+  reaplica o preset daquele novo conjunto (os steppers continuam livres
+  pra ajustar manualmente depois).
 - **Tempo real, sem turnos**: `energyYou`/`energyRival` regeneram
   continuamente (~0.6/s cada), e qualquer carta afordável pode ser jogada a
   qualquer momento, dos dois lados — não existe handoff "sua vez/vez do
@@ -250,8 +259,10 @@ Ainda não implementado:
   6 conjuntos de cartas (`CARD_SETS`, a função real: 2 ataque + 1 defesa +
   1 cura cada, mais `signatureCard`/`signatureHealCard`/
   `signatureDefenseCard` que só entram no pool se `classId === set.
-  nativeClassId`), `buildLoadout(setId, classId, counts)` monta o pool real
-  de uma Axie, fórmula de stats por contagem de cartas (`computeLaneStats`)
+  nativeClassId`, e `defaultCounts` com o split de loadout pré-definido
+  daquele conjunto), `buildLoadout(setId, classId, counts)` monta o pool
+  real de uma Axie, fórmula de stats por contagem de cartas
+  (`computeLaneStats`)
 - `src/game.js` — estado do duelo (**tempo real, sem `turn`**): N linhas
   por lado, cada uma com um `col` (slot fixo: 0 é o centro/Tanque, 1-2
   flanqueiam ele, dita alcance curto e o swap discreto) e um `localPos`
@@ -275,7 +286,12 @@ Ainda não implementado:
   seção acima); o burst de impacto em 3D é `board3d.js`'s `spawnImpact`,
   chamado via `ui.spawnImpact`
 - `src/ui.js` — HUD/DOM (montagem de esquadrão com steppers de loadout +
-  seletor de conjunto por Axie (`renderSquad`), overlay de HP/nome/status
+  seletor de conjunto por Axie (`renderSquad`), UX do montador: rótulos de
+  seção ("Your squad"/"Choose an Axie"), slots vazios fantasma (1/2/3,
+  borda tracejada) indicando quantos Axies faltam escolher, barra de
+  loadout colorida por categoria (ataque/defesa/cura) em vez de só um
+  número, botão "Start Duel" com pulso quando o time fica válido, overlay
+  de HP/nome/status
   sobre o tabuleiro 3D, clique persistente em qualquer unit chip pro fluxo
   de mira tocar-alvo-depois-carta (`buildBoard(state, onUnitClick)` +
   `markSelectedTarget`), destaque de movimento clicável pro swap discreto

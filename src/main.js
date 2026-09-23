@@ -1,6 +1,6 @@
 // Entry point: DOM wiring for the team builder and the real-time board duel.
 import './style.css';
-import { AXIES, CARD_SETS } from './cards.js';
+import { AXIES, CARD_SETS, setById } from './cards.js';
 import * as game from './game.js';
 import * as ui from './ui.js';
 import * as render from './render.js';
@@ -44,18 +44,22 @@ function nativeSetFor(classId){
 }
 function addToSquad(classId){
   if (squad.length >= game.SQUAD_SIZE) return;
+  const setId = nativeSetFor(classId);
+  const set = setById(setId);
   squad.push({
     classId,
-    setId: nativeSetFor(classId),
+    setId,
     isTank: !squad.some(p => p.isTank),
     evolved: false,
-    counts: { attack: game.LOADOUT_SIZE, defense: 0, heal: 0 },
+    counts: { ...set.defaultCounts },
   });
   renderTeamScreen();
   previewClass(classId);
 }
 function changeSet(idx, setId){
+  const set = setById(setId);
   squad[idx].setId = setId;
+  squad[idx].counts = { ...set.defaultCounts };
   renderTeamScreen();
 }
 function adjustCount(idx, cat, delta){

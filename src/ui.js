@@ -1,6 +1,6 @@
 // All DOM rendering: team-builder roster/squad, the lane board, hand, energy
 // pips, pile counts, and the win/lose banner. No game rules live here.
-import { MAX_ENERGY, LOADOUT_SIZE } from './game.js';
+import { MAX_ENERGY, LOADOUT_SIZE, SQUAD_SIZE } from './game.js';
 import { portraitHTML } from './axieArt.js';
 import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive, moveLaneVisual, setLaneLivePosition, setLaneRoaming, spawnImpact as spawnImpact3D } from './board3d.js';
 
@@ -17,10 +17,12 @@ const bannerSubEl = document.getElementById('bannerSub');
 // ================= Team builder =================
 export function renderRoster(axies, squad, onAdd){
   rosterGrid.innerHTML = '';
+  const full = squad.length >= SQUAD_SIZE;
   axies.forEach(axie => {
     const count = squad.filter(p => p.classId === axie.classId).length;
     const div = document.createElement('div');
-    div.className = 'card roster-card' + (count > 0 ? ' selected' : '');
+    div.className = 'card roster-card' + (count > 0 ? ' selected' : '') + (full ? ' at-cap' : '');
+    div.style.setProperty('--roster-color', axie.color);
     div.style.borderColor = count > 0 ? '#d9b44a' : (axie.color+'55');
     div.innerHTML = `
       <div class="card-pick-badge">${count > 0 ? '×'+count : ''}</div>
@@ -35,9 +37,9 @@ export function renderRoster(axies, squad, onAdd){
 }
 
 const CATS = [
-  { key:'attack', label:'⚔️ Attack' },
-  { key:'defense', label:'🛡️ Defense' },
-  { key:'heal', label:'💚 Heal' },
+  { key:'attack', label:'⚔️ Attack', color:'var(--clay)' },
+  { key:'defense', label:'🛡️ Defense', color:'var(--aqua)' },
+  { key:'heal', label:'💚 Heal', color:'#8fd08f' },
 ];
 
 // The set picker: a row of small icon buttons (one per card set), one per
@@ -52,6 +54,7 @@ export function renderSquad(squad, axies, sets, { onAdjust, onToggleTank, onTogg
     const total = pick.counts.attack + pick.counts.defense + pick.counts.heal;
     const row = document.createElement('div');
     row.className = 'squad-slot' + (pick.isTank ? ' is-tank' : '');
+    row.style.setProperty('--slot-color', axie.color);
     row.innerHTML = `
       ${portraitHTML(pick.classId, axie.color, 'squad-portrait')}
       <div class="squad-slot-info">
@@ -61,20 +64,25 @@ export function renderSquad(squad, axies, sets, { onAdjust, onToggleTank, onTogg
           <button type="button" class="tank-toggle${pick.isTank?' active':''}" title="Mark as Tank">${pick.isTank ? '🎯 TANK' : 'mark as Tank'}</button>
           <button type="button" class="evolve-toggle${pick.evolved?' active':''}" title="Evolve this Axie's loadout (+15% power/HP/MP)">${pick.evolved ? '✦ Evolved' : 'evolve (+)'}</button>
         </div>
+        <div class="micro-label">Card set</div>
         <div class="set-picker">
           ${sets.map(s => `<button type="button" class="set-btn${pick.setId===s.id?' active':''}" data-set="${s.id}" title="${s.name}${s.nativeClassId===pick.classId ? ' (native -- bonus card!)' : ''}" style="--set-color:${s.color}">${s.icon}${s.nativeClassId===pick.classId ? '⭐' : ''}</button>`).join('')}
         </div>
+        <div class="micro-label">Loadout</div>
         <div class="stat-steppers">
           ${CATS.map(c => `
             <div class="stat-stepper">
               <span class="stat-stepper-label">${c.label}</span>
               <button type="button" class="stepper-btn" data-cat="${c.key}" data-delta="-1">−</button>
-              <span class="stat-stepper-value">${pick.counts[c.key]}</span>
+              <span class="stat-stepper-value" style="color:${c.color}">${pick.counts[c.key]}</span>
               <button type="button" class="stepper-btn" data-cat="${c.key}" data-delta="1">+</button>
             </div>
           `).join('')}
         </div>
-        <div class="loadout-total${total===LOADOUT_SIZE?' ok':''}">${total} / ${LOADOUT_SIZE} cards</div>
+        <div class="loadout-total${total===LOADOUT_SIZE?' ok':''}">
+          <div class="loadout-bar"><div class="loadout-bar-fill${total===LOADOUT_SIZE?' ok':''}" style="width:${Math.min(100,total/LOADOUT_SIZE*100)}%"></div></div>
+          <span>${total} / ${LOADOUT_SIZE} cards</span>
+        </div>
       </div>
       <button type="button" class="squad-remove" aria-label="Remove">×</button>
     `;
@@ -89,6 +97,12 @@ export function renderSquad(squad, axies, sets, { onAdjust, onToggleTank, onTogg
     row.querySelector('.squad-remove').addEventListener('click', () => onRemove(idx));
     squadListEl.appendChild(row);
   });
+  for (let i = squad.length; i < SQUAD_SIZE; i++){
+    const ghost = document.createElement('div');
+    ghost.className = 'squad-slot squad-slot-empty';
+    ghost.innerHTML = `<span class="squad-slot-empty-num">${i+1}</span><span>Pick an Axie below</span>`;
+    squadListEl.appendChild(ghost);
+  }
 }
 
 export function renderSquadHeader(squad, maxCount){
@@ -99,6 +113,7 @@ export function renderSquadHeader(squad, maxCount){
   deckCountEl.textContent = `${squad.length} / ${maxCount} Axies · ${tankCount} Tank${tankCount===1?'':'s'}`;
   deckCountEl.className = 'deck-count' + (valid ? ' ready' : '');
   startDuelBtn.disabled = !valid;
+  startDuelBtn.classList.toggle('ready', valid);
   if (valid) startDuelBtn.textContent = 'Start Duel';
   else if (!full) startDuelBtn.textContent = `Pick ${maxCount-squad.length} more Axie(s)`;
   else if (!loadoutsOk) startDuelBtn.textContent = `Each Axie needs ${LOADOUT_SIZE} cards total`;
