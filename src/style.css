@@ -420,8 +420,14 @@ h1{
   padding:10px 10px 8px; box-shadow:0 8px 24px -10px #000000a0;
 }
 .deck-status-row{
-  display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;
+  display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;
 }
+.mute-btn{
+  flex-shrink:0; width:30px; height:30px; border-radius:50%; cursor:pointer;
+  border:1px solid #ffffff25; background:#4a382480; font-size:.85rem; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+}
+.mute-btn:active{ transform:scale(.92); }
 .energy-row{display:flex; align-items:center; gap:8px;}
 .energy-label{font-family:'Baloo 2',sans-serif; font-size:.78rem; font-weight:700; color:var(--gold); min-width:74px;}
 .pip{width:16px; height:16px; border-radius:4px; background:#3a2c1a; border:1px solid #00000050;}

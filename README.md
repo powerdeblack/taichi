@@ -105,7 +105,9 @@ npm run preview
   (carta primeiro), agora você toca em **qualquer Axie no tabuleiro**
   (seu ou do rival) pra selecioná-lo — vira um anel branco pulsante
   (`.unit-chip.selected-target`), independente de qual carta você vai
-  usar. Toca de novo no mesmo Axie pra desselecionar. Só então você toca
+  usar. A seleção é **fixa**: continua marcada depois de jogar cartas (dá
+  pra encadear várias no mesmo alvo) e só muda quando você toca em outro
+  Axie — ou some sozinha se o alvo morrer. Então você toca
   numa carta da mão: cartas de **Ataque** só resolvem se o alvo
   selecionado for um inimigo dentro do alcance daquela carta. Curto
   alcance agora é um **raio de contato real** (`SHORT_RANGE_RADIUS`,
@@ -165,6 +167,18 @@ npm run preview
   dá pra segurar o joystick com um polegar e tocar numa carta com o outro
   ao mesmo tempo, sem um atrapalhar o outro. O painel de controles inteiro
   (`.controls`) fica fixo (`position:sticky`) na parte de baixo da tela.
+- **Som dos golpes (sintetizado, sem arquivos de áudio)**: `src/sfx.js`
+  gera cada efeito na hora com a Web Audio API (osciladores + ruído
+  filtrado). O ataque muda de acordo com o conjunto da carta — **corte**
+  (Guerreiro/Ladino), **flecha** (Arqueiro; 3 flechas na Chuva de
+  Flechas), **magia** (Mago/Sacerdote/Xamã) — seguido de um **impacto
+  mais grave e forte quanto maior o dano**. Também tem som pra cura
+  (acorde subindo), escudo/defesa (clang metálico), Vulnerável (descida
+  desafinada), esquiva, veneno (bolhas), sangramento, tique de
+  regeneração, nocaute de um Axie (estrondo), selecionar alvo, carta sem
+  alvo e fanfarra de vitória/derrota. O áudio só liga depois do primeiro
+  toque (regra dos navegadores), e o botão 🔊/🔇 ao lado da energia
+  silencia tudo (lembrado entre sessões via `localStorage`).
 - **Modo paisagem (celular deitado)**: abaixo de `520px` de altura em
   paisagem (`@media (orientation:landscape) and (max-height:520px)`), o
   duelo vira um **HUD flutuante sobre o tabuleiro em tela cheia** em vez
@@ -305,6 +319,9 @@ Ainda não implementado:
 - `src/ai.js` — `aiMaybeAct`: chamado periodicamente pelo loop de
   `main.js` (não mais "turno do rival") — tenta jogar 1 carta afordável,
   mira automática via `pickAutoTarget`; não move lanes
+- `src/sfx.js` — efeitos sonoros procedurais (Web Audio API): ataque por
+  conjunto + impacto escalado pelo dano, cura, escudo, status, nocaute,
+  vitória/derrota, e o mudo (`toggleMute`)
 - `src/render.js` — feedback visual via DOM: números flutuantes, flash de
   acerto/cura, shake do tabuleiro (durações alongadas de propósito, ver
   seção acima); o burst de impacto em 3D é `board3d.js`'s `spawnImpact`,

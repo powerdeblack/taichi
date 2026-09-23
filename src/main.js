@@ -6,6 +6,7 @@ import * as ui from './ui.js';
 import * as render from './render.js';
 import { aiMaybeAct } from './ai.js';
 import { initPreview, showAxie } from './axie3d.js';
+import * as sfx from './sfx.js';
 
 const deckScreen = document.getElementById('deckScreen');
 const duelScreen = document.getElementById('duelScreen');
@@ -29,6 +30,7 @@ let selectedTarget = null; // { side, laneIndex } -- tap-target-first flow, see 
 let moveMode = false;
 let moveSource = null; // laneIndex of the Axie picked up, mid move-selection
 let matchFinished = false;
+const koPlayed = new WeakSet();
 
 // ================= Team builder =================
 function renderTeamScreen(){
@@ -116,6 +118,27 @@ resetBtn.addEventListener('click', () => beginMatch(lastYouSquad, lastRivalSquad
 
 // ================= Help modal =================
 helpBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
+
+// Browsers only start audio after a user gesture; resume on every gesture in
+// case the tab was backgrounded and the context got suspended.
+document.addEventListener('pointerdown', sfx.unlockAudio, { passive: true });
+document.addEventListener('keydown', sfx.unlockAudio);
+const muteBtn = document.getElementById('muteBtn');
+function renderMuteBtn(){
+  muteBtn.textContent = sfx.isMuted() ? '🔇' : '🔊';
+  muteBtn.setAttribute('aria-label', sfx.isMuted() ? 'Unmute sound' : 'Mute sound');
+}
+muteBtn.addEventListener('click', () => { sfx.toggleMute(); renderMuteBtn(); });
+renderMuteBtn();
+
+function playKOIfDied(side, laneIndex){
+  const lanes = side === 'you' ? state.youLanes : state.rivalLanes;
+  const lane = lanes[laneIndex];
+  if (lane && !lane.alive && !koPlayed.has(lane)){
+    koPlayed.add(lane);
+    sfx.playKO();
+  }
+}
 helpCloseBtn.addEventListener('click', () => helpModal.classList.add('hidden'));
 helpModal.addEventListener('click', (e) => { if (e.target === helpModal) helpModal.classList.add('hidden'); });
 
@@ -137,6 +160,7 @@ function beginMatch(youSquad, rivalSquad){
 }
 
 function syncUI(){
+  dropDeadTarget();
   ui.updateBoard(state);
   ui.renderPips(state);
   ui.renderPiles(state);
@@ -168,6 +192,7 @@ function applyResultFx(result){
     if (result.targetIndex === -1){
       const el = ui.getLaneSideEl(side, casterIndex);
       render.spawnFloatingText(el, 'No target!', 'text-dmg');
+      if (side === 'you') sfx.playNoTarget();
       return;
     }
     const el = ui.getLaneSideEl(result.targetSide, result.targetIndex);
@@ -175,6 +200,7 @@ function applyResultFx(result){
       if (result.reversed){
         render.flashHit(el);
         render.spawnFloatingText(el, 'VULNERABLE!', 'text-block');
+        sfx.playDebuff();
       } else {
         render.flashHeal(el);
         const labels = {
@@ -183,6 +209,7 @@ function applyResultFx(result){
         };
         render.spawnFloatingText(el, labels[card.effect] || 'GUARD!', 'text-shield');
         ui.spawnImpact(result.targetSide, result.targetIndex, 'shield');
+        sfx.playShield();
       }
       return;
     }
@@ -192,10 +219,13 @@ function applyResultFx(result){
       render.shakeBoard(boardEl);
       render.spawnFloatingText(el, (card.effect === 'regen' ? 'ROT! -' : 'REVERSE HEAL! -')+result.dmg, 'text-dmg');
       ui.spawnImpact(result.targetSide, result.targetIndex, 'hit');
+      sfx.playAttack(card, result.dmg);
+      playKOIfDied(result.targetSide, result.targetIndex);
     } else {
       render.flashHeal(el);
       render.spawnFloatingText(el, card.effect === 'regen' ? 'REGEN!' : '+'+result.healed, 'text-heal');
       ui.spawnImpact(result.targetSide, result.targetIndex, 'heal');
+      sfx.playHeal();
     }
     return;
   }
@@ -203,12 +233,16 @@ function applyResultFx(result){
   if (result.targetIndex === -1){
     const el = ui.getLaneSideEl(side, casterIndex);
     render.spawnFloatingText(el, 'No target!', 'text-dmg');
+    if (side === 'you') sfx.playNoTarget();
     return;
   }
   const el = ui.getLaneSideEl(result.targetSide, result.targetIndex);
   if (result.dodged){
     render.spawnFloatingText(el, 'DODGED!', 'text-block');
+    sfx.playDodge();
   } else {
+    sfx.playAttack(card, result.dmg);
+    playKOIfDied(result.targetSide, result.targetIndex);
     render.flashHit(el);
     render.shakeBoard(boardEl);
     render.spawnFloatingText(el, '-'+result.dmg, 'text-dmg');
@@ -226,12 +260,18 @@ function applyResultFx(result){
     render.flashHit(casterEl);
     render.spawnFloatingText(casterEl, '-'+result.thornReflected+' 🌵', 'text-dmg');
     ui.spawnImpact(result.side, result.casterIndex, 'hit');
+    sfx.playBleed(0.15);
+    playKOIfDied(result.side, result.casterIndex);
   }
 }
 
 function applyBleedFx(side, statusResults){
   if (!statusResults) return;
   const lanesArr = side === 'you' ? state.youLanes : state.rivalLanes;
+  const kinds = new Set(statusResults.map(r => r.kind));
+  if (kinds.has('regen')) sfx.playRegenTick();
+  if (kinds.has('poison')) sfx.playPoison();
+  if (kinds.has('bleed') || kinds.has('regenRot')) sfx.playBleed();
   statusResults.forEach(({ lane, dmg, kind }) => {
     const laneIndex = lanesArr.indexOf(lane);
     const el = ui.getLaneSideEl(side, laneIndex);
@@ -245,6 +285,7 @@ function applyBleedFx(side, statusResults){
     const icon = kind === 'poison' ? '☠️' : (kind === 'regenRot' ? '🥀' : '🩸');
     render.spawnFloatingText(el, '-'+dmg+' '+icon, 'text-bleed');
     ui.spawnImpact(side, laneIndex, kind === 'poison' ? 'poison' : 'bleed');
+    playKOIfDied(side, laneIndex);
   });
 }
 
@@ -270,12 +311,15 @@ function finishMatch(){
   if (state.winner === 'draw') ui.showBanner('Draw!', 'Both Tanks fell together.');
   else if (state.winner === 'you') ui.showBanner('You won the duel!', 'The rival Tank was defeated.');
   else ui.showBanner('You lost the duel.', 'Your Tank was defeated.');
+  // Let the final KO boom land before the fanfare.
+  setTimeout(state.winner === 'you' ? sfx.playVictory : sfx.playDefeat, 450);
 }
 
 // Tap-target-first flow: tapping any alive Axie (yours or the rival's)
 // selects it -- independent of which card, if any, you're about to play.
-// Tapping the same Axie again deselects it; tapping a different one moves
-// the selection. Wired once per unit chip in ui.buildBoard (always live,
+// The selection is sticky: it survives playing cards and only changes when
+// another Axie is tapped (or clears itself when the target dies), so you
+// can chain several cards on one target. Wired once per unit chip in ui.buildBoard (always live,
 // not a one-shot setSelectable mode), so it no-ops during move-mode
 // (which has its own tap-tap flow via setSelectable) instead of fighting it.
 function onUnitClick(side, laneIndex){
@@ -283,14 +327,11 @@ function onUnitClick(side, laneIndex){
   const lanes = side === 'you' ? state.youLanes : state.rivalLanes;
   const lane = lanes[laneIndex];
   if (!lane || !lane.alive) return;
-  if (selectedTarget && selectedTarget.side === side && selectedTarget.laneIndex === laneIndex){
-    clearTargetSelection();
-    ui.setHint('Tap an Axie (yours or the rival’s), then tap a card to use on it.');
-    return;
-  }
+  if (selectedTarget && selectedTarget.side === side && selectedTarget.laneIndex === laneIndex) return;
   clearTargetSelection();
   selectedTarget = { side, laneIndex };
   ui.markSelectedTarget(side, laneIndex, true);
+  sfx.playSelect();
   const who = side === 'you' ? `your ${lane.name}` : `the rival's ${lane.name}`;
   ui.setHint(`🎯 ${who} selected — now tap a card to use on it.`);
 }
@@ -298,6 +339,12 @@ function onUnitClick(side, laneIndex){
 function clearTargetSelection(){
   if (selectedTarget) ui.markSelectedTarget(selectedTarget.side, selectedTarget.laneIndex, false);
   selectedTarget = null;
+}
+
+function dropDeadTarget(){
+  if (!selectedTarget) return;
+  const lanes = selectedTarget.side === 'you' ? state.youLanes : state.rivalLanes;
+  if (!lanes[selectedTarget.laneIndex]?.alive) clearTargetSelection();
 }
 
 function onPlayerCardClick(card){
@@ -331,7 +378,6 @@ function onPlayerCardClick(card){
         : `${card.name} can't reach that target -- try a closer target or a long-range card.`);
       return;
     }
-    clearTargetSelection();
     playCard(card, tIndex, 'rival');
     return;
   }
@@ -339,7 +385,6 @@ function onPlayerCardClick(card){
   // Defense/heal: any alive lane on either side is a legal target -- an
   // ally gets the card's normal effect, an enemy gets it reversed
   // (Guard/Bulwark -> Vulnerable, Heal/Regen -> damage/DOT).
-  clearTargetSelection();
   playCard(card, tIndex, tSide);
 }
 
@@ -358,7 +403,7 @@ moveBtn.addEventListener('click', () => {
 });
 
 function startMoveMode(){
-  clearTargetSelection();
+  if (selectedTarget) ui.markSelectedTarget(selectedTarget.side, selectedTarget.laneIndex, false);
   ui.clearSelectable();
   moveMode = true;
   moveSource = null;
@@ -404,9 +449,15 @@ function performMove(destIndex){
   }
   moveMode = false;
   moveSource = null;
+  restoreTargetMark();
   updateMoveBtn();
   updateJoystick();
   ui.setHint(moved ? 'Axie moved! Choose a card to play.' : 'Choose a card to play.');
+}
+
+function restoreTargetMark(){
+  dropDeadTarget();
+  if (selectedTarget) ui.markSelectedTarget(selectedTarget.side, selectedTarget.laneIndex, true);
 }
 
 function cancelMoveMode(){
@@ -415,6 +466,7 @@ function cancelMoveMode(){
   ui.clearSelectable();
   moveMode = false;
   moveSource = null;
+  restoreTargetMark();
   updateMoveBtn();
 }
 
