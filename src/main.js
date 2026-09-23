@@ -22,7 +22,7 @@ let squad = []; // [{ classId, setId, isTank, counts:{attack,defense,heal} }] --
 let state = null;
 let lastYouSquad = [];
 let lastRivalSquad = [];
-let pendingAttack = null; // the attack card currently awaiting a manual target, if any
+let selectedTarget = null; // { side, laneIndex } -- tap-target-first flow, see onUnitClick
 let moveMode = false;
 let moveSource = null; // laneIndex of the Axie picked up, mid move-selection
 let matchFinished = false;
@@ -112,15 +112,14 @@ function beginMatch(youSquad, rivalSquad){
   lastYouSquad = youSquad;
   lastRivalSquad = rivalSquad;
   state = game.freshState(youSquad, rivalSquad);
-  pendingAttack = null;
+  selectedTarget = null;
   moveMode = false;
   moveSource = null;
   matchFinished = false;
-  selectedLaneIndex = null;
   ui.hideBanner();
-  ui.buildBoard(state);
+  ui.buildBoard(state, onUnitClick);
   syncUI();
-  ui.setHint('Choose a card to play.');
+  ui.setHint('Tap an Axie (yours or the rival’s), then tap a card to use on it.');
 }
 
 function syncUI(){
@@ -132,32 +131,10 @@ function syncUI(){
   updateJoystick();
 }
 
-// Which of the player's own lanes the joystick currently drives -- any
-// lane can roam freely now, not just the Tank (see game.js
-// moveLaneFreely). Falls back to the Tank, then to any alive lane, if the
-// previously-selected one died or nothing's selected yet.
-let selectedLaneIndex = null;
-function ensureValidSelectedLane(){
-  if (selectedLaneIndex != null && state.youLanes[selectedLaneIndex] && state.youLanes[selectedLaneIndex].alive) return;
-  const tankIdx = state.youLanes.findIndex(l => l.isTank && l.alive);
-  selectedLaneIndex = tankIdx !== -1 ? tankIdx : state.youLanes.findIndex(l => l.alive);
-}
-function selectJoystickUnit(i){
-  if (!state.youLanes[i] || !state.youLanes[i].alive) return;
-  if (joyHolding) endJoystickDrag();
-  cancelMoveMode();
-  pendingAttack = null;
-  ui.clearSelectable();
-  selectedLaneIndex = i;
-  updateJoystick();
-}
-
 function updateJoystick(){
-  ensureValidSelectedLane();
-  const lane = state.youLanes[selectedLaneIndex];
-  const canMove = !state.gameOver && lane && lane.alive;
+  const tankIdx = state.youLanes.findIndex(l => l.isTank);
+  const canMove = !state.gameOver && tankIdx !== -1 && state.youLanes[tankIdx].alive;
   joystickWrap.classList.toggle('disabled', !canMove);
-  ui.renderUnitPicker(state, selectedLaneIndex, selectJoystickUnit);
 }
 
 function updateMoveBtn(){
@@ -272,48 +249,75 @@ function finishMatch(){
   else ui.showBanner('You lost the duel.', 'Your Tank was defeated.');
 }
 
+// Tap-target-first flow: tapping any alive Axie (yours or the rival's)
+// selects it -- independent of which card, if any, you're about to play.
+// Tapping the same Axie again deselects it; tapping a different one moves
+// the selection. Wired once per unit chip in ui.buildBoard (always live,
+// not a one-shot setSelectable mode), so it no-ops during move-mode
+// (which has its own tap-tap flow via setSelectable) instead of fighting it.
+function onUnitClick(side, laneIndex){
+  if (moveMode) return;
+  const lanes = side === 'you' ? state.youLanes : state.rivalLanes;
+  const lane = lanes[laneIndex];
+  if (!lane || !lane.alive) return;
+  if (selectedTarget && selectedTarget.side === side && selectedTarget.laneIndex === laneIndex){
+    clearTargetSelection();
+    ui.setHint('Tap an Axie (yours or the rival’s), then tap a card to use on it.');
+    return;
+  }
+  clearTargetSelection();
+  selectedTarget = { side, laneIndex };
+  ui.markSelectedTarget(side, laneIndex, true);
+  const who = side === 'you' ? `your ${lane.name}` : `the rival's ${lane.name}`;
+  ui.setHint(`🎯 ${who} selected — now tap a card to use on it.`);
+}
+
+function clearTargetSelection(){
+  if (selectedTarget) ui.markSelectedTarget(selectedTarget.side, selectedTarget.laneIndex, false);
+  selectedTarget = null;
+}
+
 function onPlayerCardClick(card){
-  cancelMoveMode();
-  pendingAttack = null;
-  ui.clearSelectable();
+  if (moveMode) return;
+  if (!selectedTarget){
+    ui.setHint('Tap an Axie (yours or the rival’s) first, then tap a card.');
+    return;
+  }
+  const { side: tSide, laneIndex: tIndex } = selectedTarget;
+  const tLanes = tSide === 'you' ? state.youLanes : state.rivalLanes;
+  if (!tLanes[tIndex] || !tLanes[tIndex].alive){
+    clearTargetSelection();
+    ui.setHint('That target is no longer available -- pick a new one.');
+    return;
+  }
 
   if (card.role === 'attack'){
+    if (tSide !== 'rival'){
+      ui.setHint(`${card.name} is an attack card -- select an enemy Axie first.`);
+      return;
+    }
     const legal = game.getLegalTargets(state, 'you', card, card.laneIndex);
     if (!legal.length){
       ui.setHint('No target available!');
       return;
     }
-    pendingAttack = card;
-    const taunted = legal.length === 1 && state.rivalLanes[legal[0]].isTank;
-    ui.setHint(taunted
-      ? `🎯 Taunted! You're too close to the enemy Tank — ${card.name} must hit it.`
-      : `${card.name}: choose which enemy to hit.`);
-    ui.setSelectable(legal.map(targetIndex => ({
-      side: 'rival', laneIndex: targetIndex, cssClass: 'targetable',
-      onClick: () => {
-        pendingAttack = null;
-        ui.clearSelectable();
-        playCard(card, targetIndex, 'rival');
-      },
-    })));
+    if (!legal.includes(tIndex)){
+      const taunted = legal.length === 1 && state.rivalLanes[legal[0]].isTank;
+      ui.setHint(taunted
+        ? `🎯 Taunted! You're too close to the enemy Tank — ${card.name} must hit it instead.`
+        : `${card.name} can't reach that target -- try a closer target or a long-range card.`);
+      return;
+    }
+    clearTargetSelection();
+    playCard(card, tIndex, 'rival');
     return;
   }
 
-  // Defense/heal: aim at an ally for the normal effect, or at an enemy to
-  // reverse it (Guard/Bulwark -> Vulnerable, Heal/Regen -> damage/DOT).
-  const targets = game.getSupportTargets(state, 'you');
-  if (!targets.length){
-    ui.setHint('No target available!');
-    return;
-  }
-  ui.setHint(`${card.name}: choose an ally to help, or an enemy to reverse it on.`);
-  ui.setSelectable(targets.map(({ side, laneIndex, reversed }) => ({
-    side, laneIndex, cssClass: reversed ? 'targetable-reverse' : 'targetable-ally',
-    onClick: () => {
-      ui.clearSelectable();
-      playCard(card, laneIndex, side);
-    },
-  })));
+  // Defense/heal: any alive lane on either side is a legal target -- an
+  // ally gets the card's normal effect, an enemy gets it reversed
+  // (Guard/Bulwark -> Vulnerable, Heal/Regen -> damage/DOT).
+  clearTargetSelection();
+  playCard(card, tIndex, tSide);
 }
 
 function playCard(card, targetIndex, targetSide){
@@ -331,7 +335,7 @@ moveBtn.addEventListener('click', () => {
 });
 
 function startMoveMode(){
-  pendingAttack = null;
+  clearTargetSelection();
   ui.clearSelectable();
   moveMode = true;
   moveSource = null;
@@ -391,13 +395,15 @@ function cancelMoveMode(){
   updateMoveBtn();
 }
 
-// ================= Unit joystick (continuous free-roam, no cooldown) =================
-// Holding the stick nudges whichever lane is currently selected (see
-// selectJoystickUnit/renderUnitPicker -- any lane can roam now, not just
-// the Tank) around the formation's local space every frame (see the game
-// loop below) -- releasing just stops it where it is. "Up" on the stick =
-// toward the enemy (the rival row renders above yours), since that's also
-// the direction that brings a unit closer to the enemy Tank's taunt radius.
+// ================= Tank joystick (continuous free-roam, no cooldown) =================
+// Holding the stick nudges the Tank around the formation's local space
+// every frame (see the game loop below); the other 4 lanes escort it,
+// keeping their formation offset relative to the Tank's live position (see
+// game.js moveSquadWithTank) -- the whole squad advances/retreats
+// together. Releasing just stops everyone where they are. "Up" on the
+// stick = toward the enemy (the rival row renders above yours), since
+// that's also the direction that brings the squad closer to the enemy
+// Tank's taunt radius.
 const JOY_MAX_PX = 24;
 const UNIT_MOVE_SPEED = 1.8; // local units/sec at full stick deflection
 let joyHolding = false;
@@ -428,7 +434,7 @@ function endJoystickDrag(){
   joyHolding = false;
   joyDirX = 0; joyDirZ = 0;
   joystickKnob.style.transform = '';
-  if (state.youLanes[selectedLaneIndex]) ui.endLiveLanePosition('you', selectedLaneIndex);
+  state.youLanes.forEach((lane, i) => { if (lane.alive) ui.endLiveLanePosition('you', i); });
 }
 joystickBase.addEventListener('pointerup', endJoystickDrag);
 joystickBase.addEventListener('pointercancel', endJoystickDrag);
@@ -464,10 +470,10 @@ function gameLoop(nowMs){
   game.cullDeadHand(state);
 
   if (joyHolding){
-    const lane = state.youLanes[selectedLaneIndex];
-    if (lane && lane.alive){
-      game.moveLaneFreely(state, 'you', selectedLaneIndex, joyDirX * UNIT_MOVE_SPEED * dt, joyDirZ * UNIT_MOVE_SPEED * dt);
-      ui.setLiveLanePosition('you', selectedLaneIndex, lane.localPos);
+    const tankIdx = state.youLanes.findIndex(l => l.isTank);
+    if (tankIdx !== -1 && state.youLanes[tankIdx].alive){
+      game.moveSquadWithTank(state, 'you', joyDirX * UNIT_MOVE_SPEED * dt, joyDirZ * UNIT_MOVE_SPEED * dt);
+      state.youLanes.forEach((lane, i) => { if (lane.alive) ui.setLiveLanePosition('you', i, lane.localPos); });
     }
   }
 
@@ -477,7 +483,7 @@ function gameLoop(nowMs){
     const result = aiMaybeAct(state);
     if (result){
       applyResultFx(result);
-      if (!pendingAttack && !moveMode) setHintForResult('rival', result);
+      if (!selectedTarget && !moveMode) setHintForResult('rival', result);
     }
   }
 

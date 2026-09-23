@@ -248,6 +248,15 @@ h1{
   position:relative; border-radius:10px; padding:4px 6px;
   background:#1c130cd0; border:1px solid #ffffff25; backdrop-filter:blur(2px);
   transition:background .15s ease, opacity .3s ease, box-shadow .15s ease;
+  pointer-events:auto; cursor:pointer;
+}
+.unit-chip.selected-target{
+  box-shadow:0 0 0 2px #e8f2ff, 0 0 12px 3px #e8f2ffa0;
+  animation:selected-target-pulse 1s ease-in-out infinite;
+}
+@keyframes selected-target-pulse{
+  0%,100%{ box-shadow:0 0 0 2px #e8f2ff, 0 0 8px 1px #e8f2ff70; }
+  50%{ box-shadow:0 0 0 2px #e8f2ff, 0 0 16px 4px #e8f2ffd0; }
 }
 .unit-chip.dead{ opacity:.35; filter:grayscale(1); }
 .unit-chip.lane-hit{ background:#b8452fcc; }
@@ -351,15 +360,6 @@ h1{
   transition:opacity .2s ease;
 }
 .joystick-wrap.disabled{ opacity:.35; pointer-events:none; }
-.joystick-unit-picker{ display:flex; gap:3px; }
-.unit-picker-btn{
-  width:20px; height:20px; border-radius:6px; cursor:pointer;
-  border:1px solid #4a382480; background:#1c130c; color:var(--text-light);
-  font-size:.62rem; line-height:1; display:flex; align-items:center; justify-content:center;
-  opacity:.55;
-}
-.unit-picker-btn.active{ opacity:1; background:#4a3824; box-shadow:0 0 0 2px var(--gold); }
-.unit-picker-btn.dead{ opacity:.25; cursor:default; }
 .joystick-label{
   font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.62rem; color:var(--gold);
 }

@@ -13,8 +13,6 @@ const pipsEl = document.getElementById('pips');
 const hintEl = document.getElementById('hint');
 const bannerEl = document.getElementById('banner');
 const bannerSubEl = document.getElementById('bannerSub');
-const joystickUnitPicker = document.getElementById('joystickUnitPicker');
-const joystickLabel = document.getElementById('joystickLabel');
 
 // ================= Team builder =================
 export function renderRoster(axies, squad, onAdd){
@@ -199,13 +197,25 @@ export function endLiveLanePosition(side, laneIndex){
   setLaneRoaming(side, laneIndex, false);
 }
 
-export function buildBoard(state){
+// `onUnitClick(side, laneIndex)` is wired once per unit chip here (not via
+// setSelectable) so it's always live, independent of any one-shot
+// targeting mode -- the tap-target-first flow: pick an Axie on the board,
+// then a card in hand to use on it. main.js no-ops the callback while
+// move-mode (setSelectable) is active instead of us coordinating here.
+export function buildBoard(state, onUnitClick){
   currentState = state;
   boardOverlay.innerHTML = '';
   unitRefs = {
     you: state.youLanes.map(() => buildUnitTag()),
     rival: state.rivalLanes.map(() => buildUnitTag()),
   };
+  if (onUnitClick){
+    ['you','rival'].forEach(side => {
+      unitRefs[side].forEach((ref, i) => {
+        ref.chip.addEventListener('click', () => onUnitClick(side, i));
+      });
+    });
+  }
 
   // initBoard3D sets up the camera synchronously, so overlays can be
   // positioned right away -- they shouldn't wait on the 3D models (which
@@ -288,40 +298,42 @@ export function getLaneSideEl(side, laneIndex){
   return ref ? ref.chip : null;
 }
 
-// Small icon-button row next to the joystick: picks which of the player's
-// own lanes the joystick currently drives (any lane can roam freely now,
-// not just the Tank -- see game.js moveLaneFreely).
-export function renderUnitPicker(state, selectedIndex, onSelect){
-  if (!joystickUnitPicker) return;
-  joystickUnitPicker.innerHTML = '';
-  state.youLanes.forEach((lane, i) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'unit-picker-btn' + (i === selectedIndex ? ' active' : '') + (!lane.alive ? ' dead' : '');
-    btn.style.borderColor = lane.color;
-    btn.textContent = lane.isTank ? '🎯' : (lane.name[0] || '?');
-    btn.title = lane.name + (lane.isTank ? ' (Tank)' : '');
-    btn.disabled = !lane.alive;
-    btn.addEventListener('click', () => onSelect(i));
-    joystickUnitPicker.appendChild(btn);
-  });
-  const selLane = state.youLanes[selectedIndex];
-  if (joystickLabel) joystickLabel.textContent = selLane ? `🕹️ ${selLane.name}${selLane.isTank ? ' 🎯' : ''}` : '🕹️';
+// A persistent highlight for "this is the currently selected target" (the
+// tap-target-first flow: pick an Axie on the board, then pick a card to
+// use on it). Independent of setSelectable/clearSelectable's one-shot
+// targeting modes, which are only used for the move-swap flow now.
+export function markSelectedTarget(side, laneIndex, on){
+  const ref = unitRefs[side] && unitRefs[side][laneIndex];
+  if (ref) ref.chip.classList.toggle('selected-target', on);
 }
 
 // ================= Hand / energy / piles =================
+// Reconciles by card.uid instead of wiping+rebuilding the whole hand every
+// call -- renderHand runs on a fast fixed tick (energy is continuous, so
+// affordability can flip at any moment), and a full innerHTML='' + rebuild
+// every ~150ms was destroying and recreating the exact DOM node a real tap
+// or click was targeting, which could make the tap land on nothing and the
+// card visibly fail to respond. Keeping one persistent element per uid
+// means a click's target never gets pulled out from under it.
+const handNodes = new Map(); // card.uid -> element
 export function renderHand(state, { onPlay }){
-  handEl.innerHTML = '';
-  state.hand.forEach((card) => {
-    const div = document.createElement('div');
+  const seen = new Set();
+  state.hand.forEach((card, i) => {
+    seen.add(card.uid);
     const casterLane = state.youLanes[card.laneIndex];
     const laneAlive = casterLane && casterLane.alive;
     const affordable = state.energyYou >= card.cost;
     const playable = affordable && !state.gameOver && laneAlive;
-    div.className = 'card' + (!playable ? ' disabled' : '');
-    div.style.borderColor = card.color + '55';
     const rangeLabel = card.range==='short' ? 'Short' : card.range==='long' ? 'Long'
       : card.role==='heal' ? 'Heal' : 'Defense';
+
+    let div = handNodes.get(card.uid);
+    if (!div){
+      div = document.createElement('div');
+      handNodes.set(card.uid, div);
+    }
+    div.className = 'card' + (!playable ? ' disabled' : '');
+    div.style.borderColor = card.color + '55';
     div.innerHTML = `
       <div class="card-top">
         <div class="card-name">${card.name}</div>
@@ -330,9 +342,15 @@ export function renderHand(state, { onPlay }){
       <div class="card-class" style="color:${card.color}">${card.setIcon ? card.setIcon+' ' : ''}${card.setName || card.cls} · ${rangeLabel}</div>
       <div class="card-desc">${card.desc}${!laneAlive ? ' <b>(lane destroyed)</b>' : ''}</div>
     `;
-    if (playable) div.addEventListener('click', () => onPlay(card));
-    handEl.appendChild(div);
+    div.onclick = playable ? () => onPlay(card) : null;
+    if (handEl.children[i] !== div) handEl.insertBefore(div, handEl.children[i] || null);
   });
+  for (const [uid, div] of handNodes){
+    if (!seen.has(uid)){
+      div.remove();
+      handNodes.delete(uid);
+    }
+  }
 }
 
 export function renderPips(state){

@@ -84,39 +84,40 @@ npm run preview
   rival". O rival age sozinho, em intervalos aleatórios (~1.5-2.5s), via
   `ai.js`'s `aiMaybeAct`. Bleed/Poison tickam num timer fixo (a cada 2s)
   compartilhado pelos dois lados, não mais "no início do seu turno".
-- **Mira manual**: jogar uma carta de ataque não resolve sozinho — abre um
-  modo de mira que destaca (com brilho pulsante) os inimigos legais pra
-  aquele alcance, e você toca em qual quer acertar. Curto alcance só pode
-  acertar quem estiver **na sua mesma coluna** no tabuleiro (cai pra
-  "qualquer um vivo" se não houver ninguém lá); longo alcance pode acertar
-  qualquer inimigo vivo. O rival ainda mira automático (curto = mesma
-  coluna, longo = o mais fraco).
-- **Mira de Defesa/Cura em qualquer lado (Cura Reversa)**: cartas de defesa
-  e cura também abrem um modo de mira — mas nesse a lista de alvos legais
-  cobre **os dois lados do tabuleiro**: qualquer aliado vivo (brilho verde,
-  `.targetable-ally`) recebe o efeito normal da carta, e qualquer inimigo
-  vivo (brilho rosa, `.targetable-reverse`) recebe a versão **invertida**
-  dela, igual à mecânica real do Origin de "Cura Reversa": Guarda/Bulwark
-  viram **Vulnerável** (+30% de dano recebido nos próximos golpes) e
-  Cura/Regeneração viram **dano/DOT** direto no inimigo em vez de cura.
-- **Movimento**: dá pra trocar a coluna de um dos seus próprios Axies com
-  outra (toca "Mover", toca o Axie, toca o destino) — sem turno pra
-  esperar, só um cooldown curto (4s) depois de usar. É a ferramenta tática
-  pro sistema de mira acima — tira um Axie da coluna de um atacante de
-  curto alcance inimigo, ou reposiciona pra alinhar seu próprio curto
-  alcance num alvo específico.
-- **Joystick de qualquer Axie (posição livre, em tempo real)**: ao lado do
-  botão de mover, um joystick com uma fileira de ícones em cima — toca um
-  dos seus 5 Axies pra "empunhar" ele (padrão: o Tanque), depois **segura e
-  arrasta** o manche pra ele andar continuamente na direção empurrada (sem
-  cooldown, sem encaixar em slot fixo), até um raio máximo ao redor do
-  centro da formação. Solta e ele para onde estiver. "Pra cima" no
-  joystick = rumo ao inimigo (linha de frente, mais perto do raio de
-  Provocação do Tanque inimigo); "pra baixo" = recuar pra linha de trás.
-  Isso é independente do `col` (slot fixo, usado pro alcance curto/longo e
-  pro swap discreto) -- o roam livre só mexe na posição `localPos`, então
-  qualquer Axie pode fugir/entrar na Provocação sem perder sua coluna de
-  mira.
+- **Mira: toca no alvo, depois na carta**: diferente do modelo antigo
+  (carta primeiro), agora você toca em **qualquer Axie no tabuleiro**
+  (seu ou do rival) pra selecioná-lo — vira um anel branco pulsante
+  (`.unit-chip.selected-target`), independente de qual carta você vai
+  usar. Toca de novo no mesmo Axie pra desselecionar. Só então você toca
+  numa carta da mão: cartas de **Ataque** só resolvem se o alvo
+  selecionado for um inimigo dentro do alcance daquela carta (curto =
+  mesma coluna, cai pra qualquer um vivo se não houver ninguém lá; longo =
+  qualquer inimigo vivo) — senão a carta não é gasta e o hint explica por
+  quê (fora de alcance, ou "Provocado" se o Tanque inimigo estiver
+  puxando). Cartas de **Defesa/Cura** aceitam qualquer alvo vivo dos dois
+  lados: aliado = efeito normal, inimigo = **revertido** (Cura Reversa,
+  igual ao Origin) — Guarda/Bulwark/Barreira/Evasão/Espinhos viram
+  **Vulnerável**, Cura/Regeneração viram **dano/DOT**. O clique é sempre
+  ativo em cada unit chip (não é mais um modo que abre/fecha por carta) —
+  ver `ui.js`'s `buildBoard(state, onUnitClick)`. O rival ainda mira
+  automático (curto = mesma coluna, longo = o mais fraco).
+- **Movimento discreto**: dá pra trocar a coluna de um dos seus próprios
+  Axies com outra (toca "Mover", toca o Axie, toca o destino) — sem turno
+  pra esperar, só um cooldown curto (4s) depois de usar. Tira um Axie da
+  coluna de um atacante de curto alcance inimigo, ou reposiciona pra
+  alinhar seu próprio curto alcance num alvo específico.
+- **Joystick do Tanque + escolta (posição livre, em tempo real)**: ao lado
+  do botão de mover, um joystick **só do Tanque** — **segura e arrasta**
+  pra ele andar continuamente na direção empurrada (sem cooldown, sem
+  encaixar em slot fixo), até um raio máximo ao redor do centro da
+  formação. Os outros 4 Axies **escoltam**: seguem automaticamente,
+  mantendo seu deslocamento de formação relativo à posição atual do
+  Tanque (`moveSquadWithTank`), então o esquadrão inteiro avança/recua
+  junto. Solta e todo mundo para onde estiver. "Pra cima" no joystick =
+  rumo ao inimigo (mais perto do raio de Provocação do Tanque inimigo);
+  "pra baixo" = recuar pra linha de trás. Isso é independente do `col`
+  (slot fixo, usado pro alcance curto/longo e pro swap discreto) -- o
+  roam livre só mexe na posição `localPos`.
 - **Formação e Provocação (Taunt)**: cada lado forma um losango — o Tanque
   nasce no **centro** (tile dourado brilhante, com um anel de raio), e os
   outros 4 Axies ficam 2 na frente/2 atrás ao redor dele, fixos nesses
@@ -186,12 +187,22 @@ que ganha uma 2ª carta de **cura** (Regeneração) em vez de ataque. Os
 **números** (dano, HP, custo) são calibrados pra escala própria deste jogo
 (~100-150 HP), não pra escala do Origin.
 
-### Próximo passo: rotação sazonal de meta
+### Próximos passos
 
-Ainda não implementado (fica pro próximo passo): uma "temporada" que
-buffa/vaulta conjuntos periodicamente, trazendo o mesmo tipo de movimento
-de meta que motiva o mercado de Axies real — sem mexer no sistema de
-conjuntos em si, só numa camada de multiplicadores temporários por cima.
+Ainda não implementado:
+
+- **Rotação sazonal de meta**: uma "temporada" que buffa/vaulta conjuntos
+  periodicamente, trazendo o mesmo tipo de movimento de meta que motiva o
+  mercado de Axies real — sem mexer no sistema de conjuntos em si, só numa
+  camada de multiplicadores temporários por cima.
+- **Salão de arena estilo WoW 3x3**: substituir os tiles em losango atuais
+  por um grande salão fechado com colunas e o símbolo da Lunacia no
+  centro, com os dois esquadrões começando a uma certa distância um do
+  outro e caminhando de encontro no início da partida, em vez de já
+  nascerem em formação cara a cara. É trabalho de arte/ambiente 3D (novo
+  chão/paredes/colunas em `board3d.js`, mais uma sequência de entrada
+  antes do duelo liberar) — maior escopo que os ajustes de gameplay acima,
+  fica pra uma leva dedicada.
 
 ## Estrutura
 
@@ -205,15 +216,16 @@ conjuntos em si, só numa camada de multiplicadores temporários por cima.
 - `src/game.js` — estado do duelo (**tempo real, sem `turn`**): N linhas
   por lado, cada uma com um `col` (slot fixo: 0 é o centro/Tanque, 1-4 são
   frente/trás, dita alcance curto e o swap discreto) e um `localPos`
-  ({x,z} ao vivo, **qualquer lane** pode andar livre nele via
-  `moveLaneFreely`/`ROAM_RADIUS`, não só o Tanque), dano, cura, status
-  effects (inclui `applyBarrier`/`applyDodge`/`applyThorns` além dos
-  antigos Bulwark/Vulnerable/Regen), mira manual + Provocação por
-  distância real (`getLegalTargets`/`TAUNT_RADIUS`/`pickAutoTarget`), mira
-  de defesa/cura nos dois lados (`getSupportTargets`), movimento discreto
-  com cooldown (`moveLane`/`MOVE_COOLDOWN_SEC`), regen de energia e tick de
-  status contínuos (`tickEnergyRealtime`/`tickStatusTimer`), `resolveCard`
-  recebe `targetSide` e despacha por `card.effect` (shield/bulwark/
+  ({x,z} ao vivo; o Tanque anda livre nele via `moveSquadWithTank`/
+  `ROAM_RADIUS`, e essa mesma função reposiciona os outros 4 relativo à
+  posição atual dele, formação de escolta), dano, cura, status effects
+  (inclui `applyBarrier`/`applyDodge`/`applyThorns` além dos antigos
+  Bulwark/Vulnerable/Regen), mira manual + Provocação por distância real
+  (`getLegalTargets`/`TAUNT_RADIUS`/`pickAutoTarget`), mira de defesa/cura
+  nos dois lados (`getSupportTargets`), movimento discreto com cooldown
+  (`moveLane`/`MOVE_COOLDOWN_SEC`), regen de energia e tick de status
+  contínuos (`tickEnergyRealtime`/`tickStatusTimer`), `resolveCard` recebe
+  `targetSide` e despacha por `card.effect` (shield/bulwark/
   bulwark_cleanse/barrier/dodge/thorns/regen) normal-vs-revertido,
   condição de vitória (Tanque)
 - `src/ai.js` — `aiMaybeAct`: chamado periodicamente pelo loop de
@@ -222,10 +234,14 @@ conjuntos em si, só numa camada de multiplicadores temporários por cima.
 - `src/render.js` — feedback visual via DOM (números flutuantes, flash, shake)
 - `src/ui.js` — HUD/DOM (montagem de esquadrão com steppers de loadout +
   seletor de conjunto por Axie (`renderSquad`), overlay de HP/nome/status
-  sobre o tabuleiro 3D, destaque de alvo/movimento clicável
-  (`setSelectable`), posicionamento ao vivo de qualquer lane durante o
-  joystick (`setLiveLanePosition`/`endLiveLanePosition`), seletor de qual
-  Axie o joystick controla (`renderUnitPicker`), mão, energia, banner)
+  sobre o tabuleiro 3D, clique persistente em qualquer unit chip pro fluxo
+  de mira tocar-alvo-depois-carta (`buildBoard(state, onUnitClick)` +
+  `markSelectedTarget`), destaque de movimento clicável pro swap discreto
+  (`setSelectable`, agora só usado por esse fluxo), posicionamento ao vivo
+  de qualquer lane durante o joystick (`setLiveLanePosition`/
+  `endLiveLanePosition`), mão com reconciliação por `card.uid` (evita
+  recriar o DOM a cada tick, que fazia cliques reais falharem), energia,
+  banner)
 - `src/axieArt.js` — arte SVG original por classe, usada só no team picker
   (roster/esquadrão) como fallback quando o 3D não carrega
 - `src/axie3d.js` — preview 3D real (Axie Mixer 3D) no team picker (1 Axie

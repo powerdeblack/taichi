@@ -17,10 +17,12 @@
 // heal cards can go on any living lane on EITHER side (see
 // getSupportTargets) -- an ally gets the card's normal effect, an enemy
 // gets its reversed form instead. Every lane has a `localPos` ({x,z}, in
-// the same local space as FORMATION_XZ) that ANY lane can roam through
-// freely and continuously (see moveLaneFreely) -- that live position is
-// what the Tank's taunt radius measures, regardless of who's roaming near
-// it. `col` (the formation slot) is separate and only changes via the
+// the same local space as FORMATION_XZ); the Tank roams that space freely
+// and continuously (see moveSquadWithTank), and the other 4 lanes escort
+// it, keeping their formation offset relative to wherever the Tank
+// currently stands. That live position is what the Tank's taunt radius
+// measures, so the whole squad shares whatever taunt exposure roaming
+// brings. `col` (the formation slot) is separate and only changes via the
 // discrete moveLane swap (cooldown-gated); it's what still drives
 // short-range column-matching, independent of live roaming. Win condition:
 // a team loses the instant its designated Tank lane dies.
@@ -221,8 +223,17 @@ export function moveLane(state, side, sourceIndex, destIndex){
   const src = lanes[sourceIndex], dest = lanes[destIndex];
   if (!src || !dest || sourceIndex === destIndex || !src.alive) return false;
   const tmp = src.col; src.col = dest.col; dest.col = tmp;
-  src.localPos = { ...FORMATION_XZ[src.col] };
-  dest.localPos = { ...FORMATION_XZ[dest.col] };
+  // Whichever lane isn't the Tank gets anchored to wherever the Tank
+  // currently stands (it may have roamed away from the origin) instead of
+  // the raw formation slot, so it stays part of the escort instead of
+  // snapping back to a stale absolute position -- see moveSquadWithTank.
+  const tank = lanes.find(l => l.isTank && l.alive);
+  const anchor = tank ? tank.localPos : { x: 0, z: 0 };
+  [src, dest].forEach(lane => {
+    lane.localPos = lane.isTank
+      ? { ...FORMATION_XZ[lane.col] }
+      : { x: anchor.x + FORMATION_XZ[lane.col].x, z: anchor.z + FORMATION_XZ[lane.col].z };
+  });
   if (side === 'you') state.moveCooldown = MOVE_COOLDOWN_SEC;
   return true;
 }
@@ -231,26 +242,33 @@ export function tickMoveCooldown(state, dt){
   if (state.moveCooldown > 0) state.moveCooldown = Math.max(0, state.moveCooldown - dt);
 }
 
-// Free-roam control (the joystick): nudges any one lane by (dx,dz) in
-// local space, clamped to a radius around the formation center so it can't
-// wander into the enemy's half of the board. Unlike moveLane this has no
+// The Tank's dedicated free-roam control (the joystick): nudges it by
+// (dx,dz) in local space, clamped to a radius around the formation center
+// so it can't wander into the enemy's half of the board. The other 4
+// lanes aren't independently controllable -- they escort the Tank,
+// keeping their original formation offset relative to wherever the Tank
+// currently stands, so the whole squad advances/retreats together (and
+// shares whatever taunt exposure that brings). Unlike moveLane this has no
 // cooldown -- it's continuous positioning, not a discrete action -- and it
 // only ever moves `localPos`, never `col` (short-range column-matching and
-// the discrete move-swap stay based on col, untouched by roaming). Every
-// lane can be the one under joystick control now, not just the Tank --
-// main.js lets the player pick which of their units it currently drives.
+// the discrete move-swap stay based on col, untouched by roaming).
 export const ROAM_RADIUS = 1.6;
-export function moveLaneFreely(state, side, laneIndex, dx, dz){
+export function moveSquadWithTank(state, side, dx, dz){
   const lanes = side === 'you' ? state.youLanes : state.rivalLanes;
-  const lane = lanes[laneIndex];
-  if (!lane || !lane.alive) return;
-  let x = lane.localPos.x + dx, z = lane.localPos.z + dz;
+  const tank = lanes.find(l => l.isTank && l.alive);
+  if (!tank) return;
+  let x = tank.localPos.x + dx, z = tank.localPos.z + dz;
   const dist = Math.hypot(x, z);
   if (dist > ROAM_RADIUS){
     const s = ROAM_RADIUS / dist;
     x *= s; z *= s;
   }
-  lane.localPos = { x, z };
+  tank.localPos = { x, z };
+  lanes.forEach(lane => {
+    if (lane.isTank || !lane.alive) return;
+    const off = FORMATION_XZ[lane.col];
+    lane.localPos = { x: tank.localPos.x + off.x, z: tank.localPos.z + off.z };
+  });
 }
 
 const BULWARK_REDUCTION = 0.25;
