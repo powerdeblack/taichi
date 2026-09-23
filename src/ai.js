@@ -6,6 +6,7 @@
 // or null if it had nothing affordable to play. Doesn't move lanes --
 // kept simple on purpose.
 import { resolveCard, pickAutoTarget } from './game.js';
+import { setById } from './cards.js';
 
 export function aiMaybeAct(state){
   if (state.gameOver) return null;
@@ -13,8 +14,11 @@ export function aiMaybeAct(state){
   const candidates = [];
   state.rivalLanes.forEach((lane, laneIndex) => {
     if (!lane.alive) return;
+    const set = setById(lane.setId);
     lane.cardPool.forEach(c => {
-      if (c.cost <= state.energyRival) candidates.push({ ...c, cls: lane.classId, laneIndex, color: lane.color });
+      if (c.cost <= state.energyRival){
+        candidates.push({ ...c, cls: lane.classId, laneIndex, color: lane.color, setId: lane.setId, setName: set.name, setIcon: set.icon });
+      }
     });
   });
   if (!candidates.length) return null;

@@ -1,23 +1,31 @@
 # Axie Duel
 
 Protótipo de duelo em tabuleiro 3D pro Axie Vibeathon (Sky Mavis / Axie
-Infinity): esquadrão livre de 5 Axies, cada um com um **loadout de 5
-cartas** que você monta (ataque/defesa/cura, na proporção que quiser) — é
-essa composição, não um papel fixo, que determina o quão forte, tanque ou
-curador cada Axie fica. A **espécie** de um Axie (Beast/Aqua/Plant/Bird/
-Bug/Reptile) e sua **função em combate** são desacopladas: qualquer espécie
-pode equipar qualquer **conjunto de cartas** (Guerreiro/Sacerdote/Mago/
-Arqueiro/Ladino/Xamã) — é o conjunto, não a espécie, que decide as cartas
-de ataque/defesa/cura reais daquele Axie. Cada espécie tem um conjunto
-"nativo" (Bird↔Arqueiro, Beast↔Guerreiro...) que desbloqueia uma carta-
-assinatura bônus quando combinados, recompensando a combinação natural sem
-travar as outras. O duelo é **em tempo real, sem turnos**: os dois lados
-regeneram energia continuamente e podem jogar cartas a qualquer momento,
-com mira manual (você escolhe o alvo, inclusive pra reverter cartas de
-defesa/cura no inimigo) e movimento livre em tempo real pra **qualquer**
-Axie via joystick (não só o Tanque), que também provoca (taunt) por perto.
-Tudo baseado no core do Axie Origin (energia, classes, status effects).
-Vence quem matar o Tanque do adversário primeiro. No team picker, cada
+Infinity), ambientado num **Salão Lunacia** (chão de pedra, colunas e um
+emblema lunar brilhante no centro, estilo arena 3x3 de WoW): esquadrão
+livre de 5 Axies, cada um com um **loadout de 5 cartas** que você monta
+(ataque/defesa/cura, na proporção que quiser) — é essa composição, não um
+papel fixo, que determina o quão forte, tanque ou curador cada Axie fica.
+A **espécie** de um Axie (Beast/Aqua/Plant/Bird/Bug/Reptile) e sua
+**função em combate** são desacopladas: qualquer espécie pode equipar
+qualquer **conjunto de cartas** (Guerreiro/Sacerdote/Mago/Arqueiro/Ladino/
+Xamã) — é o conjunto, não a espécie, que decide as cartas de ataque/
+defesa/cura reais daquele Axie. Cada espécie tem um conjunto "nativo"
+(Bird↔Arqueiro, Beast↔Guerreiro...) que desbloqueia uma carta-assinatura
+bônus quando combinados, recompensando a combinação natural sem travar as
+outras. Os dois esquadrões **entram andando** no salão a partir de uma
+certa distância quando o duelo começa. O duelo é **em tempo real, sem
+turnos**: os dois lados regeneram energia continuamente e podem jogar
+cartas a qualquer momento; a mira é **tocar no alvo, depois na carta** —
+qualquer Axie no tabuleiro, seu ou do rival (inclusive tocando direto na
+barra de vida dele), inclusive pra reverter cartas de defesa/cura no
+inimigo. O Tanque provoca (taunt) por perto e pode ser movido livremente
+com um joystick, com o resto do esquadrão escoltando ele em formação.
+Cada carta jogada aparece na tela com seu próprio ícone/nome, e os
+efeitos de dano/cura ficam visíveis por mais tempo pra facilitar
+acompanhar o jogo. Tudo baseado no core do Axie Origin (energia, classes,
+status effects). Vence quem matar o Tanque do adversário primeiro. No
+team picker, cada
 Axie aparece como um modelo 3D real (Axie Mixer 3D oficial), não
 placeholder.
 
@@ -129,6 +137,23 @@ npm run preview
   correr pra frente pra proteger a retaguarda puxando os golpes pra si, ou
   recuar pra fugir da provocação e liberar os aliados pra mirar em
   qualquer um.
+- **Salão Lunacia**: o tabuleiro é um grande salão circular (chão de
+  pedra, anel de colunas na borda, `board3d.js`'s `buildHall`) com um
+  **emblema lunar brilhante** (`buildLunaciaSigilTexture`, desenhado via
+  canvas em runtime — não é um asset importado) no centro, entre as duas
+  fileiras. Ao começar o duelo, os dois esquadrões nascem afastados (atrás
+  da própria formação) e **caminham** até a posição real (`introWalk`,
+  reaproveitando o sistema de lerp que já existia pro swap discreto, só
+  que mais lento) — a etiqueta de nome/vida de cada Axie só aparece
+  (fade-in) depois que essa entrada termina, pra não ficar destacada numa
+  posição que o modelo 3D ainda não alcançou.
+- **Feedback de jogada**: toda carta jogada — sua ou do rival — mostra um
+  popup com o ícone do conjunto e o nome da carta perto da respectiva
+  fileira (`render.spawnCardPopup`, a "arte" da carta nesse protótipo, já
+  que não há ilustração própria). Números flutuantes de dano/cura,
+  flashes de acerto/cura e o shake do tabuleiro agora duram bem mais
+  (~1.7s o texto, ~0.65-0.75s os flashes) do que a v1 (~0.4-0.9s) — as
+  ativações estavam rápidas demais pra acompanhar.
 - Status effects em cartas de Ataque: Bleed, **Poison** (empilha, bate 2x a
   stack atual e decai 1 stack por tick — mais forte no início, some
   sozinho), Deathmark, Retain, Ambush (2x dano no 1º acerto) e o combo de
@@ -195,14 +220,6 @@ Ainda não implementado:
   periodicamente, trazendo o mesmo tipo de movimento de meta que motiva o
   mercado de Axies real — sem mexer no sistema de conjuntos em si, só numa
   camada de multiplicadores temporários por cima.
-- **Salão de arena estilo WoW 3x3**: substituir os tiles em losango atuais
-  por um grande salão fechado com colunas e o símbolo da Lunacia no
-  centro, com os dois esquadrões começando a uma certa distância um do
-  outro e caminhando de encontro no início da partida, em vez de já
-  nascerem em formação cara a cara. É trabalho de arte/ambiente 3D (novo
-  chão/paredes/colunas em `board3d.js`, mais uma sequência de entrada
-  antes do duelo liberar) — maior escopo que os ajustes de gameplay acima,
-  fica pra uma leva dedicada.
 
 ## Estrutura
 
@@ -231,7 +248,9 @@ Ainda não implementado:
 - `src/ai.js` — `aiMaybeAct`: chamado periodicamente pelo loop de
   `main.js` (não mais "turno do rival") — tenta jogar 1 carta afordável,
   mira automática via `pickAutoTarget`; não move lanes
-- `src/render.js` — feedback visual via DOM (números flutuantes, flash, shake)
+- `src/render.js` — feedback visual via DOM: números flutuantes, flash de
+  acerto/cura, shake do tabuleiro (durações alongadas de propósito, ver
+  seção acima) e `spawnCardPopup` (o popup de ícone+nome da carta jogada)
 - `src/ui.js` — HUD/DOM (montagem de esquadrão com steppers de loadout +
   seletor de conjunto por Axie (`renderSquad`), overlay de HP/nome/status
   sobre o tabuleiro 3D, clique persistente em qualquer unit chip pro fluxo
@@ -248,16 +267,21 @@ Ainda não implementado:
   por vez)
 - `src/board3d.js` — o tabuleiro de duelo em si: uma cena three.js
   **compartilhada** (1 renderer/câmera só) com até 10 Axies 3D reais (5 de
-  cada lado) sobre tiles em losango (laranja/azul, estilo Apeiron) numa
-  **formação centrada no Tanque** (`FORMATION`: centro + frente/trás),
-  com um tile maior e anel pulsante no slot do Tanque marcando o raio de
-  Provocação. Cada Axie balança sutilmente perto da sua posição quando
-  ocioso ("patrulha"), desliza suavemente pra novo slot no movimento
-  discreto (`moveLaneVisual`, com lerp), e o Tanque é posicionado
-  diretamente frame a frame enquanto o joystick é segurado
-  (`setLaneLivePosition`/`setLaneRoaming`, sem lerp/patrulha nesse
-  momento). HP/nome/status ficam em HTML posicionado por cima via projeção
-  de câmera (`projectLane`) — não são modelos 3D
+  cada lado). O **Salão Lunacia** (`buildHall`) é o piso circular de
+  pedra + anel de 8 colunas + o emblema lunar central desenhado via canvas
+  em runtime (`buildLunaciaSigilTexture`) por cima do qual ficam os tiles
+  em losango (laranja/azul, estilo Apeiron) numa **formação centrada no
+  Tanque** (`FORMATION`: centro + frente/trás), com um tile maior e anel
+  pulsante no slot do Tanque marcando o raio de Provocação. No início da
+  partida cada Axie nasce afastado da sua posição real e **caminha** até
+  ela (`syncBoardAxies`'s `introWalk`, lerp mais lento que o normal +
+  `setLocomotion('walk')` até chegar). Fora disso, cada Axie balança
+  sutilmente perto da sua posição quando ocioso ("patrulha"), desliza
+  suavemente pra novo slot no movimento discreto (`moveLaneVisual`, com
+  lerp), e o Tanque é posicionado diretamente frame a frame enquanto o
+  joystick é segurado (`setLaneLivePosition`/`setLaneRoaming`, sem
+  lerp/patrulha nesse momento). HP/nome/status ficam em HTML posicionado
+  por cima via projeção de câmera (`projectLane`) — não são modelos 3D
 - `src/main.js` — entrada: wiring de DOM e o **loop de tempo real**
   (`requestAnimationFrame`) que regenera energia, tica status effects,
   chama a IA periodicamente e atualiza a UI — nada de handoff de turno
@@ -306,7 +330,6 @@ errada.
 
 ## Próximos passos
 
-- Levar o Axie 3D também pro tabuleiro de duelo (hoje só o team picker usa).
 - Reduzir o tamanho do bundle JS (o toolkit 3D é o grosso dele) com
   code-splitting/import dinâmico.
 

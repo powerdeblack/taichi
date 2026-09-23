@@ -209,6 +209,13 @@ export function buildBoard(state, onUnitClick){
     you: state.youLanes.map(() => buildUnitTag()),
     rival: state.rivalLanes.map(() => buildUnitTag()),
   };
+  // The 3D models walk in from further back at match start (see
+  // board3d.js's introWalk) -- fade the name/HP tags in only once they've
+  // (roughly) arrived, instead of having them sit at the final formation
+  // spot while the visible model is still approaching from behind.
+  boardOverlay.classList.remove('overlay-intro');
+  void boardOverlay.offsetWidth;
+  boardOverlay.classList.add('overlay-intro');
   if (onUnitClick){
     ['you','rival'].forEach(side => {
       unitRefs[side].forEach((ref, i) => {

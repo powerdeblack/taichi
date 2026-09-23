@@ -38,6 +38,7 @@
       <div class="board" id="board">
         <canvas id="board3dCanvas"></canvas>
         <div class="board-overlay" id="boardOverlay"></div>
+        <div class="card-popup-layer" id="cardPopupLayer"></div>
       </div>
       <div class="banner" id="banner">Game over<span class="sub" id="bannerSub"></span></div>
     </div>
@@ -72,7 +73,7 @@
     </div>
   </div>
 
-  <p class="note">Concept prototype for the Vibeathon — real-time, no turns: both sides regenerate energy continuously and can play cards anytime. Tap any Axie on the board (yours or the rival's) to select it — glowing white ring — then tap a card in your hand to use it on that target: attack cards only work on a selected enemy in range, defense/heal cards work on either side (ally = normal effect, enemy = reversed — Vulnerable instead of a shield, damage instead of healing). The Tank sits in the center with a taunt radius: attack from the front line and you're forced to hit it. Hold the joystick to roam the Tank freely — the other 4 escort it, staying in formation around wherever it goes — or use "Move an Axie" (a few seconds' cooldown) to swap any two of your own.</p>
+  <p class="note">Concept prototype for the Vibeathon — a Lunacia dueling hall, real-time, no turns: both squads walk in from a distance when the duel starts, both sides regenerate energy continuously and can play cards anytime. Tap any Axie on the board (yours or the rival's), or its HP bar directly, to select it — glowing white ring — then tap a card in your hand to use it on that target: attack cards only work on a selected enemy in range, defense/heal cards work on either side (ally = normal effect, enemy = reversed — Vulnerable instead of a shield, damage instead of healing). Every played card pops up its own name/icon on the board, and hit/heal/status text now lingers longer so the action's easier to follow. The Tank sits in the center with a taunt radius: attack from the front line and you're forced to hit it. Hold the joystick to roam the Tank freely — the other 4 escort it, staying in formation around wherever it goes — or use "Move an Axie" (a few seconds' cooldown) to swap any two of your own.</p>
 </div>
 
 <script type="module" src="/src/main.js"></script>

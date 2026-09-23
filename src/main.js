@@ -149,6 +149,7 @@ function updateMoveBtn(){
 function applyResultFx(result){
   if (!result) return;
   const { side, card, casterIndex } = result;
+  render.spawnCardPopup(card, side);
 
   if (card.role === 'defense' || card.role === 'heal'){
     if (result.targetIndex === -1){
