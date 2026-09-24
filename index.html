@@ -2,8 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Axie Duel</title>
+  <!-- Installable: "Add to Home Screen" opens it with no browser bars
+       (the only way to get a full screen on iPhone, which has no
+       Fullscreen API for pages). -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <meta name="theme-color" content="#241a12">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Axie Duel">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
@@ -34,13 +45,8 @@
       <canvas id="preview3dCanvas"></canvas>
       <div class="preview3d-label" id="preview3dLabel">Click an Axie to see it in 3D</div>
     </div>
-    <div class="section-label">Archetypes &amp; meta</div>
-    <p class="meta-note" id="metaNote"></p>
+    <div class="section-label">Archetypes — ready-made teams</div>
     <div class="arch-row" id="archetypeRow"></div>
-    <details class="meta-matrix">
-      <summary>Full matchup table — who beats whom</summary>
-      <div id="metaMatrix"></div>
-    </details>
     <div class="effect-legend">
       <span><b>🩸 Bleed</b> each hit adds a stack (max 3); every 2s tick deals 4 per stack, for 3 ticks.</span>
       <span><b>☠️ Poison</b> each hit adds 3 stacks (max 9); a tick deals 2 per stack, then fades by 1.</span>
@@ -88,6 +94,7 @@
           <span id="discardPileCount">Discard: 0</span>
         </div>
         <button class="mute-btn" id="muteBtn" type="button" aria-label="Mute sound">🔊</button>
+        <button class="mute-btn hidden" id="fullscreenBtn" type="button" aria-label="Full screen">⛶</button>
       </div>
       <div class="hint" id="hint">Choose a card to play.</div>
       <div class="play-row">
@@ -126,14 +133,14 @@
       <p>The duel runs in real time — no turns, energy just keeps regenerating. Tap any Axie on the board (yours or the rival's), or its HP bar, to select it — a white ring shows the pick, and it stays selected until you tap a different Axie, so you can chain several cards on the same target — then tap a card in your hand to use it on that target. Attack cards need the target within range: short range only reaches an enemy within actual contact distance of your Axie right now, long range reaches anyone alive. Defense/Heal cards work on either side: cast on an ally for the normal effect, or on an enemy to reverse it (a shield becomes Vulnerable, a heal becomes damage).</p>
 
       <h3>3. Holding a card: range and misses</h3>
-      <p>Press and hold a card to aim: a ring on the snow shows how far it reaches from the Axie that owns it, and a line shows who it will hit — your selected enemy, or the nearest one if you haven't picked. <b>Green</b> = in range, <b>red</b> = out of range. The card fires when you let go; an attack released out of range <b>misses and is spent</b>, so walk closer first. Defense/Heal cards have no range limit.</p>
+      <p>Press and hold a card to aim: a ring on the snow shows how far it reaches from the Axie that owns it, and a line shows who it will hit — your selected enemy if the card reaches it, otherwise the nearest enemy it does reach. <b>Green</b> = in range, <b>red</b> = out of range. The card fires when you let go; an attack released out of range <b>misses and is spent</b>, so walk closer first. Defense/Heal cards have no range limit.</p>
       <p>Every card takes about <b>5 seconds</b>: it charges on its Axie, flies to the target and only then lands. Until those 5 seconds pass you can't play another card. The rival plays by the same rule — watch the bar over its Axies to see its next hit coming.</p>
 
       <h3>4. Effects and archetypes</h3>
       <p><b>🩸 Bleed</b> stacks up to 3 and deals 4 per stack every 2s tick for 3 ticks. <b>☠️ Poison</b> adds 3 stacks per hit (max 9), deals 2 per stack each tick and fades by one. <b>⚔️ Damage</b> is the direct hit of an attack card. <b>💚 Heal</b> restores HP right away (stronger with more MP); <b>Regen</b> heals a little every tick. The Archetypes on the team screen are ready-made squads built around one of these — tap "Use this team" to load one, then tweak it if you like.</p>
 
-      <h3>5. Meta, counters and the Blizzard</h3>
-      <p>The Archetypes are ranked from thousands of simulated duels: <b>S</b> is the current meta, a <b>counter-meta</b> team is the best answer from outside the meta to an S team, and each card lists who it beats and who counters it (open the matchup table for the numbers). After <b>2 minutes</b> a <b>Blizzard</b> hits every Axie each tick (harder every 15s) and halves all healing. The match always ends by <b>3:20</b>: if both Tanks are still standing, the one with more HP left wins. The clock next to your energy counts down.</p>
+      <h3>5. The Blizzard and the 3:20 limit</h3>
+      <p>After <b>2 minutes</b> a <b>Blizzard</b> hits every Axie each tick (harder every 15s) and halves all healing. The match always ends by <b>3:20</b>: if both Tanks are still standing, the one with more HP left wins. The clock next to your energy counts down. Which team beats which is up to you to find out.</p>
 
       <h3>6. Tank, Taunt, and movement</h3>
       <p>The Tank sits at the center and "taunts" — anyone attacking from close to it is forced to hit the Tank instead of picking freely, win or lose. Hold the joystick to walk the Tank anywhere on the snowfield; the other 2 Axies escort it automatically, keeping formation around wherever it goes. Use "Move an Axie" (a short cooldown) to swap two of your own lanes instead — handy for ducking out of Taunt range or lining up a short-range hit.</p>

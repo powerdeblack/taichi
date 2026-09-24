@@ -114,6 +114,9 @@ export function initBoard3D(canvas){
   buildTauntRings();
   resizeBoard3D();
   window.addEventListener('resize', resizeBoard3D);
+  // The board's size follows the page layout (full-screen duel, rotation),
+  // not just the window -- keep the render size in step with the canvas.
+  if (window.ResizeObserver) new ResizeObserver(resizeBoard3D).observe(canvas);
   if (!loopStarted){
     loopStarted = true;
     requestAnimationFrame(animate);

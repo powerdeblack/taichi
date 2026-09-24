@@ -112,10 +112,12 @@ npm run preview
   alcance, **vermelho** = fora; os inimigos alcançáveis brilham em verde
   (`.unit-chip.in-range`). A carta **dispara ao soltar** — um ataque solto
   com o alvo fora do alcance **erra e a carta é gasta** ("MISS! Out of
-  range", `game.js`'s `playerPlayCard`/`result.missed`). Alvo de ataque: o
-  inimigo selecionado, senão o inimigo mais próximo (`nearestEnemy`);
-  quem está dentro do raio de Provocação do Tanque inimigo sempre mira no
-  Tanque. Cartas de **Defesa/Cura** não têm limite de alcance: aliado
+  range", `result.missed`). Alvo de ataque: o inimigo selecionado **se a
+  carta alcança ele**; senão, o inimigo mais próximo que ela alcança (um
+  alvo marcado lá longe não faz todo ataque errar enquanto tem outro
+  inimigo do seu lado); só quando ninguém está no alcance ela mira (e
+  erra) no selecionado/mais próximo. Quem está dentro do raio de
+  Provocação do Tanque inimigo sempre mira no Tanque. Cartas de **Defesa/Cura** não têm limite de alcance: aliado
   selecionado = efeito normal, inimigo = **revertido** (Cura Reversa, igual
   ao Origin — Guarda/Bulwark/Barreira/Evasão/Espinhos viram
   **Vulnerável**, Cura/Regeneração viram **dano/DOT**); sem seleção, vai no
@@ -167,25 +169,22 @@ npm run preview
   cura) e 🧪 Blood & Venom (Bleed + Poison juntos). "Use this team" carrega
   o time inteiro; dá pra ajustar depois. O rival sempre entra com um
   arquétipo (diferente do seu quando possível).
-- **Meta e contra-meta (simulado, não chutado)**: `scripts/simulate-meta.mjs`
-  (`npm run meta`) joga **todos os arquétipos contra todos** com o motor
-  real (`game.js`) e a **mesma IA** do rival (`ai.js`) dos dois lados — 400
-  duelos por par, metade de cada lado do tabuleiro, semente fixa (sempre
-  gera o mesmo resultado) — e grava `src/metaData.js`: matriz de vitórias,
-  taxa de vitória geral, **tier** por ranking (S = top 2 = o meta, depois
-  A/B/C), **"Beats"** (vence o confronto em ≥55%), **"Countered by"** e
-  **contra-meta** (pra cada time S, a melhor resposta de fora do tier S — o que mais vence contra ele, desde que vença mais de 50%). A tela mostra
-  os arquétipos nessa ordem com selo de tier, % de vitória, 🏆 META ou
-  🎯 COUNTER-META, e uma **tabela de confrontos** (escala divergente: azul =
-  a linha vence, vermelho = perde, cinza = equilibrado; toque numa célula
-  pra ler o confronto). Rodar de novo depois de mexer em cartas/regras
-  atualiza tudo. Pra chegar num meta equilibrado (41–57% de vitória, sem
-  time invencível) a simulação expôs e levou a: IA que não reaplica uma
-  defesa ainda ativa e põe defesas no aliado mais ferido (Espinhos no
-  Tanque), Espinhos mais fortes (60% dos próximos 3 golpes), uma
-  carta-assinatura nova do Sacerdote nativo (**Purificação**: remove
-  Bleed/Poison/Deathmark e dá Bulwark — a IA só usa em quem tem DOT), e a
-  Nevasca (abaixo).
+- **Meta escondido (a galera descobre)**: o jogo **não mostra** qual
+  arquétipo é o meta, quem vence quem nem taxas de vitória — só o estilo
+  e o "como funciona" de cada time. O balanceamento é feito fora do jogo
+  com `scripts/simulate-meta.mjs` (`npm run meta`), que joga **todos os
+  arquétipos contra todos** com o motor real (`game.js`) e a **mesma IA**
+  do rival (`ai.js`) dos dois lados — 400 duelos por par, metade de cada
+  lado do tabuleiro, semente fixa — e grava um relatório só pra quem
+  desenvolve em `scripts/meta-results.json` (matriz de vitórias, tier por
+  ranking, quem vence quem com ≥55%, e contra-meta = a melhor resposta de
+  fora do tier S pra cada time S). Esse relatório não entra no jogo
+  publicado. Pra chegar num meta equilibrado (39–59% de vitória, sem time
+  invencível) a simulação expôs e levou a: IA que não reaplica uma defesa
+  ainda ativa e põe defesas no aliado mais ferido (Espinhos no Tanque),
+  Espinhos mais fortes (60% dos próximos 3 golpes), uma carta-assinatura
+  nova do Sacerdote nativo (**Purificação**: remove Bleed/Poison/Deathmark
+  e dá Bulwark — a IA só usa em quem tem DOT), e a Nevasca (abaixo).
 - **IA por alcance**: `ai.js` serve pros dois lados. Times com maioria de
   cartas curtas avançam até encostar; times de longe mantêm distância de
   alcance longo e recuam se o inimigo chega perto (kite)
@@ -235,6 +234,21 @@ npm run preview
   alvo e fanfarra de vitória/derrota. O áudio só liga depois do primeiro
   toque (regra dos navegadores), e o botão 🔊/🔇 ao lado da energia
   silencia tudo (lembrado entre sessões via `localStorage`).
+- **Duelo sempre cabe na tela, sem rolar**: durante o duelo a página vira
+  uma tela só (`body.in-duel`, altura `100dvh`, sem título da página). Em
+  pé (e em tablets/telas altas) o tabuleiro estica pra ocupar o espaço que
+  sobra acima dos controles, e Revanche/Trocar time viram botões pequenos
+  no canto do tabuleiro; em celular estreito o contador Deck/Discard some e
+  as barrinhas de energia encolhem pra caber o relógio, o som e o botão de
+  tela cheia. Testado sem rolagem em 390×844, 360×640, 844×390, 667×375 e
+  1024×768. Os controles respeitam o notch (`env(safe-area-inset-*)`).
+- **Tela cheia**: em celular/tablet, começar um duelo já pede **tela cheia
+  de verdade** (some a barra do navegador) e trava na horizontal quando o
+  aparelho deixa; o botão ⛶ ao lado do som liga/desliga. No **iPhone** o
+  Safari não deixa página nenhuma entrar em tela cheia, então o jogo é
+  **instalável**: Compartilhar → "Adicionar à Tela de Início" abre sem
+  nenhuma barra (`public/manifest.webmanifest` com `display: fullscreen`,
+  ícone `public/icon.svg`, meta tags da Apple).
 - **Modo paisagem (celular deitado)**: abaixo de `520px` de altura em
   paisagem (`@media (orientation:landscape) and (max-height:520px)`), o
   duelo vira um **HUD flutuante sobre o tabuleiro em tela cheia** em vez
@@ -378,8 +392,9 @@ Ainda não implementado:
   `main.js` — joga 1 carta afordável; ataques só se alguém estiver no
   alcance (mira via `pickAutoTarget`). O movimento do rival fica no
   `main.js` (`pickAiWanderMove`, que se aproxima do seu time)
-- `src/metaData.js` — **gerado** por `npm run meta` (não editar à mão):
-  matriz de vitórias, tiers, counters e contra-metas dos arquétipos
+- `scripts/meta-results.json` — **gerado** por `npm run meta`: relatório
+  de balanceamento (matriz de vitórias, tiers, counters, contra-metas).
+  Só pra desenvolvimento; o jogo não usa nem mostra
 - `src/tutorial.js` — o duelo guiado (balão, foco, passos que esperam a
   ação do jogador)
 - `scripts/simulate-meta.mjs` — o simulador de meta (400 duelos por par)

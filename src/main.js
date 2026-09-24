@@ -7,7 +7,6 @@ import * as render from './render.js';
 import { aiBeginCard, aiMoveIntent } from './ai.js';
 import { initPreview, showAxie } from './axie3d.js';
 import * as sfx from './sfx.js';
-import { META } from './metaData.js';
 import { createTutorial, tutorialDone, tutorialDismissed, dismissTutorialInvite } from './tutorial.js';
 
 const deckScreen = document.getElementById('deckScreen');
@@ -51,7 +50,7 @@ function renderTeamScreen(){
     const arch = ARCHETYPES.find(a => a.id === loadedArchetype);
     if (JSON.stringify(arch.picks) !== JSON.stringify(squad)) loadedArchetype = null;
   }
-  ui.renderArchetypes(ARCHETYPES, AXIES, CARD_SETS, useArchetype, loadedArchetype, META);
+  ui.renderArchetypes(ARCHETYPES, AXIES, CARD_SETS, useArchetype, loadedArchetype);
   ui.renderRoster(AXIES, squad, addToSquad);
   ui.renderSquad(squad, AXIES, CARD_SETS, { onAdjust: adjustCount, onToggleTank: toggleTank, onToggleEvolve: toggleEvolve, onSetChange: changeSet, onRemove: removeFromSquad });
   ui.renderSquadHeader(squad, game.SQUAD_SIZE);
@@ -123,9 +122,52 @@ function previewClass(classId){
     });
 }
 
-startDuelBtn.addEventListener('click', () => {
+// The duel takes over the whole screen (no page title, no scrolling);
+// the team builder is a normal scrolling page.
+function showDuelScreen(){
   deckScreen.classList.add('hidden');
   duelScreen.classList.remove('hidden');
+  document.body.classList.add('in-duel');
+  window.scrollTo(0, 0);
+  // On phones/tablets, starting a duel (a tap = a user gesture, which the
+  // Fullscreen API requires) also hides the browser bars and prefers
+  // landscape. Desktop keeps its window; the ⛶ button toggles either way.
+  if (window.matchMedia('(pointer: coarse)').matches) enterFullscreen();
+}
+
+// ================= Full screen =================
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+const canFullscreen = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+function isFullscreen(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+function enterFullscreen(){
+  if (!canFullscreen || isFullscreen()) return;
+  const el = document.documentElement;
+  const req = el.requestFullscreen ? el.requestFullscreen({ navigationUI: 'hide' }) : el.webkitRequestFullscreen?.();
+  Promise.resolve(req)
+    .then(() => screen.orientation?.lock?.('landscape'))
+    .catch(() => { /* refused or unsupported: stay as is */ });
+}
+function exitFullscreen(){
+  if (!isFullscreen()) return;
+  (document.exitFullscreen || document.webkitExitFullscreen)?.call(document)?.catch?.(() => {});
+}
+function renderFullscreenBtn(){
+  fullscreenBtn.classList.toggle('hidden', !canFullscreen);
+  fullscreenBtn.textContent = isFullscreen() ? '🡼' : '⛶';
+  fullscreenBtn.setAttribute('aria-label', isFullscreen() ? 'Exit full screen' : 'Full screen');
+}
+fullscreenBtn.addEventListener('click', () => (isFullscreen() ? exitFullscreen() : enterFullscreen()));
+document.addEventListener('fullscreenchange', renderFullscreenBtn);
+document.addEventListener('webkitfullscreenchange', renderFullscreenBtn);
+renderFullscreenBtn();
+function showTeamScreen(){
+  duelScreen.classList.add('hidden');
+  deckScreen.classList.remove('hidden');
+  document.body.classList.remove('in-duel');
+}
+
+startDuelBtn.addEventListener('click', () => {
+  showDuelScreen();
   // The rival fields one of the archetypes too (a different one when
   // possible), so every duel is a clash of two real synergies.
   const pool = ARCHETYPES.filter(a => a.id !== loadedArchetype);
@@ -134,8 +176,7 @@ startDuelBtn.addEventListener('click', () => {
 });
 switchDeckBtn.addEventListener('click', () => {
   endTutorial();
-  duelScreen.classList.add('hidden');
-  deckScreen.classList.remove('hidden');
+  showTeamScreen();
 });
 
 // ================= Tutorial =================
@@ -167,8 +208,7 @@ function endTutorial(){
   renderTutorialCta();
 }
 function startTutorial(){
-  deckScreen.classList.add('hidden');
-  duelScreen.classList.remove('hidden');
+  showDuelScreen();
   const you = copyArchetypePicks(ARCHETYPES.find(a => a.id === 'damage'));
   const rival = copyArchetypePicks(ARCHETYPES.find(a => a.id === 'deathmark'));
   beginMatch(you, rival);
@@ -449,11 +489,19 @@ function aimFor(card){
   const caster = card.laneIndex;
   if (card.role === 'attack'){
     const taunt = game.tauntedBy(state, 'you', caster);
+    const legal = game.getLegalTargets(state, 'you', card, caster);
+    const selected = selectedTarget && selectedTarget.side === 'rival' ? selectedTarget.laneIndex : -1;
+    // Selected enemy if this card reaches it; otherwise whoever it does
+    // reach (nearest first) -- a far-away sticky selection shouldn't make
+    // every attack miss while another enemy stands right next to you.
+    // Only when nobody is in reach does it aim (and miss) at the selected
+    // or nearest enemy.
     let targetIndex;
     if (taunt !== -1) targetIndex = taunt;
-    else if (selectedTarget && selectedTarget.side === 'rival') targetIndex = selectedTarget.laneIndex;
-    else targetIndex = game.nearestEnemy(state, 'you', caster);
-    const legal = game.getLegalTargets(state, 'you', card, caster);
+    else if (selected >= 0 && legal.includes(selected)) targetIndex = selected;
+    else if (legal.length) targetIndex = legal.reduce((best, i) =>
+      game.distanceBetween(state, 'you', caster, 'rival', i) < game.distanceBetween(state, 'you', caster, 'rival', best) ? i : best, legal[0]);
+    else targetIndex = selected >= 0 ? selected : game.nearestEnemy(state, 'you', caster);
     return { targetSide: 'rival', targetIndex, legal, taunted: taunt !== -1,
       inRange: targetIndex >= 0 && legal.includes(targetIndex) };
   }
