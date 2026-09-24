@@ -54,7 +54,7 @@ export function renderArchetypes(archetypes, axies, sets, onUse, activeId){
       return `<div class="arch-member">
         ${portraitHTML(p.classId, axie.color, 'arch-portrait')}
         <div class="arch-member-set" style="color:${set.color}">${set.icon} ${set.name}</div>
-        ${p.isTank ? '<div class="arch-tank">🎯 Tank</div>' : ''}
+        ${p.isTank ? '<div class="arch-tank">🛡️ Tank</div>' : ''}
       </div>`;
     }).join('');
     card.innerHTML = `
@@ -94,7 +94,7 @@ export function renderSquad(squad, axies, sets, { onAdjust, onToggleTank, onTogg
         <div class="squad-slot-name">
           ${axie.name}${pick.evolved ? '<span class="role-badge evolved">+</span>' : ''}
           <span class="set-tag" style="color:${set.color}">${set.icon} ${set.name}${set.nativeClassId===pick.classId ? ' ⭐' : ''}</span>
-          <button type="button" class="tank-toggle${pick.isTank?' active':''}" title="Mark as Tank">${pick.isTank ? '🎯 TANK' : 'mark as Tank'}</button>
+          <button type="button" class="tank-toggle${pick.isTank?' active':''}" title="Mark as Tank">${pick.isTank ? '🛡️ TANK' : 'mark as Tank'}</button>
           <button type="button" class="evolve-toggle${pick.evolved?' active':''}" title="Evolve this Axie's loadout (+15% power/HP/MP)">${pick.evolved ? '✦ Evolved' : 'evolve (+)'}</button>
         </div>
         <div class="micro-label">Card set</div>
@@ -371,7 +371,7 @@ export function markMoveSource(side, laneIndex, on){
 function updateUnit(ref, lane, side, laneIndex){
   if (!ref) return;
   const { attack, defense, heal } = lane.counts;
-  ref.nameEl.innerHTML = `${lane.name}${lane.evolved ? '<span class="role-badge evolved">+</span>' : ''}${lane.isTank ? '<span class="role-badge tank">🎯</span>' : ''}`;
+  ref.nameEl.innerHTML = `${lane.name}${lane.evolved ? '<span class="role-badge evolved">+</span>' : ''}${lane.isTank ? '<span class="role-badge tank">🛡️</span>' : ''}`;
   ref.hpFill.style.width = Math.max(0, lane.hp/lane.maxHp*100) + '%';
   ref.mpEl.textContent = `MP ${lane.mp} · ⚔️${attack} 🛡️${defense} 💚${heal}`;
   ref.statusEl.innerHTML = Object.keys(lane.status)

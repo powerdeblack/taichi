@@ -150,8 +150,9 @@ npm run preview
   inteiro (Tanque + os 2 que escoltam, em formação) por **toda a arena de
   neve**, os dois lados do campo (`ARENA`, limites em unidades do
   tabuleiro; o limite do lado da câmera é mais curto pra seu time não
-  ficar embaixo do HUD). Ninguém atravessa um Axie inimigo — o esquadrão é
-  empurrado de volta pra `MIN_SEPARATION`. O rival também anda: na maior
+  ficar embaixo do HUD; o fundo também é limitado pra ninguém sumir atrás
+  da barra de energia). Os esquadrões **não se bloqueiam**: dá pra passar
+  por dentro e por trás do rival sem travar. O rival também anda: na maior
   parte do tempo **se aproxima** do seu time (os ataques dele também
   precisam de alcance), às vezes desvia ou para (`pickAiWanderMove`), e só
   gasta cartas de ataque que alcançam alguém naquele momento (`ai.js`).

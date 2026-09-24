@@ -397,6 +397,17 @@ h1{
   transition:background .15s ease, opacity .3s ease, box-shadow .15s ease;
   pointer-events:auto; cursor:pointer;
 }
+/* The current target (ally or enemy) gets a bobbing 🎯 above its tag. */
+.unit-chip.selected-target::before{
+  content:'🎯'; position:absolute; left:50%; top:-26px; transform:translateX(-50%);
+  font-size:1.25rem; line-height:1; filter:drop-shadow(0 2px 3px #000a);
+  animation:target-bob 1s ease-in-out infinite; pointer-events:none;
+}
+@keyframes target-bob{
+  0%,100%{ transform:translate(-50%, 0); }
+  50%{ transform:translate(-50%, -4px); }
+}
+@media (prefers-reduced-motion: reduce){ .unit-chip.selected-target::before{ animation:none; } }
 .unit-chip.selected-target{
   box-shadow:0 0 0 2px #e8f2ff, 0 0 12px 3px #e8f2ffa0;
   animation:selected-target-pulse 1s ease-in-out infinite;
@@ -689,11 +700,14 @@ h1{
   }
   .pile-counts{ display:none; }
   .energy-label{ display:none; }
+  /* The hint sits in the free strip between the joystick and the cards,
+     so the top of the board (where the far squad stands) stays clear. */
   .hint{
-    position:absolute; top:46px; left:50%; transform:translateX(-50%); z-index:6;
-    margin:0; max-width:42%; min-height:0;
+    position:absolute; z-index:6; margin:0; min-height:0;
+    left:calc(112px + env(safe-area-inset-left, 0px)); bottom:calc(10px + env(safe-area-inset-bottom, 0px));
+    max-width:calc(100% - 112px - 350px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
     background:#1c130cb0; border-radius:10px; padding:4px 10px;
-    text-align:center; font-size:.6rem; line-height:1.25;
+    text-align:left; font-size:.6rem; line-height:1.25;
   }
   .play-row{
     position:absolute; z-index:6;

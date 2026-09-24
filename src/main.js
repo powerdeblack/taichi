@@ -538,7 +538,7 @@ function updateAim(){
     const onSelf = a.targetSide === 'you';
     ui.setHint(`${card.name} → ${onSelf ? 'your' : "the rival's"} ${target.name}${onSelf ? '' : ' (reversed!)'} — release to use.`);
   } else if (a.taunted){
-    ui.setHint(`🎯 Taunted! ${card.name} can only hit the enemy Tank — release to strike.`);
+    ui.setHint(`🛡️ Taunted! ${card.name} can only hit the enemy Tank — release to strike.`);
   } else if (a.inRange){
     ui.setHint(`✅ ${target.name} is in range — release to strike!`);
   } else {

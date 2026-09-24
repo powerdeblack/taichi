@@ -18,11 +18,11 @@ const youTankChip = (state) => {
 
 const STEPS = [
   { advance: 'next', focus: youTankChip,
-    text: 'Welcome to the snowfield! These 3 are your squad. The one marked 🎯 is your <b>Tank</b> — if it falls, you lose. Knock out the rival\'s Tank to win.' },
+    text: 'Welcome to the snowfield! These 3 are your squad. The one marked 🛡️ is your <b>Tank</b> — if it falls, you lose. Knock out the rival\'s Tank to win.' },
   { advance: 'moved', focus: () => [document.getElementById('joystickBase')],
     text: '<b>Move:</b> hold the joystick and drag. Your whole squad walks together — anywhere on the snow. Walk a little now.' },
   { advance: 'selected', focus: rivalChips,
-    text: '<b>Pick a target:</b> tap one of the rival\'s Axies (or its HP bar). A white ring marks it and stays until you tap someone else.' },
+    text: '<b>Pick a target:</b> tap one of the rival\'s Axies (or its HP bar). A 🎯 appears over it and stays until you tap someone else.' },
   { advance: 'aiming', focus: () => [document.getElementById('hand')],
     text: '<b>Aim:</b> press and <b>hold</b> a card. A ring on the snow shows how far it reaches — <b>green</b> means your target is in range, <b>red</b> means too far.' },
   { advance: 'landed', focus: () => [document.getElementById('hand')],
@@ -30,7 +30,7 @@ const STEPS = [
   { advance: 'next', rival: true, focus: rivalChips,
     text: 'Now the rival fights back! Watch the <b>bar above its Axies</b> — it shows which card is coming. Tip: Heal and Defense cards work on your own Axies too — select one of yours first.' },
   { advance: 'next', rival: true, focus: () => [],
-    text: 'Finish it: bring down the rival\'s 🎯 Tank! At 2:00 a <b>Blizzard</b> hurts everyone and halves healing, and at <b>3:20</b> the match ends — the Tank with more HP left wins. The clock at the top shows how long you have. Good luck!' },
+    text: 'Finish it: bring down the rival\'s 🛡️ Tank! At 2:00 a <b>Blizzard</b> hurts everyone and halves healing, and at <b>3:20</b> the match ends — the Tank with more HP left wins. The clock at the top shows how long you have. Good luck!' },
 ];
 
 export function tutorialDone(){

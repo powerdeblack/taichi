@@ -254,41 +254,22 @@ export function tickMoveCooldown(state, dt){
 
 // The joystick (and the rival's wander): moves the whole squad by (dx,dz)
 // in its own facing space. The squad center can go anywhere inside the
-// arena circle (the whole snowfield in view, both halves), but no Axie can
-// walk through an enemy -- the squad is pushed back to MIN_SEPARATION.
-// Squad-center bounds in world units: wide left/right, and a shallower
-// limit toward the camera so your own squad never walks under the HUD.
-export const ARENA = { xMin: -4.4, xMax: 4.4, zMin: -3.6, zMax: 2.6 };
-export const MIN_SEPARATION = 0.9;
+// arena (the whole snowfield in view, both halves). Squads don't block
+// each other: they can walk past and around enemy Axies freely, so
+// nobody gets stuck behind an opponent.
+// Squad-center bounds in world units: wide left/right, and limits at both
+// ends of the field so no squad walks under the HUD bars (top: energy and
+// clock; bottom: joystick and cards).
+export const ARENA = { xMin: -4.4, xMax: 4.4, zMin: -2.1, zMax: 2.6 };
 export function moveSquadWithTank(state, side, dx, dz){
   const lanes = lanesOf(state, side);
   const tank = lanes.find(l => l.isTank && l.alive);
   if (!tank) return;
   const anchor = squadAnchor(lanes);
   anchor.x += dx; anchor.z += dz;
-  let w = worldPos(side, { localPos: anchor });
+  const w = worldPos(side, { localPos: anchor });
   w.x = Math.min(ARENA.xMax, Math.max(ARENA.xMin, w.x));
   w.z = Math.min(ARENA.zMax, Math.max(ARENA.zMin, w.z));
-
-  // No Axie of this squad can walk through an enemy Axie: push the whole
-  // squad back until every pair is at least MIN_SEPARATION apart.
-  const enemySide = other(side);
-  const enemies = lanesOf(state, enemySide).filter(e => e.alive).map(e => worldPos(enemySide, e));
-  for (let pass = 0; pass < 3; pass++){
-    const a = localFromWorld(side, w);
-    lanes.forEach(lane => {
-      if (!lane.alive) return;
-      const off = FORMATION_XZ[lane.col];
-      const lw = worldPos(side, { localPos: { x: a.x + off.x, z: a.z + off.z } });
-      enemies.forEach(ew => {
-        const d = dist(lw, ew);
-        if (d < MIN_SEPARATION && d > 1e-4){
-          const push = (MIN_SEPARATION - d) / d;
-          w = { x: w.x + (lw.x - ew.x) * push, z: w.z + (lw.z - ew.z) * push };
-        }
-      });
-    });
-  }
   placeSquad(lanes, localFromWorld(side, w));
 }
 
