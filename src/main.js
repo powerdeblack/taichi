@@ -42,7 +42,7 @@ function useArchetype(arch){
   squad = copyArchetypePicks(arch);
   loadedArchetype = arch.id;
   renderTeamScreen();
-  previewClass(squad.find(p => p.isTank).classId);
+  previewPick(squad.find(p => p.isTank));
 }
 
 function renderTeamScreen(){
@@ -73,13 +73,14 @@ function addToSquad(classId){
     counts: { ...set.defaultCounts },
   });
   renderTeamScreen();
-  previewClass(classId);
+  previewPick(squad[squad.length - 1]);
 }
 function changeSet(idx, setId){
   const set = setById(setId);
   squad[idx].setId = setId;
   squad[idx].counts = { ...set.defaultCounts };
   renderTeamScreen();
+  previewPick(squad[idx]);
 }
 function adjustCount(idx, cat, delta){
   const counts = squad[idx].counts;
@@ -97,6 +98,7 @@ function toggleTank(idx){
 function toggleEvolve(idx){
   squad[idx].evolved = !squad[idx].evolved;
   renderTeamScreen();
+  previewPick(squad[idx]);
 }
 function removeFromSquad(idx){
   const wasTank = squad[idx].isTank;
@@ -110,12 +112,17 @@ renderTeamScreen();
 const preview3dCanvas = document.getElementById('preview3dCanvas');
 const preview3dLabel = document.getElementById('preview3dLabel');
 let preview3dReady = null;
-function previewClass(classId){
+// Shows one squad pick in 3D: its class colour, its card set's weapon and,
+// when Evolved, the Mystic look.
+function previewPick(pick){
+  const { classId, setId, evolved } = pick;
+  const set = setById(setId);
+  const label = `${classId}${set ? ' · ' + set.icon + ' ' + set.name : ''}${evolved ? ' · ✨ Mystic' : ''}`;
   preview3dLabel.textContent = `Loading ${classId} in 3D...`;
   if (!preview3dReady) preview3dReady = initPreview(preview3dCanvas);
   preview3dReady
-    .then(() => showAxie(classId))
-    .then(() => { preview3dLabel.textContent = classId; })
+    .then(() => showAxie(classId, { setId, evolved }))
+    .then(() => { preview3dLabel.textContent = label; })
     .catch((err) => {
       console.error('3D preview failed:', err);
       preview3dLabel.textContent = '3D preview unavailable';
@@ -379,6 +386,8 @@ function applyResultFx(result){
     sfx.playDodge();
   } else {
     attackCinematic(result);
+    // Heavy blows stagger the target (stun clip), the rest flinch.
+    ui.playLaneAction(result.targetSide, result.targetIndex, result.dmg >= 30 || result.ambush ? 'stun' : 'hit');
     sfx.playAttack(card, result.dmg);
     playKOIfDied(result.targetSide, result.targetIndex);
     render.flashHit(el);
@@ -399,6 +408,7 @@ function applyResultFx(result){
     render.spawnFloatingText(casterEl, '-'+result.thornReflected+' 🌵', 'text-dmg');
     ui.spawnImpact(result.side, result.casterIndex, 'hit');
     cine.thornSpikes(result.side, result.casterIndex);
+    ui.playLaneAction(result.side, result.casterIndex, 'hit');
     ui.hitSquash(result.side, result.casterIndex, 0.7);
     sfx.playBleed(0.15);
     playKOIfDied(result.side, result.casterIndex);
@@ -502,6 +512,11 @@ function finishMatch(){
   endTutorial();
   cine.letterbox(true);
   cine.slowMo(0.25, 1.6);
+  // The winning squad strikes its weapon's Skill pose.
+  if (state.winner === 'you' || state.winner === 'rival'){
+    const lanes = state.winner === 'you' ? state.youLanes : state.rivalLanes;
+    lanes.forEach((l, i) => { if (l.alive) setTimeout(() => ui.playLaneAction(state.winner, i, 'victory'), 500 + i * 150); });
+  }
   if (state.timeUp){
     if (state.winner === 'draw') ui.showBanner('Time up — draw!', 'Both Tanks ended with the same HP share.');
     else if (state.winner === 'you') ui.showBanner('Time up — you win!', 'Your Tank had more HP left at 3:20.');
@@ -698,6 +713,9 @@ function startCast(plan){
   const travels = !selfCast && plan.targetIndex >= 0;
   ui.startCastFX(id, plan.side, plan.casterIndex, castColor(plan.card), travels ? game.CAST_LAUNCH_AT : game.CAST_IMPACT_AT);
   sfx.playCastStart(plan.card);
+  // A self-cast never flies anywhere: the weapon's Skill pose plays as it
+  // charges instead.
+  if (!travels) ui.playLaneAction(plan.side, plan.casterIndex, 'skill');
   pendingCasts.push({ id, plan, age: 0, travels, launched: false });
   if (plan.side === 'you') ui.setHint(`⏳ Casting ${plan.card.name}…`);
   else if (!aiming) ui.setHint(`⚠️ The rival is casting ${plan.card.name}!`);
@@ -709,6 +727,8 @@ function tickPendingCasts(dt){
     if (c.travels && !c.launched && c.age >= game.CAST_LAUNCH_AT){
       c.launched = true;
       ui.launchCastFX(c.id, c.plan.targetSide, c.plan.targetIndex, game.CAST_IMPACT_AT - game.CAST_LAUNCH_AT, c.plan.missed, projectileStyle(c.plan.card));
+      // The caster swings its weapon as the shot leaves (toolkit clips).
+      ui.playLaneAction(c.plan.side, c.plan.casterIndex, c.plan.card.role === 'attack' ? 'attack' : 'skill');
       sfx.playLaunch(c.plan.card);
     }
     if (c.age < game.CAST_IMPACT_AT) return true;

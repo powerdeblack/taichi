@@ -161,6 +161,12 @@ h1{
 .roster-card:active{ transform:translateY(0) scale(.97); }
 .roster-card.at-cap:not(.selected){ opacity:.5; }
 .card-top{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px;}
+.card-face{
+  width:26px; height:26px; flex:0 0 auto; margin-right:4px; border-radius:50%;
+  background:radial-gradient(circle at 50% 40%, #ffffff30, #ffffff08); object-fit:cover;
+}
+.card-top .card-name{ flex:1 1 auto; min-width:0; }
+@media (orientation:portrait) and (max-width:520px){ .card-face{ display:none; } }
 .card-name{font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.82rem; line-height:1.05;}
 .card-cost{
   font-family:'Baloo 2',sans-serif; font-weight:800; font-size:.72rem;

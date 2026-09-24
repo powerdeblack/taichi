@@ -518,6 +518,35 @@ estilingue), mantido como referência histórica — não é mais o jogo atual.
 
 ## Axies 3D reais (Axie Mixer 3D)
 
+**O que o jogo usa do toolkit** (`src/axieLook.js`, compartilhado pelo
+tabuleiro e pela prévia do time):
+- **Cor de corpo por classe** — índice no catálogo de cores do toolkit
+  (`manifest.creator.colorVariants`): Beast laranja, Plant verde, Aqua azul,
+  Bug vermelho, Bird rosa, Reptile roxo (antes todos saíam brancos com
+  `colorVariant: 0`).
+- **Arma por conjunto de cartas** (`equipWeapon`): Guerreiro Sword,
+  Arqueiro Bow, Mago Staff, Ladino Dagger, Sacerdote Tome, Xamã Mala. Axie
+  **Evoluído** usa a arma de nível 3.
+- **Evoluído = Místico**: partes skin 1 (S01) com material brilhante e as
+  partículas místicas do toolkit (o catálogo de partículas vem compilado no
+  JS da biblioteca; só as texturas/materiais delas entram no pacote).
+- **Animações do toolkit**: ao soltar uma carta o Axie faz o golpe da arma
+  (`<Arma>.Attack` nos ataques, `<Arma>.Skill` em defesa/cura, na hora em
+  que o projétil sai; carta em si mesmo faz a Skill enquanto carrega); quem
+  apanha faz `Action.IdleGetHit`, golpe pesado (≥30, Ambush) faz
+  `Default.Stun`; nocaute toca `Default.Dead` antes do modelo sumir; o time
+  vencedor faz a Skill da arma no fim. Os Axies **andam/correm** de verdade
+  (walk/run da arma) enquanto o esquadrão se move, em vez de deslizar.
+- **Retratos 3D** (`renderAvatar`) de cada Axie da partida, com cor, arma e
+  brilho místico, no canto das cartas da mão (escondidos no retrato estreito
+  do celular pra não espremer o nome).
+- A prévia do time mostra a classe com a arma do conjunto escolhido e o
+  visual místico quando evoluído, alternando Attack/Skill de vitrine.
+
+Ficaram de fora de propósito: os outros 7 corpos (bigyak, sumo, fuzzy...)
+custam ~16-20MB de animações **cada** (sem compartilhar com o corpo
+normal), pesado demais pro celular.
+
 O team picker renderiza cada Axie como um modelo 3D real via
 `@jaatster/threejs-axie-mixer3d-public` (toolkit oficial do Sky Mavis pro
 Vibeathon), sem precisar de genes de carteira: `src/axie3d.js` monta um
@@ -527,8 +556,10 @@ e chama `mixer.create({ descriptor, ... })`.
 O pacote de assets oficial tem ~512MB (5.821 arquivos, todas as
 classes/variantes/níveis/armas). `public/assets/axie3d/` guarda só o
 subconjunto que os 6 Axies do roster usam — corpo "normal", as 36 partes
-(6 classes × olho/boca/orelha/chifre/costas/cauda) e as animações — uns
-37MB. O `manifest.json` ali é uma cópia **inteira e sem alterações** do
+(6 classes × olho/boca/orelha/chifre/costas/cauda) nas versões normal e
+Mística, as 6 armas (nível 1 e 3), as texturas das partículas místicas e as
+animações — uns 60MB em disco, mas o celular só baixa o que a partida usa
+(as texturas místicas só quando há um Axie Evoluído). O `manifest.json` ali é uma cópia **inteira e sem alterações** do
 oficial (o runtime valida a contagem exata de cada categoria e rejeita um
 manifest cortado), só os arquivos físicos é que foram reduzidos.
 

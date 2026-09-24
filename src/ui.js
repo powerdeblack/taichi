@@ -3,8 +3,8 @@
 import { MAX_ENERGY, LOADOUT_SIZE, SQUAD_SIZE, cardValues } from './game.js';
 import { portraitHTML } from './axieArt.js';
 import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive, moveLaneVisual, setLaneLivePosition, setLaneRoaming, spawnImpact as spawnImpact3D, setTauntRing, showAim, hideAim,
-  startCastFX, launchCastFX, landCastFX, clearCastsFX, setBlizzard, hitSquash, cinematics } from './board3d.js';
-export { setTauntRing, showAim, hideAim, startCastFX, launchCastFX, landCastFX, clearCastsFX, setBlizzard, hitSquash, cinematics };
+  startCastFX, launchCastFX, landCastFX, clearCastsFX, setBlizzard, hitSquash, cinematics, playLaneAction, getLanePortrait } from './board3d.js';
+export { setTauntRing, showAim, hideAim, startCastFX, launchCastFX, landCastFX, clearCastsFX, setBlizzard, hitSquash, cinematics, playLaneAction };
 
 const rosterGrid = document.getElementById('rosterGrid');
 const squadListEl = document.getElementById('squadList');
@@ -95,7 +95,7 @@ export function renderSquad(squad, axies, sets, { onAdjust, onToggleTank, onTogg
           ${axie.name}${pick.evolved ? '<span class="role-badge evolved">+</span>' : ''}
           <span class="set-tag" style="color:${set.color}">${set.icon} ${set.name}${set.nativeClassId===pick.classId ? ' ⭐' : ''}</span>
           <button type="button" class="tank-toggle${pick.isTank?' active':''}" title="Mark as Tank">${pick.isTank ? '🛡️ TANK' : 'mark as Tank'}</button>
-          <button type="button" class="evolve-toggle${pick.evolved?' active':''}" title="Evolve this Axie's loadout (+15% power/HP/MP)">${pick.evolved ? '✦ Evolved' : 'evolve (+)'}</button>
+          <button type="button" class="evolve-toggle${pick.evolved?' active':''}" title="Evolve this Axie: +15% power/HP/MP, Mystic look and a level-3 weapon">${pick.evolved ? '✦ Evolved' : 'evolve (+)'}</button>
         </div>
         <div class="micro-label">Card set</div>
         <div class="set-picker">
@@ -439,12 +439,15 @@ export function renderHand(state, { onPress, onRelease, onCancel, aimingUid, rev
     // A heal with the 🎯 on an enemy becomes Reverse Heal -- show it red,
     // with the damage it would deal, before the player lets go.
     const reversing = reverseHeals && card.role === 'heal';
+    // The owning Axie's rendered 3D portrait (colour, weapon, Mystic glow).
+    const portrait = getLanePortrait('you', card.laneIndex);
     const chips = cardValues(state, card, casterLane, reversing)
       .map(c => `<span class="val val-${c.kind}">${c.icon}<b>${c.text}</b></span>`).join('');
     div.className = 'card' + (!playable ? ' disabled' : '') + (card.uid === aimingUid ? ' aiming' : '') + (reversing ? ' reversing' : '');
     div.style.borderColor = card.color + '55';
     div.innerHTML = `
       <div class="card-top">
+        ${portrait ? `<img class="card-face" src="${portrait}" alt="">` : ''}
         <div class="card-name">${card.name}</div>
         <div class="card-cost">${card.cost}</div>
       </div>

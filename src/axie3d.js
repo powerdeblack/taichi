@@ -4,19 +4,7 @@
 // No genes/wallet lookup needed: we build an explicit AxieDescriptor per class.
 import * as THREE from 'three';
 import { createAxieMixer3D } from '@jaatster/threejs-axie-mixer3d-public';
-
-const NEED_TYPES = ['eye', 'mouth', 'ear', 'horn', 'back', 'tail'];
-// Our roster uses 'Aqua'; the asset pack's class id is 'Aquatic'.
-const CLASS_ALIAS = { Aqua: 'Aquatic' };
-
-function buildDescriptor(classId){
-  const cls = CLASS_ALIAS[classId] || classId;
-  return {
-    colorVariant: 0,
-    body: 'normal',
-    parts: NEED_TYPES.map(type => ({ type, skin: 0, class: cls, variant: 2, level: 1 })),
-  };
-}
+import { buildDescriptor, equipSetWeapon, weaponPrefix, playClip } from './axieLook.js';
 
 let renderer, scene, camera, clock, canvasEl;
 let mixerPromise = null;
@@ -70,20 +58,32 @@ export function initPreview(canvas){
   return ensureMixer();
 }
 
+// Showcase: every few seconds the previewed Axie swings its set's weapon,
+// alternating its Attack and Skill clips.
+let showcaseTimer = 1.2, showcaseStep = 0, currentWeapon = null;
 function animate(){
   requestAnimationFrame(animate);
   const dt = Math.min(0.05, clock.getDelta());
-  if (currentAxie && !currentAxie.disposed) currentAxie.update(dt);
+  if (currentAxie && !currentAxie.disposed){
+    currentAxie.update(dt);
+    showcaseTimer -= dt;
+    if (showcaseTimer <= 0 && currentWeapon){
+      showcaseTimer = 4;
+      playClip(currentAxie, `${currentWeapon}.${showcaseStep++ % 2 ? 'Skill' : 'Attack'}`);
+    }
+  }
   if (renderer && scene && camera) renderer.render(scene, camera);
 }
 
 // Swaps the previewed Axie. Guards against out-of-order async resolution
 // (rapid class switching) with a request id.
-export async function showAxie(classId){
+// `setId` equips that card set's weapon; `evolved` shows the Mystic version.
+export async function showAxie(classId, { setId = null, evolved = false } = {}){
   const requestId = ++currentRequestId;
   const mixer = await ensureMixer();
-  const descriptor = buildDescriptor(classId);
+  const descriptor = buildDescriptor(classId, { evolved });
   const axie = await mixer.create({ descriptor, quality: 'balanced', artMode: 'faithful', strict: true });
+  if (setId) await equipSetWeapon(axie, setId, evolved);
   if (requestId !== currentRequestId){
     axie.dispose();
     return;
@@ -93,6 +93,8 @@ export async function showAxie(classId){
     currentAxie.dispose();
   }
   currentAxie = axie;
+  currentWeapon = weaponPrefix(setId);
+  showcaseTimer = 1.2;
   scene.add(axie.wrapper);
   axie.setLocomotion('idle');
 }

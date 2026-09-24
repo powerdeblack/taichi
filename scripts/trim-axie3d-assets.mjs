@@ -15,7 +15,7 @@ const SRC_ASSETS = path.join(PKG, 'public/assets/axie');
 const OUT_ASSETS = path.join(ROOT, 'public/assets/axie3d');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(SRC_ASSETS, 'manifest.json'), 'utf8'));
-const { bodies, parts, textures, materials, shaders } = manifest.assets;
+const { bodies, parts, textures, materials, shaders, addons, weapons } = manifest.assets;
 
 const NEED_TYPES = ['eye', 'mouth', 'ear', 'horn', 'back', 'tail'];
 const CLASSES = ['Aquatic', 'Beast', 'Bird', 'Bug', 'Plant', 'Reptile'];
@@ -42,17 +42,30 @@ function pullMaterial(materialId) {
     const tex = textures[texId];
     if (!tex) { console.warn('missing texture', texId); continue; }
     usedTextures[texId] = tex;
-    // Copy every variant -- which one the runtime requests for a given
-    // texture depends on its role/quality profile, not just a fixed choice.
-    for (const file of Object.values(tex.variants || {})) copyLater(file);
+    // The 'balanced' quality profile the game uses only ever requests the
+    // 'source' variant (checked against the network log), so the parallel
+    // 'unity-import' copies stay out of the pack.
+    copyLater(tex.variants?.source);
   }
 }
 
+function pullTexture(texId) {
+  if (usedTextures[texId]) return;
+  const tex = textures[texId];
+  if (!tex) { console.warn('missing texture', texId); return; }
+  usedTextures[texId] = tex;
+  copyLater(tex.variants?.source);
+}
+
+// skin 0 = the regular parts; skin 1 = their Mystic (S01) versions, which
+// the game uses for Evolved Axies -- a glowing material plus particle
+// add-ons (see the addons pass below).
+for (const skin of [0, 1])
 for (const cls of CLASSES) {
   for (const type of NEED_TYPES) {
     const key = Object.keys(parts).find((k) => {
       const d = parts[k].descriptor;
-      return d.class === cls && d.type === type && d.variant === 2 && d.skin === 0 && d.level === 1;
+      return d.class === cls && d.type === type && d.variant === 2 && d.skin === skin && d.level === 1;
     });
     if (!key) { console.warn('MISSING PART', cls, type); continue; }
     const entry = parts[key];
@@ -62,6 +75,37 @@ for (const cls of CLASSES) {
       pullMaterial(rig.materialId);
     }
   }
+}
+
+// Mystic add-ons (S01 ... 02_L1_*): particle glows attached to the Mystic
+// parts above. Their component JSON (read here, not shipped) names the
+// extra materials/textures the particles need.
+for (const [id, addon] of Object.entries(addons)) {
+  if (!/^S01_[A-Za-z]+02_L1_/.test(id)) continue;
+  for (const matId of Object.values(addon.materialOverrides || {})) pullMaterial(matId);
+  for (const att of addon.attachments || []) {
+    // The runtime builds the particles from a catalog compiled into its JS;
+    // only the textures and materials they name are fetched, so the add-on
+    // .glb/.json files themselves stay out of the pack.
+    const comp = fs.readFileSync(path.join(SRC_ASSETS, att.componentUrl.replace(/^\/assets\/axie\//, '')), 'utf8');
+    // Materials/textures show up both as "<guid>:<fileId>" ids and as bare
+    // Unity guids (e.g. a particle sprite's texture).
+    for (const guid of new Set(comp.match(/[0-9a-f]{32}/g) || [])) {
+      if (materials[guid + ':2100000']) pullMaterial(guid + ':2100000');
+      if (textures[guid + ':2800000']) pullTexture(guid + ':2800000');
+    }
+  }
+}
+
+// One weapon per card set (see board3d.js SET_WEAPON): the base model, the
+// level-1 variant for regular Axies, level 3 for Evolved ones, and any
+// paired weapon animations (e.g. the Tome's pages).
+const WEAPONS = ['Sword', 'Bow', 'Staff', 'Dagger', 'Tome', 'Mala'];
+for (const id of WEAPONS) {
+  const w = weapons[id];
+  copyLater(w.url);
+  for (const v of w.variants || []) if (v.level === 1 || v.level === 3) copyLater(v.url);
+  for (const clip of Object.values(w.pairedAnimations?.clips || {})) copyLater(clip.url);
 }
 
 const body = bodies.normal;

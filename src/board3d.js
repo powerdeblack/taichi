@@ -8,19 +8,7 @@ import * as THREE from 'three';
 import { createAxieMixer3D } from '@jaatster/threejs-axie-mixer3d-public';
 import { ROW_Z, TAUNT_RADIUS } from './game.js';
 import * as cine from './cinematics.js';
-
-const NEED_TYPES = ['eye', 'mouth', 'ear', 'horn', 'back', 'tail'];
-// Our roster uses 'Aqua'; the asset pack's class id is 'Aquatic'.
-const CLASS_ALIAS = { Aqua: 'Aquatic' };
-
-function buildDescriptor(classId){
-  const cls = CLASS_ALIAS[classId] || classId;
-  return {
-    colorVariant: 0,
-    body: 'normal',
-    parts: NEED_TYPES.map(type => ({ type, skin: 0, class: cls, variant: 2, level: 1 })),
-  };
-}
+import { buildDescriptor, equipSetWeapon, weaponPrefix, playClip, renderPortrait } from './axieLook.js';
 
 let renderer, scene, camera, clock, canvasEl;
 let mixerPromise = null;
@@ -153,6 +141,7 @@ function animate(){
       const dx = s.axie.wrapper.position.x - s.lastPos.x;
       const dz = s.axie.wrapper.position.z - s.lastPos.z;
       faceDirection(s, dx, dz, dt);
+      stepGait(s, dt > 0 ? Math.hypot(dx, dz) / dt : 0, dt);
       s.lastPos.copy(s.axie.wrapper.position);
       return;
     }
@@ -185,12 +174,52 @@ function animate(){
       s.lastPos.copy(s.axie.wrapper.position);
     }
   });
+  tickDeaths();
   tickImpacts(dt);
   tickCasts(dt);
   tickScenery(dt);
   tickSquash(dt);
   if (scene) cine.tickCinematics(dt, realDt);
   if (renderer && scene && camera) renderer.render(scene, camera);
+}
+
+// The toolkit's walk/run cycles (with the weapon's own stance) while a
+// squad is actually moving, idle once it stops -- smoothed so a one-frame
+// stall doesn't flicker the gait.
+function stepGait(s, speed, dt){
+  s.gaitSpeed = (s.gaitSpeed || 0) + (speed - (s.gaitSpeed || 0)) * Math.min(1, dt * 8);
+  const want = s.gaitSpeed > 1.6 ? 'run' : s.gaitSpeed > 0.25 ? 'walk' : 'idle';
+  if (want !== s.gait){ s.gait = want; trySetLocomotion(s.axie, want); }
+}
+
+// ================= Toolkit character animations =================
+// Card casts, hits, knockouts and the victory pose use the Axie Mixer 3D
+// clips: each set's weapon has its own Attack and Skill swing (Sword.Attack,
+// Bow.Skill...), plus the shared Action.IdleGetHit, Default.Stun and
+// Default.Dead. They play over movement, so a squad keeps walking while
+// it strikes.
+export function playLaneAction(side, laneIndex, action){
+  const s = slots.get(slotKey(side, laneIndex));
+  if (!s || s.dying) return;
+  const w = s.weapon;
+  switch (action){
+    case 'attack': playClip(s.axie, w ? `${w}.Attack` : 'Action.AttackHead') || playClip(s.axie, 'Action.AttackRange'); break;
+    case 'skill': playClip(s.axie, w ? `${w}.Skill` : 'Action.AttackCombo', { timeScale: w && SLOW_SKILLS.has(w) ? 1.6 : 1 }); break;
+    case 'hit': playClip(s.axie, 'Action.IdleGetHit'); break;
+    case 'stun': playClip(s.axie, 'Default.Stun'); break;
+    case 'victory': playClip(s.axie, w ? `${w}.Skill` : 'Action.AttackCombo'); break;
+  }
+}
+// Long skill clips (the Staff's is ~3s) are sped up to fit a cast.
+const SLOW_SKILLS = new Set(['Staff', 'Tome', 'Bow']);
+
+// A knockout plays the toolkit's death clip, then the model fades out of
+// the scene instead of vanishing on the spot.
+const DEATH_HIDE_AFTER = 1.4;
+function tickDeaths(){
+  slots.forEach(s => {
+    if (s.dying && elapsedTime - s.diedAt > DEATH_HIDE_AFTER){ s.axie.wrapper.visible = false; s.dying = false; }
+  });
 }
 
 // Short-lived 3D feedback at a lane's current position: an expanding,
@@ -970,8 +999,9 @@ export async function syncBoardAxies(youLanes, rivalLanes){
   // Load all up-to-10 models concurrently (not one-by-one) so the board
   // pops in together instead of unit-by-unit over several seconds.
   const spawn = (side, lane, i) => (async () => {
-    const descriptor = buildDescriptor(lane.classId);
+    const descriptor = buildDescriptor(lane.classId, { evolved: lane.evolved });
     const axie = await mixer.create({ descriptor, quality: 'balanced', artMode: 'faithful', strict: true });
+    await equipSetWeapon(axie, lane.setId, lane.evolved);
     const basePos = laneWorldPos(side, lane.localPos);
     const introOffset = new THREE.Vector3(0, 0, side === 'you' ? INTRO_SPAWN_OFFSET : -INTRO_SPAWN_OFFSET);
     const spawnPos = basePos.clone().add(introOffset);
@@ -986,7 +1016,8 @@ export async function syncBoardAxies(youLanes, rivalLanes){
     slots.set(slotKey(side, i), {
       axie, side, laneIndex: i, targetPos: walking ? basePos.clone() : null, live: false,
       basePos: spawnPos.clone(), phase: Math.random() * Math.PI * 2, introWalk: walking,
-      baseRotation, lastPos: spawnPos.clone(),
+      baseRotation, lastPos: spawnPos.clone(), weapon: weaponPrefix(lane.setId),
+      alive: lane.alive, dying: false, diedAt: 0, gait: walking ? 'walk' : 'idle',
     });
   })();
   const jobs = [
@@ -994,11 +1025,28 @@ export async function syncBoardAxies(youLanes, rivalLanes){
     ...rivalLanes.map((lane, i) => spawn('rival', lane, i)),
   ];
   await Promise.all(jobs);
+  // Portraits of the real models (with colour, weapon and Mystic glow) for
+  // the cards in hand -- rendered once per match.
+  portraits.clear();
+  slots.forEach((s, key) => { const url = renderPortrait(s.axie, renderer); if (url) portraits.set(key, url); });
 }
 
+const portraits = new Map();
+export function getLanePortrait(side, laneIndex){ return portraits.get(slotKey(side, laneIndex)) || null; }
+
+// Called on every board refresh -- only acts on a change: a fresh knockout
+// plays the death clip (see tickDeaths), a revive shows the model again.
 export function setLaneAlive(side, laneIndex, alive){
   const s = slots.get(slotKey(side, laneIndex));
-  if (s) s.axie.wrapper.visible = alive;
+  if (!s || s.alive === alive) return;
+  s.alive = alive;
+  if (!alive){
+    if (playClip(s.axie, 'Default.Dead')){ s.dying = true; s.diedAt = elapsedTime; }
+    else s.axie.wrapper.visible = false;
+  } else {
+    s.dying = false;
+    s.axie.wrapper.visible = true;
+  }
 }
 
 // Slides a lane's 3D model toward a new local {x,z} over the next few
