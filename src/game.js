@@ -265,6 +265,10 @@ export function moveSquadWithTank(state, side, dx, dz){
   const lanes = lanesOf(state, side);
   const tank = lanes.find(l => l.isTank && l.alive);
   if (!tank) return;
+  // Origin control on the Tank moves the whole squad: Stun roots it,
+  // Chill halves its speed.
+  if (tank.status.stun > 0) return;
+  if (tank.status.chill > 0){ dx *= CHILL_SLOW; dz *= CHILL_SLOW; }
   const anchor = squadAnchor(lanes);
   anchor.x += dx; anchor.z += dz;
   const w = worldPos(side, { localPos: anchor });
@@ -291,7 +295,7 @@ function applyDamage(lane, amount, attackerClassId, casterLane){
   let dmg = amount * mult * casterLane.powerMult;
   let deathmarked = false, shielded = false, bulwarked = false, dodged = false, thornReflected = 0;
 
-  if (lane.status.dodgeCharges && lane.status.dodgeCharges > 0){
+  if (lane.status.dodgeCharges && lane.status.dodgeCharges > 0 && !(lane.status.chill > 0)){
     const chance = lane.status.dodgeChance != null ? lane.status.dodgeChance : 1;
     lane.status.dodgeCharges -= 1;
     if (lane.status.dodgeCharges <= 0){ delete lane.status.dodgeCharges; delete lane.status.dodgeChance; }
@@ -448,6 +452,9 @@ function applyThorns(lane, hits, pct){
 
 // Cleanse: strips the DOTs/debuffs Guardião Tropical is meant to counter.
 function applyGuardianCleanse(lane){
+  delete lane.status.stun;
+  delete lane.status.chill;
+  delete lane.status.fear;
   delete lane.status.bleed;
   delete lane.status.bleedTicks;
   delete lane.status.poison;
@@ -500,6 +507,59 @@ function tickRegenRot(lane){
 // Heal -> instant damage, Regen -> a matching DOT), matching the real
 // Origin "Reverse Heal" pattern. Returns a result descriptor used by
 // main.js to drive floating-text/shake feedback.
+// ================= Origin-style control and Secrets =================
+// Stun (seconds): the Axie can't start a card, a cast it's charging is
+// interrupted, and a stunned Tank roots its whole squad. Chill (seconds):
+// no dodging and the squad moves at half speed. Fear (FEAR_TIME seconds):
+// if that Axie attacks before it wears off, the attack misses completely.
+export const STUN_TIME = 2.5;
+export const CHILL_TIME = 8;
+export const CHILL_SLOW = 0.5;
+export const FEAR_TIME = 4; // seconds a Fear waits for the Axie's next attack
+
+// Secrets: a Skill card laid face-down on an ally. Its owner sees which
+// one it is, the other side only sees that a Secret is there. It springs
+// by itself when that Axie is attacked (Grace: when a hit drops it under
+// half HP), then it's gone.
+const SECRET_TEXT = {
+  counter: 'strikes back', frost: 'freezes the attacker', snare: 'stuns the attacker',
+  shadow: 'dodges and frightens', venom: 'poisons and bleeds the attacker', grace: 'heals when low',
+};
+function secretInfo(secret){ return { name: secret.name, trap: secret.trap, text: SECRET_TEXT[secret.trap] || '' }; }
+
+// Applies a (non-shadow) Secret's effect; returns what happened, or null
+// when its condition isn't met yet (Grace waits for low HP).
+function springSecret(state, secret, owner, attacker){
+  switch (secret.trap){
+    case 'counter': {
+      const dmg = Math.round((secret.amount || 20) * (secret.ownerPower || 1));
+      attacker.hp = Math.max(0, attacker.hp - dmg);
+      if (attacker.hp <= 0) attacker.alive = false;
+      return { attackerDmg: dmg };
+    }
+    case 'frost': {
+      const dmg = secret.amount || 10;
+      attacker.hp = Math.max(0, attacker.hp - dmg);
+      if (attacker.hp <= 0) attacker.alive = false;
+      attacker.status.chill = Math.max(attacker.status.chill || 0, secret.duration || CHILL_TIME);
+      return { attackerDmg: dmg, control: 'chill' };
+    }
+    case 'snare':
+      attacker.status.stun = Math.max(attacker.status.stun || 0, secret.duration || STUN_TIME);
+      return { control: 'stun' };
+    case 'venom':
+      applyBleed(attacker); applyPoison(attacker);
+      return { control: 'venom' };
+    case 'grace': {
+      if (!owner.alive || owner.hp / owner.maxHp >= 0.5) return null;
+      const before = owner.hp;
+      owner.hp = Math.min(owner.maxHp, owner.hp + Math.round((secret.amount || 30) * ((secret.ownerMp || BASE_MP) / BASE_MP) * healScale(state)));
+      return { healed: owner.hp - before };
+    }
+  }
+  return null;
+}
+
 function baseResult(side, card, casterIndex){
   return {
     side, card, casterIndex, targetIndex: -1, targetSide: side, reversed: false,
@@ -531,6 +591,10 @@ export function resolveCard(state, side, card, casterIndex, targetIndex, targetS
     if (card.role === 'defense'){
       if (!reversed){
         switch (card.effect){
+          case 'secret':
+            targetLane.secret = { id: card.id, name: card.name, trap: card.trap, amount: card.amount, duration: card.duration, ownerPower: casterLane.powerMult, ownerMp: casterLane.mp };
+            result.secretSet = true;
+            break;
           case 'bulwark_cleanse':
             applyGuardianCleanse(targetLane);
             applyBulwark(targetLane, card.hits || BULWARK_HITS);
@@ -583,9 +647,39 @@ export function resolveCard(state, side, card, casterIndex, targetIndex, targetS
   const targetLane = enemyLanes[targetIndex];
   result.targetSide = side === 'you' ? 'rival' : 'you';
 
+  result.targetIndex = targetIndex;
+  // Fear: the frightened attacker's swing goes wide -- a full miss.
+  if (casterLane.status.fear > 0){
+    delete casterLane.status.fear;
+    result.feared = true;
+    return result;
+  }
+  // A Secret laid on the target may spring before the hit lands.
+  const ownerSide = result.targetSide;
+  const secret = targetLane.secret;
+  if (secret && secret.trap === 'shadow'){
+    targetLane.secret = null;
+    casterLane.status.fear = Math.max(casterLane.status.fear || 0, FEAR_TIME);
+    result.dodged = true;
+    result.secret = { ...secretInfo(secret), side: ownerSide, index: targetIndex };
+    return result;
+  }
+
   const ambush = !state.firstHitDone && card.effect === 'ambush';
   const dmgToApply = card.dmg * (ambush ? 2 : 1);
   const { dmg, deathmarked, shielded, bulwarked, dodged, thornReflected } = applyDamage(targetLane, dmgToApply, card.cls, casterLane);
+  if (!dodged){
+    if (card.effect === 'stun') targetLane.status.stun = Math.max(targetLane.status.stun || 0, card.duration || STUN_TIME);
+    if (card.effect === 'chill') targetLane.status.chill = Math.max(targetLane.status.chill || 0, card.duration || CHILL_TIME);
+    if (card.effect === 'fear') targetLane.status.fear = Math.max(targetLane.status.fear || 0, FEAR_TIME);
+  }
+  if (secret && !dodged && secret.trap !== 'shadow'){
+    const fired = springSecret(state, secret, targetLane, casterLane);
+    if (fired){
+      targetLane.secret = null;
+      result.secret = { ...secretInfo(secret), side: ownerSide, index: targetIndex, ...fired };
+    }
+  }
   if (dmg > 0) state.firstHitDone = true;
   if (card.effect === 'bleed' && !dodged) applyBleed(targetLane);
   if (card.effect === 'poison' && !dodged) applyPoison(targetLane);
@@ -618,6 +712,12 @@ export const CAST_IMPACT_AT = 3.2;
 export function tickCasts(state, dt){
   state.castYou = Math.max(0, state.castYou - dt);
   state.castRival = Math.max(0, state.castRival - dt);
+  // Stun and Chill count down in real seconds.
+  [...state.youLanes, ...state.rivalLanes].forEach(l => {
+    for (const k of ['stun', 'chill', 'fear']){
+      if (l.status[k] > 0){ l.status[k] -= dt; if (l.status[k] <= 0) delete l.status[k]; }
+    }
+  });
 }
 
 // Starts a card from the player's hand: spends its energy, moves it to the
@@ -628,6 +728,7 @@ export function tickCasts(state, dt){
 // the enemy Tank. Returns the cast plan, or null if the hand is locked.
 export function playerBeginCard(state, card, targetIndex, targetSide){
   if (state.castYou > 0 || state.energyYou < card.cost) return null;
+  if (state.youLanes[card.laneIndex]?.status.stun > 0) return null;
   const casterIndex = card.laneIndex;
   state.energyYou -= card.cost;
   state.castYou = CAST_TIME;
@@ -651,6 +752,10 @@ export function landCast(state, plan){
   const casterLane = lanesOf(state, plan.side)[plan.casterIndex];
   if (!casterLane || !casterLane.alive){
     return Object.assign(baseResult(plan.side, plan.card, plan.casterIndex), { fizzled: true });
+  }
+  // A caster stunned mid-cast is interrupted: the card is lost.
+  if (casterLane.status.stun > 0){
+    return Object.assign(baseResult(plan.side, plan.card, plan.casterIndex), { fizzled: true, interrupted: true });
   }
   if (plan.missed){
     return Object.assign(baseResult(plan.side, plan.card, plan.casterIndex),
@@ -764,6 +869,9 @@ export function cardValues(state, card, casterLane, reversed = false){
     if (card.effect === 'poison') chips.push({ icon: '☠️', text: '+' + POISON_STACK, kind: 'fx' });
     if (card.effect === 'deathmark') chips.push({ icon: '💀', text: '+' + DEATHMARK_BONUS + '×' + DEATHMARK_HITS, kind: 'fx' });
     if (card.effect === 'retain') chips.push({ icon: '♻️', text: 'keeps', kind: 'fx' });
+    if (card.effect === 'stun') chips.push({ icon: '😵', text: (card.duration || STUN_TIME) + 's', kind: 'ctl' });
+    if (card.effect === 'chill') chips.push({ icon: '🥶', text: (card.duration || CHILL_TIME) + 's', kind: 'ctl' });
+    if (card.effect === 'fear') chips.push({ icon: '😱', text: 'miss', kind: 'ctl' });
     return chips;
   }
   if (card.role === 'heal'){
@@ -779,6 +887,15 @@ export function cardValues(state, card, casterLane, reversed = false){
     return chips;
   }
   switch (card.effect){
+    case 'secret': {
+      const t = card.trap;
+      const txt = t === 'counter' ? `⚔️ ${Math.round((card.amount || 20) * casterLane.powerMult)} back`
+        : t === 'grace' ? `💚 +${Math.round((card.amount || 30) * mp * scale)} <½HP`
+        : t === 'frost' ? `🥶 +${card.amount || 10}` : t === 'snare' ? `😵 ${card.duration || STUN_TIME}s`
+        : t === 'shadow' ? '💨 + 😱' : '🩸 + ☠️';
+      chips.push({ icon: '❓', text: txt, kind: 'ctl' });
+      break;
+    }
     case 'bulwark_cleanse':
       chips.push({ icon: '✨', text: 'cleanse', kind: 'def' });
       chips.push({ icon: '🛡️', text: '-' + Math.round(BULWARK_REDUCTION * 100) + '%×' + (card.hits || BULWARK_HITS), kind: 'def' });

@@ -175,11 +175,14 @@ const STATUS_LABELS = {
   bleed:'🩸 Bleed', poison:'☠️ Poison', deathmark:'💀 Mark', shield:'🛡️ Shield',
   bulwark:'🛡️+ Bulwark', vulnerable:'⚡ Vulnerable', barrier:'🔵 Barrier',
   dodgeCharges:'💨 Evasion', thornsHits:'🌵 Thorns', regen:'🌿 Regen', regenRot:'🥀 Rot',
+  stun:'😵 Stun', chill:'🥶 Chill', fear:'😱 Fear',
 };
+const TIMED_STATUS = new Set(['stun', 'chill', 'fear']);
 
 function statusLabel(key, value){
   const label = STATUS_LABELS[key] || key;
   if (key === 'barrier') return `${label} ${value}`;
+  if (TIMED_STATUS.has(key)) return `${label} ${Math.ceil(value)}s`;
   if (typeof value === 'number' && value > 1) return `${label} x${value}`;
   return label;
 }
@@ -377,7 +380,9 @@ function updateUnit(ref, lane, side, laneIndex){
   ref.mpEl.textContent = `MP ${lane.mp} · ⚔️${attack} 🛡️${defense} 💚${heal}`;
   ref.statusEl.innerHTML = Object.keys(lane.status)
     .filter(k => !STATUS_COMPANION_KEYS.has(k) && (lane.status[k]>0 || lane.status[k]===true))
-    .map(k => `<span class="status-pill">${statusLabel(k, lane.status[k])}</span>`).join('');
+    .map(k => `<span class="status-pill${TIMED_STATUS.has(k) ? ' control' : ''}">${statusLabel(k, lane.status[k])}</span>`).join('')
+    // A Secret: its owner sees which one; the other side only sees "?".
+    + (lane.secret ? `<span class="status-pill secret">❓ ${side === 'you' ? lane.secret.name : 'Secret'}</span>` : '');
   ref.chip.classList.toggle('dead', !lane.alive);
   setLaneAlive(side, laneIndex, lane.alive);
 }
@@ -428,9 +433,11 @@ export function renderHand(state, { onPress, onRelease, onCancel, onDrag, aiming
     const casterLane = state.youLanes[card.laneIndex];
     const laneAlive = casterLane && casterLane.alive;
     const affordable = state.energyYou >= card.cost;
-    const playable = affordable && !state.gameOver && laneAlive && state.castYou <= 0;
-    const rangeLabel = card.range==='short' ? '🗡️ Short 2.3' : card.range==='long' ? '🏹 Long 6'
-      : card.role==='heal' ? 'Heal' : 'Defense';
+    const stunned = laneAlive && casterLane.status.stun > 0;
+    const playable = affordable && !state.gameOver && laneAlive && !stunned && state.castYou <= 0;
+    // Origin-style card type first (ATTACK / SKILL / SECRET), then reach.
+    const rangeLabel = card.range==='short' ? 'Attack · 🗡️ Short 2.3' : card.range==='long' ? 'Attack · 🏹 Long 6'
+      : card.effect==='secret' ? 'Secret ❓' : card.role==='heal' ? 'Skill · Heal' : 'Skill · Defense';
     // Live answer to "does this card reach right now?" (see main.js reachFor).
     const r = reach[card.uid];
 

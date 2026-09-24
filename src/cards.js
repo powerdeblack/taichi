@@ -56,11 +56,15 @@ export const CARD_SETS = [
     attackCards: [
       { id:'corte_selvagem', name:'Corte Selvagem', range:'short', role:'attack', cost:0, dmg:21, effect:'ambush',
         desc:'Short range. Ambush: doubles damage on the match’s first hit.' },
-      { id:'investida_brutal', name:'Investida Brutal', range:'long', role:'attack', cost:0, dmg:32, effect:'none',
+      { id:'investida_brutal', name:'Investida Brutal', range:'long', role:'attack', cost:0, dmg:34, effect:'none',
         desc:'Long range. Heavy hit, targets the weakest enemy lane.' },
     ],
     signatureCard: { id:'furia_selvagem', name:'Fúria Selvagem', range:'short', role:'attack', cost:0, dmg:20, effect:'bleed',
       desc:'Beast-born Warrior signature. Short range. Bites deep: applies Bleed on top of a heavy hit.' },
+    controlCard: { id:'golpe_atordoante', name:'Golpe Atordoante', range:'short', role:'attack', cost:1, dmg:14, effect:'stun', duration:2.5,
+      desc:'Short range. Stun 2.5s: the target can\'t play cards, its cast is interrupted, a stunned Tank can\'t move.' },
+    secretCard: { id:'contra_ataque', name:'Contra-Ataque', range:'own', role:'defense', cost:1, effect:'secret', trap:'counter', amount:22,
+      desc:'Secret: laid face-down on an ally. When it\'s attacked, it strikes back for 22 (scaled by Power).' },
     defenseCard: { id:'postura_defensiva', name:'Postura Defensiva', range:'own', role:'defense', cost:2, effect:'bulwark', hits:3,
       desc:'Bulwark: reduces the next 3 hits taken by 35% each, no cleanse.' },
     healCard: { id:'grito_de_guerra', name:'Grito de Guerra', range:'own', role:'heal', cost:1, heal:17,
@@ -77,9 +81,13 @@ export const CARD_SETS = [
     ],
     signatureCard: { id:'espinhos_da_fe', name:'Espinhos da Fé', range:'short', role:'attack', cost:0, dmg:15, effect:'retain',
       desc:'Plant-born Priest signature. Short range. Thorny faith: Retain, never leaves your hand, hit or miss.' },
+    controlCard: { id:'luz_ofuscante', name:'Luz Ofuscante', range:'long', role:'attack', cost:1, dmg:10, effect:'fear',
+      desc:'Long range. Fear: the target\'s next attack misses completely.' },
+    secretCard: { id:'graca_oculta', name:'Graça Oculta', range:'own', role:'defense', cost:1, effect:'secret', trap:'grace', amount:26,
+      desc:'Secret: laid face-down on an ally. When a hit drops it under half HP, it heals 32 (scaled by MP).' },
     defenseCard: { id:'protecao_divina', name:'Proteção Divina', range:'own', role:'defense', cost:1, effect:'shield',
       desc:'Guard: blocks 60% of the next hit taken.' },
-    healCard: { id:'bencao', name:'Bênção', range:'own', role:'heal', cost:2, heal:30,
+    healCard: { id:'bencao', name:'Bênção', range:'own', role:'heal', cost:2, heal:28,
       desc:'A priest’s biggest single heal -- 30 HP right away (scaled by MP). Reversed on an enemy: Reverse Heal, deals that much damage instead.' },
     signatureDefenseCard: { id:'purificacao', name:'Purificação', range:'own', role:'defense', cost:1, effect:'bulwark_cleanse', hits:2,
       desc:'Plant-born Priest signature. Cleanse: removes Bleed, Poison and Deathmark from an ally, then Bulwark (next 2 hits taken -35%).' },
@@ -92,12 +100,16 @@ export const CARD_SETS = [
     attackCards: [
       { id:'centelha_arcana', name:'Centelha Arcana', range:'short', role:'attack', cost:0, dmg:12, effect:'bleed',
         desc:'Short range. Applies Bleed: arcane burns that linger for 2 rounds.' },
-      { id:'explosao_arcana', name:'Explosão Arcana', range:'long', role:'attack', cost:0, dmg:20, effect:'none',
+      { id:'explosao_arcana', name:'Explosão Arcana', range:'long', role:'attack', cost:0, dmg:22, effect:'none',
         desc:'Long range. Heavy nuke, targets the weakest enemy lane.' },
     ],
     signatureCard: { id:'mare_arcana', name:'Maré Arcana', range:'long', role:'attack', cost:0, dmg:16, effect:'poison',
       desc:'Aqua-born Mage signature. Long range. A corrosive arcane tide: applies Poison.' },
-    defenseCard: { id:'barreira_arcana', name:'Barreira Arcana', range:'own', role:'defense', cost:2, effect:'barrier', amount:26,
+    controlCard: { id:'rajada_gelida', name:'Rajada Gélida', range:'long', role:'attack', cost:0, dmg:12, effect:'chill', duration:8,
+      desc:'Long range. Chill 8s: the target can\'t dodge and a chilled Tank moves at half speed.' },
+    secretCard: { id:'armadilha_gelida', name:'Armadilha Gélida', range:'own', role:'defense', cost:1, effect:'secret', trap:'frost', amount:12, duration:8,
+      desc:'Secret: laid face-down on an ally. When it\'s attacked, the attacker takes 12 and is Chilled for 8s.' },
+    defenseCard: { id:'barreira_arcana', name:'Barreira Arcana', range:'own', role:'defense', cost:2, effect:'barrier', amount:30,
       desc:'Barrier: absorbs the next 26 damage taken, no matter how many hits it takes to burn through.' },
     healCard: { id:'dreno_vital', name:'Dreno Vital', range:'own', role:'heal', cost:1, heal:21,
       desc:'Channels life force -- heals an ally for 21 HP (scaled by MP), or drains an enemy for the same amount as damage instead (Reverse Heal).' },
@@ -106,13 +118,17 @@ export const CARD_SETS = [
     id: 'ranger', name: 'Arqueiro', icon: '🏹', color: '#d9b44a', nativeClassId: 'Bird',
     defaultCounts: { attack: 3, defense: 1, heal: 1 },
     attackCards: [
-      { id:'tiro_certeiro', name:'Tiro Certeiro', range:'short', role:'attack', cost:0, dmg:20, effect:'none',
+      { id:'tiro_certeiro', name:'Tiro Certeiro', range:'short', role:'attack', cost:0, dmg:22, effect:'none',
         desc:'Short range. A precise, direct shot.' },
-      { id:'chuva_de_flechas', name:'Chuva de Flechas', range:'long', role:'attack', cost:0, dmg:12, effect:'multi',
+      { id:'chuva_de_flechas', name:'Chuva de Flechas', range:'long', role:'attack', cost:0, dmg:13, effect:'multi',
         desc:'Long range. 3 arrows: +50% bonus damage if 2+ land.' },
     ],
     signatureCard: { id:'voo_certeiro', name:'Voo Certeiro', range:'long', role:'attack', cost:0, dmg:12, effect:'multi',
       desc:'Bird-born Ranger signature. Long range. A second arrow-rain: 3 more arrows, +50% bonus if 2+ land.' },
+    controlCard: { id:'flecha_congelante', name:'Flecha Congelante', range:'long', role:'attack', cost:0, dmg:14, effect:'chill', duration:8,
+      desc:'Long range. Chill 8s: the target can\'t dodge and a chilled Tank moves at half speed.' },
+    secretCard: { id:'rede_de_caca', name:'Rede de Caça', range:'own', role:'defense', cost:1, effect:'secret', trap:'snare', duration:3,
+      desc:'Secret: laid face-down on an ally. When it\'s attacked, the attacker is Stunned for 3s.' },
     defenseCard: { id:'reflexos_ageis', name:'Reflexos Ágeis', range:'own', role:'defense', cost:2, effect:'dodge', charges:3, chance:0.5,
       desc:'Evasion: 50% chance to fully dodge each of the next 3 hits taken.' },
     healCard: { id:'kit_medico', name:'Kit Médico', range:'own', role:'heal', cost:1, heal:21,
@@ -129,6 +145,10 @@ export const CARD_SETS = [
     ],
     signatureCard: { id:'ferroada', name:'Ferroada', range:'short', role:'attack', cost:0, dmg:14, effect:'poison',
       desc:'Bug-born Rogue signature. Short range. A venomous sting: applies Poison up close.' },
+    controlCard: { id:'golpe_sombrio', name:'Golpe Sombrio', range:'short', role:'attack', cost:1, dmg:13, effect:'fear',
+      desc:'Short range. Fear: the target\'s next attack misses completely.' },
+    secretCard: { id:'sombra', name:'Sombra', range:'own', role:'defense', cost:2, effect:'secret', trap:'shadow',
+      desc:'Secret: laid face-down on an ally. The first attack on it is dodged and the attacker is Feared.' },
     defenseCard: { id:'cortina_de_fumaca', name:'Cortina de Fumaça', range:'own', role:'defense', cost:1, effect:'dodge', charges:1, chance:1,
       desc:'Smoke bomb: guaranteed dodge of the next hit taken.' },
     healCard: { id:'adrenalina', name:'Adrenalina', range:'own', role:'heal', cost:1, effect:'regen', regenTicks:2,
@@ -145,6 +165,10 @@ export const CARD_SETS = [
     ],
     signatureCard: { id:'presas_ancestrais', name:'Presas Ancestrais', range:'short', role:'attack', cost:0, dmg:15, effect:'deathmark',
       desc:'Reptile-born Shaman signature. Short range. Ancestral fangs mark the prey: applies Deathmark.' },
+    controlCard: { id:'uivo_ancestral', name:'Uivo Ancestral', range:'short', role:'attack', cost:1, dmg:12, effect:'stun', duration:2,
+      desc:'Short range. Stun 2s: the target can\'t play cards, its cast is interrupted, a stunned Tank can\'t move.' },
+    secretCard: { id:'totem_amaldicoado', name:'Totem Amaldiçoado', range:'own', role:'defense', cost:1, effect:'secret', trap:'venom',
+      desc:'Secret: laid face-down on an ally. When it\'s attacked, the attacker gets Bleed and Poison.' },
     defenseCard: { id:'vinculo_espiritual', name:'Vínculo Espiritual', range:'own', role:'defense', cost:2, effect:'thorns', hits:3, pct:0.6,
       desc:'Thorns: reflects 60% of the damage from the next 3 hits taken back onto whoever landed them.' },
     healCard: { id:'comunhao_ancestral', name:'Comunhão Ancestral', range:'own', role:'heal', cost:2, effect:'regen', regenTicks:4,
@@ -200,8 +224,12 @@ export const BASE_MP = 100;
 export function buildLoadout(setId, classId, counts){
   const set = setById(setId);
   const native = set.nativeClassId === classId;
-  const attackPool = (native && set.signatureCard) ? [...set.attackCards, set.signatureCard] : set.attackCards;
-  const defensePool = (native && set.signatureDefenseCard) ? [set.defenseCard, set.signatureDefenseCard] : [set.defenseCard];
+  // Origin-style depth: each set's control attack (Stun / Fear / Chill)
+  // comes after its regular and signature attacks, and its Secret after
+  // its defenses -- so it shows up once a loadout invests enough in that
+  // role.
+  const attackPool = [...set.attackCards, ...((native && set.signatureCard) ? [set.signatureCard] : []), ...(set.controlCard ? [set.controlCard] : [])];
+  const defensePool = [set.defenseCard, ...((native && set.signatureDefenseCard) ? [set.signatureDefenseCard] : []), ...(set.secretCard ? [set.secretCard] : [])];
   const healPool = (native && set.signatureHealCard) ? [set.healCard, set.signatureHealCard] : [set.healCard];
   const pool = [];
   for (let i=0; i<counts.attack; i++) pool.push({ ...attackPool[i % attackPool.length] });

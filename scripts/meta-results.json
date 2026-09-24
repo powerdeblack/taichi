@@ -1,150 +1,161 @@
 {
   "gamesPerPair": 400,
   "beatsAt": 0.55,
-  "avgDuelSeconds": 95,
+  "avgDuelSeconds": 98,
   "timeoutShare": 0,
   "ranked": [
+    "heal",
     "bleed",
     "poison",
-    "heal",
+    "deathmark",
+    "toxic",
     "thorns",
     "hybrid",
     "mirage",
-    "toxic",
-    "bastion",
-    "deathmark",
-    "damage"
+    "damage",
+    "bastion"
   ],
   "winRate": {
-    "bleed": 0.627,
-    "poison": 0.579,
-    "damage": 0.405,
-    "heal": 0.572,
-    "thorns": 0.507,
-    "mirage": 0.488,
-    "bastion": 0.444,
-    "deathmark": 0.427,
-    "toxic": 0.459,
-    "hybrid": 0.493
+    "bleed": 0.571,
+    "poison": 0.561,
+    "damage": 0.387,
+    "heal": 0.623,
+    "thorns": 0.494,
+    "mirage": 0.407,
+    "bastion": 0.377,
+    "deathmark": 0.551,
+    "toxic": 0.543,
+    "hybrid": 0.487
   },
   "tier": {
+    "heal": "S",
     "bleed": "S",
-    "poison": "S",
-    "heal": "A",
-    "thorns": "A",
-    "hybrid": "A",
+    "poison": "A",
+    "deathmark": "A",
+    "toxic": "A",
+    "thorns": "B",
+    "hybrid": "B",
     "mirage": "B",
-    "toxic": "B",
-    "bastion": "B",
-    "deathmark": "C",
-    "damage": "C"
+    "damage": "C",
+    "bastion": "C"
   },
   "beats": {
     "bleed": [
       "damage",
-      "deathmark",
-      "mirage",
       "bastion",
-      "thorns",
-      "heal",
-      "hybrid"
+      "mirage",
+      "thorns"
     ],
     "poison": [
       "bastion",
       "damage",
-      "heal",
       "mirage",
-      "thorns"
+      "thorns",
+      "heal"
     ],
     "damage": [
       "toxic"
     ],
     "heal": [
       "damage",
-      "deathmark",
+      "mirage",
+      "bastion",
       "hybrid",
       "toxic",
       "thorns",
-      "mirage"
+      "deathmark"
     ],
     "thorns": [
-      "deathmark",
+      "mirage",
       "damage",
-      "mirage"
+      "deathmark"
     ],
     "mirage": [
-      "toxic",
-      "bastion"
+      "toxic"
     ],
     "bastion": [
       "damage"
     ],
     "deathmark": [
-      "bastion"
+      "bastion",
+      "mirage",
+      "poison",
+      "damage"
     ],
     "toxic": [
+      "bastion",
       "poison",
-      "bastion"
+      "bleed",
+      "thorns",
+      "hybrid"
     ],
     "hybrid": [
-      "deathmark",
-      "toxic"
+      "damage",
+      "thorns",
+      "mirage"
     ]
   },
   "counteredBy": {
-    "bleed": [],
-    "poison": [
+    "bleed": [
       "toxic"
+    ],
+    "poison": [
+      "toxic",
+      "deathmark"
     ],
     "damage": [
       "heal",
       "bleed",
       "poison",
-      "bastion",
-      "thorns"
-    ],
-    "heal": [
-      "poison",
-      "bleed"
-    ],
-    "thorns": [
-      "heal",
-      "bleed",
-      "poison"
-    ],
-    "mirage": [
-      "bleed",
-      "poison",
-      "thorns",
-      "heal"
-    ],
-    "bastion": [
-      "poison",
-      "bleed",
-      "mirage",
-      "toxic",
-      "deathmark"
-    ],
-    "deathmark": [
-      "bleed",
       "thorns",
       "hybrid",
+      "deathmark",
+      "bastion"
+    ],
+    "heal": [
+      "poison"
+    ],
+    "thorns": [
+      "bleed",
+      "poison",
+      "heal",
+      "hybrid",
+      "toxic"
+    ],
+    "mirage": [
+      "heal",
+      "poison",
+      "bleed",
+      "deathmark",
+      "thorns",
+      "hybrid"
+    ],
+    "bastion": [
+      "toxic",
+      "deathmark",
+      "poison",
+      "heal",
+      "bleed"
+    ],
+    "deathmark": [
+      "thorns",
       "heal"
     ],
     "toxic": [
-      "mirage",
-      "damage",
       "heal",
-      "hybrid"
+      "mirage",
+      "damage"
     ],
     "hybrid": [
       "heal",
-      "bleed"
+      "toxic"
     ]
   },
   "counterMetaVs": {
     "bleed": [],
-    "poison": [],
+    "poison": [
+      "heal"
+    ],
     "damage": [],
     "heal": [],
     "thorns": [],
@@ -152,121 +163,120 @@
     "bastion": [],
     "deathmark": [],
     "toxic": [
-      "bleed",
-      "poison"
+      "bleed"
     ],
     "hybrid": []
   },
   "matrix": {
     "bleed": {
-      "poison": 0.513,
-      "damage": 0.766,
-      "heal": 0.605,
-      "thorns": 0.608,
-      "mirage": 0.704,
-      "bastion": 0.665,
-      "deathmark": 0.711,
-      "toxic": 0.481,
-      "hybrid": 0.591
+      "poison": 0.479,
+      "damage": 0.725,
+      "heal": 0.526,
+      "thorns": 0.601,
+      "mirage": 0.664,
+      "bastion": 0.684,
+      "deathmark": 0.531,
+      "toxic": 0.388,
+      "hybrid": 0.54
     },
     "poison": {
-      "bleed": 0.488,
-      "damage": 0.678,
-      "heal": 0.675,
-      "thorns": 0.568,
-      "mirage": 0.618,
-      "bastion": 0.774,
-      "deathmark": 0.49,
-      "toxic": 0.376,
-      "hybrid": 0.541
+      "bleed": 0.521,
+      "damage": 0.713,
+      "heal": 0.558,
+      "thorns": 0.588,
+      "mirage": 0.698,
+      "bastion": 0.743,
+      "deathmark": 0.386,
+      "toxic": 0.326,
+      "hybrid": 0.519
     },
     "damage": {
-      "bleed": 0.234,
-      "poison": 0.323,
-      "heal": 0.18,
-      "thorns": 0.358,
+      "bleed": 0.275,
+      "poison": 0.288,
+      "heal": 0.215,
+      "thorns": 0.381,
       "mirage": 0.52,
-      "bastion": 0.356,
-      "deathmark": 0.543,
-      "toxic": 0.631,
-      "hybrid": 0.502
+      "bastion": 0.436,
+      "deathmark": 0.411,
+      "toxic": 0.559,
+      "hybrid": 0.4
     },
     "heal": {
-      "bleed": 0.395,
-      "poison": 0.325,
-      "damage": 0.82,
-      "thorns": 0.621,
-      "mirage": 0.561,
-      "bastion": 0.51,
-      "deathmark": 0.644,
-      "toxic": 0.625,
-      "hybrid": 0.644
+      "bleed": 0.474,
+      "poison": 0.443,
+      "damage": 0.785,
+      "thorns": 0.576,
+      "mirage": 0.736,
+      "bastion": 0.723,
+      "deathmark": 0.558,
+      "toxic": 0.638,
+      "hybrid": 0.675
     },
     "thorns": {
-      "bleed": 0.392,
-      "poison": 0.433,
-      "damage": 0.643,
-      "heal": 0.379,
-      "mirage": 0.581,
-      "bastion": 0.469,
-      "deathmark": 0.668,
-      "toxic": 0.528,
-      "hybrid": 0.466
+      "bleed": 0.399,
+      "poison": 0.413,
+      "damage": 0.619,
+      "heal": 0.424,
+      "mirage": 0.631,
+      "bastion": 0.53,
+      "deathmark": 0.57,
+      "toxic": 0.431,
+      "hybrid": 0.43
     },
     "mirage": {
-      "bleed": 0.296,
-      "poison": 0.382,
+      "bleed": 0.336,
+      "poison": 0.303,
       "damage": 0.48,
-      "heal": 0.439,
-      "thorns": 0.419,
-      "bastion": 0.599,
-      "deathmark": 0.484,
-      "toxic": 0.764,
-      "hybrid": 0.525
+      "heal": 0.264,
+      "thorns": 0.369,
+      "bastion": 0.529,
+      "deathmark": 0.336,
+      "toxic": 0.615,
+      "hybrid": 0.434
     },
     "bastion": {
-      "bleed": 0.335,
-      "poison": 0.226,
-      "damage": 0.644,
-      "heal": 0.49,
-      "thorns": 0.531,
-      "mirage": 0.401,
-      "deathmark": 0.448,
-      "toxic": 0.408,
-      "hybrid": 0.516
+      "bleed": 0.316,
+      "poison": 0.257,
+      "damage": 0.564,
+      "heal": 0.277,
+      "thorns": 0.47,
+      "mirage": 0.471,
+      "deathmark": 0.253,
+      "toxic": 0.248,
+      "hybrid": 0.533
     },
     "deathmark": {
-      "bleed": 0.289,
-      "poison": 0.51,
-      "damage": 0.458,
-      "heal": 0.356,
-      "thorns": 0.333,
-      "mirage": 0.516,
-      "bastion": 0.553,
-      "toxic": 0.499,
-      "hybrid": 0.333
+      "bleed": 0.469,
+      "poison": 0.614,
+      "damage": 0.589,
+      "heal": 0.443,
+      "thorns": 0.43,
+      "mirage": 0.664,
+      "bastion": 0.748,
+      "toxic": 0.469,
+      "hybrid": 0.529
     },
     "toxic": {
-      "bleed": 0.519,
-      "poison": 0.624,
-      "damage": 0.369,
-      "heal": 0.375,
-      "thorns": 0.473,
-      "mirage": 0.236,
-      "bastion": 0.593,
-      "deathmark": 0.501,
-      "hybrid": 0.444
+      "bleed": 0.613,
+      "poison": 0.674,
+      "damage": 0.441,
+      "heal": 0.363,
+      "thorns": 0.569,
+      "mirage": 0.385,
+      "bastion": 0.753,
+      "deathmark": 0.531,
+      "hybrid": 0.561
     },
     "hybrid": {
-      "bleed": 0.409,
-      "poison": 0.459,
-      "damage": 0.498,
-      "heal": 0.356,
-      "thorns": 0.534,
-      "mirage": 0.475,
-      "bastion": 0.484,
-      "deathmark": 0.668,
-      "toxic": 0.556
+      "bleed": 0.46,
+      "poison": 0.481,
+      "damage": 0.6,
+      "heal": 0.325,
+      "thorns": 0.57,
+      "mirage": 0.566,
+      "bastion": 0.468,
+      "deathmark": 0.471,
+      "toxic": 0.439
     }
   }
 }

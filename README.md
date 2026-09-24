@@ -128,6 +128,31 @@ npm run preview
   🎯 grudado num inimigo pra atacar transformava toda cura em dano sem
   aviso — parecia que a cura não funcionava). Sem 🎯, a cura vai no aliado
   mais ferido.
+- **Mecânicas do Axie Origin** (`game.js`): toda carta mostra seu tipo —
+  **Attack** (com alcance), **Skill** (defesa/cura) ou **Secret**. Cada
+  classe ganhou uma carta de **controle** (entra no pool de ataque depois
+  das normais/assinatura) e um **Secret** (entra no pool de defesa):
+  | Classe | Controle | Secret |
+  |---|---|---|
+  | Guerreiro | Golpe Atordoante — 😵 Stun 2.5s | Contra-Ataque — revida 22 (× Power) |
+  | Sacerdote | Luz Ofuscante — 😱 Fear | Graça Oculta — cura 26 (× MP) ao cair abaixo de ½ HP |
+  | Mago | Rajada Gélida — 🥶 Chill 8s | Armadilha Gélida — 12 de dano + Chill no atacante |
+  | Arqueiro | Flecha Congelante — 🥶 Chill 8s | Rede de Caça — Stun 3s no atacante |
+  | Ladino | Golpe Sombrio — 😱 Fear | Sombra — esquiva o golpe e dá Fear no atacante |
+  | Xamã | Uivo Ancestral — 😵 Stun 2s | Totem Amaldiçoado — Bleed + Poison no atacante |
+
+  **Stun**: o Axie não joga carta, a carta que ele estava carregando é
+  **interrompida**, e um Tanque atordoado não move o esquadrão. **Chill**:
+  sem esquiva e o esquadrão anda a meia velocidade. **Fear** (4s): se o
+  Axie atacar nesse tempo, o ataque erra por completo. Stun/Chill/Fear
+  contam em segundos reais (`tickCasts`) e a Purificação limpa os três.
+  **Secret**: colocado virado pra baixo num aliado (a IA põe no Tanque);
+  dispara sozinho quando aquele Axie é atacado e some. Você vê qual é o
+  seu Secret; do rival só aparece "❓ Secret" (nem nas mensagens nem na
+  barra de cast o nome dele aparece). Reequilibrado no simulador (400
+  duelos por par): todos os arquétipos entre 38% e 62%, Fear virou janela
+  de 4s pra não anular golpe demais, e o Chill virou o counter natural da
+  esquiva (Miragem).
 - **Clareza ao soltar uma carta** (principalmente curto × longo alcance):
   cada carta na mão diz ao vivo se alcança (`main.js`'s `reachFor`: "✅
   hits Shell" ou "❌ Shell 3.1 away · reach 2.3") e fica com borda vermelha

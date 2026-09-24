@@ -311,7 +311,13 @@ function applyResultFx(result){
   if (!result) return;
   const { side, card, casterIndex } = result;
 
-  if (result.fizzled) return;
+  if (result.fizzled){
+    if (result.interrupted){
+      render.spawnFloatingText(ui.getLaneSideEl(side, casterIndex), '😵 INTERRUPTED', 'text-mark');
+      sfx.playDodge();
+    }
+    return;
+  }
 
   if (result.missed){
     if (result.targetIndex >= 0) cine.afterimage(result.targetSide, result.targetIndex, '#ffffff');
@@ -343,6 +349,7 @@ function applyResultFx(result){
         const labels = {
           bulwark_cleanse: 'CLEANSE + BULWARK!', bulwark: 'BULWARK!',
           barrier: 'BARRIER!', dodge: 'EVASION!', thorns: 'THORNS!',
+          secret: side === 'you' ? `❓ ${card.name} set` : '❓ SECRET SET',
         };
         render.spawnFloatingText(el, labels[card.effect] || 'GUARD!', 'text-shield');
         defenseCinematic(card, result.targetSide, result.targetIndex);
@@ -380,6 +387,12 @@ function applyResultFx(result){
     return;
   }
   const el = ui.getLaneSideEl(result.targetSide, result.targetIndex);
+  if (result.feared){
+    render.spawnFloatingText(ui.getLaneSideEl(side, casterIndex), '😱 FEAR — missed!', 'text-mark');
+    cine.afterimage(result.targetSide, result.targetIndex, '#b89cff');
+    sfx.playDodge();
+    return;
+  }
   if (result.dodged){
     cine.afterimage(result.targetSide, result.targetIndex);
     render.spawnFloatingText(el, 'DODGED!', 'text-block');
@@ -401,7 +414,15 @@ function applyResultFx(result){
     if (result.bulwarked) render.spawnFloatingText(el, 'BULWARK!', 'text-block');
     if (result.deathmarked) render.spawnFloatingText(el, '+'+game.DEATHMARK_BONUS+' MARK', 'text-mark');
     if (result.comboBonus) render.spawnFloatingText(el, 'COMBO! -'+result.comboBonus, 'text-combo');
+    // Origin control landed on the target.
+    const ctl = { stun: `😵 STUN ${card.duration || game.STUN_TIME}s`, chill: `🥶 CHILL ${card.duration || game.CHILL_TIME}s`, fear: '😱 FEAR' }[card.effect];
+    if (ctl){
+      render.spawnFloatingText(el, ctl, 'text-mark');
+      if (card.effect === 'stun') ui.playLaneAction(result.targetSide, result.targetIndex, 'stun');
+      if (card.effect === 'chill') ui.spawnImpact(result.targetSide, result.targetIndex, 'frost');
+    }
   }
+  if (result.secret) applySecretFx(result);
   if (result.thornReflected > 0){
     const casterEl = ui.getLaneSideEl(result.side, result.casterIndex);
     render.flashHit(casterEl);
@@ -459,8 +480,33 @@ function defenseCinematic(card, side, index){
     case 'barrier': cine.bubble(side, index); break;
     case 'dodge': cine.afterimage(side, index); break;
     case 'thorns': cine.thornSpikes(side, index); break;
+    case 'secret': cine.shockwave(side, index, '#b89cff', 0.5); break;
     default: cine.dome(side, index);
   }
+}
+
+// A Secret sprang: reveal it over its owner, then show what it did to the
+// attacker (or the heal on its owner).
+function applySecretFx(result){
+  const sec = result.secret;
+  const ownerEl = ui.getLaneSideEl(sec.side, sec.index);
+  const casterEl = ui.getLaneSideEl(result.side, result.casterIndex);
+  render.spawnFloatingText(ownerEl, `❗ SECRET: ${sec.name}`, 'text-ambush');
+  cine.flash('#b89cff', 0.35);
+  cine.shockwave(sec.side, sec.index, '#b89cff', 0.8);
+  sfx.playShield();
+  if (sec.attackerDmg){
+    render.flashHit(casterEl);
+    render.spawnFloatingText(casterEl, '-' + sec.attackerDmg, 'text-dmg');
+    ui.spawnImpact(result.side, result.casterIndex, 'hit');
+    ui.playLaneAction(result.side, result.casterIndex, 'hit');
+    playKOIfDied(result.side, result.casterIndex);
+  }
+  if (sec.control === 'stun' || sec.trap === 'snare'){ render.spawnFloatingText(casterEl, '😵 STUN', 'text-mark'); ui.playLaneAction(result.side, result.casterIndex, 'stun'); }
+  if (sec.control === 'chill') render.spawnFloatingText(casterEl, '🥶 CHILL', 'text-mark');
+  if (sec.control === 'venom') render.spawnFloatingText(casterEl, '🩸☠️ BLEED + POISON', 'text-bleed');
+  if (sec.trap === 'shadow') render.spawnFloatingText(casterEl, '😱 FEAR', 'text-mark');
+  if (sec.healed){ render.flashHeal(ownerEl); render.spawnFloatingText(ownerEl, '+' + sec.healed, 'text-heal'); cine.healBeam(sec.side, sec.index); }
 }
 
 function applyBleedFx(side, statusResults){
@@ -490,7 +536,9 @@ function applyBleedFx(side, statusResults){
 function setHintForResult(side, result){
   const who = side === 'you' ? 'You' : 'The rival';
   if (!result) return; // no card affordable right now -- not worth a hint, it happens constantly
-  if (result.fizzled){ ui.setHint(`${who}: ${result.card.name} fizzled — its caster fell.`); return; }
+  if (result.fizzled){ ui.setHint(result.interrupted ? `${who}: ${result.card.name} was INTERRUPTED — its caster is stunned.` : `${who}: ${result.card.name} fizzled — its caster fell.`); return; }
+  if (result.feared){ ui.setHint(`${who}: ${result.card.name} missed — the caster was Feared.`); return; }
+  if (result.secret){ ui.setHint(`❗ ${result.secret.side === 'you' ? 'Your' : "The rival's"} Secret ${result.secret.name} sprang — it ${result.secret.text}!`); return; }
   if (result.missed){ ui.setHint(`${result.card.name} missed — the target was out of range.`); return; }
   if (result.card.role === 'defense' || result.card.role === 'heal'){
     if (result.targetIndex === -1){ ui.setHint(`${who}: no target available!`); return; }
@@ -498,7 +546,7 @@ function setHintForResult(side, result){
     const targetWho = onSelf ? 'its own ally' : 'the enemy';
     ui.setHint(result.reversed
       ? `${who} reversed ${result.card.name} on ${targetWho}!`
-      : `${who} used ${result.card.name} on ${targetWho}!`);
+      : `${who} used ${cardLabel(result.card, side)} on ${targetWho}!`);
     return;
   }
   if (result.targetIndex === -1){ ui.setHint(`${who}: no target available!`); return; }
@@ -583,6 +631,7 @@ let previewTimer = 0; // how long the post-release confirmation stays up
 function reachFor(card){
   const caster = state.youLanes[card.laneIndex];
   if (!caster || !caster.alive) return null;
+  if (caster.status.stun > 0) return { ok: false, text: `😵 stunned ${Math.ceil(caster.status.stun)}s` };
   const a = aimFor(card);
   const lanes = a.targetSide === 'you' ? state.youLanes : state.rivalLanes;
   const target = lanes[a.targetIndex];
@@ -640,6 +689,11 @@ function aimFor(card){
 // protection. Ties keep the card's own Axie.
 function supportTargetFor(card, caster){
   const alive = state.youLanes.map((l, i) => ({ l, i })).filter(x => x.l.alive);
+  if (card.effect === 'secret'){
+    const open = alive.filter(x => !x.l.secret);
+    const pick = open.find(x => x.l.isTank) || open[0] || alive.find(x => x.l.isTank) || alive[0];
+    return pick ? pick.i : caster;
+  }
   if (card.role === 'defense' && card.effect === 'thorns'){
     const tank = alive.find(x => x.l.isTank);
     if (tank) return tank.i;
@@ -801,7 +855,7 @@ function startCast(plan){
   if (!travels) ui.playLaneAction(plan.side, plan.casterIndex, 'skill');
   pendingCasts.push({ id, plan, age: 0, travels, launched: false });
   if (plan.side === 'you') ui.setHint(`⏳ Casting ${plan.card.name}…`);
-  else if (!aiming) ui.setHint(`⚠️ The rival is casting ${plan.card.name}!`);
+  else if (!aiming) ui.setHint(`⚠️ The rival is casting ${cardLabel(plan.card, 'rival')}!`);
 }
 
 function tickPendingCasts(dt){
@@ -827,9 +881,14 @@ function tickPendingCasts(dt){
   ui.setCastBars(pendingCasts.map(c => ({
     side: c.plan.side, laneIndex: c.plan.casterIndex,
     frac: Math.min(1, c.age / game.CAST_IMPACT_AT),
-    label: `${c.plan.card.setIcon || ''} ${c.plan.card.name} → ${targetName(c.plan)}`,
+    label: `${c.plan.card.setIcon || ''} ${cardLabel(c.plan.card, c.plan.side)} → ${targetName(c.plan)}`,
     miss: c.plan.missed,
   })));
+}
+
+// The rival's Secrets stay hidden: you only ever see "a Secret".
+function cardLabel(card, side){
+  return side === 'rival' && card.effect === 'secret' ? 'a Secret ❓' : card.name;
 }
 
 function targetName(plan){

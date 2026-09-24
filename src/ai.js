@@ -47,6 +47,13 @@ function supportTarget(state, side, card){
     const worst = alive.reduce((best, x) => (dots(x) > dots(best) ? x : best), alive[0]);
     return dots(worst) > 0 ? worst.i : -1;
   }
+  // Secrets go face-down on the Tank (Taunt makes it the one that gets
+  // hit), otherwise on any ally without one.
+  if (card.effect === 'secret'){
+    const open = alive.filter(x => !x.lane.secret);
+    if (!open.length) return -1;
+    return (open.find(x => x.lane.isTank) || open[0]).i;
+  }
   const key = DEFENSE_STATUS[card.effect] || 'shield';
   const open = alive.filter(x => !x.lane.status[key]);
   if (!open.length) return -1;
@@ -63,7 +70,7 @@ export function aiBeginCard(state, side = 'rival'){
 
   const candidates = [];
   lanesOf(state, side).forEach((lane, laneIndex) => {
-    if (!lane.alive) return;
+    if (!lane.alive || lane.status.stun > 0) return; // stunned Axies can't cast
     const set = setById(lane.setId);
     lane.cardPool.forEach(c => {
       if (c.cost > state[ENERGY[side]]) return;
