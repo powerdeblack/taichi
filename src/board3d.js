@@ -1033,13 +1033,14 @@ export async function syncBoardAxies(youLanes, rivalLanes){
   // marker in place (same position, facing and state) as soon as it's ready.
   let mixer;
   try { mixer = await ensureMixer(); }
-  catch (err){ loadStatus.failed = lanes.length; loadStatus.error = err?.message || String(err); renderLoadPill(); return; }
+  catch (err){ if (isStaleBuildError(err)) reloadForNewVersion(); loadStatus.failed = lanes.length; loadStatus.error = err?.message || String(err); renderLoadPill(); return; }
   if (token !== matchToken) return;
   await Promise.all(lanes.map(async ({ side, lane, i }) => {
     let axie;
     try {
       axie = await mixer.create({ descriptor: buildDescriptor(lane.classId, { evolved: lane.evolved }), quality: 'balanced', artMode: 'faithful', strict: true });
     } catch (err){
+      if (isStaleBuildError(err)) reloadForNewVersion();
       loadStatus.failed++; loadStatus.error = loadStatus.error || err?.message || String(err);
       console.error('Axie model failed:', lane.classId, err);
       renderLoadPill();
@@ -1085,6 +1086,24 @@ function makeMarker(color){
     dispose(){ this.disposed = true; body.geometry.dispose(); body.material.dispose(); e1.geometry.dispose(); eyeMat.dispose(); },
   };
 }
+
+// A page left open across a deploy can still reference code files the new
+// deploy removed; reload once to pick up the current version.
+function isStaleBuildError(err){
+  return /dynamically imported module|Importing a module script failed|error loading dynamically/i.test(err?.message || String(err));
+}
+export function reloadForNewVersion(){
+  try {
+    const last = Number(sessionStorage.getItem('axieDuelReloadAt') || 0);
+    if (Date.now() - last < 60000) return; // at most once a minute -- never a reload loop
+    sessionStorage.setItem('axieDuelReloadAt', String(Date.now()));
+  } catch { /* storage blocked: still worth one reload */ }
+  if (loadPill){ loadPill.textContent = 'A new version is out — reloading…'; loadPill.className = 'load-pill show'; }
+  setTimeout(() => location.reload(), 600);
+}
+
+// Vite's own signal that a code file of an older build is gone.
+window.addEventListener('vite:preloadError', (e) => { e.preventDefault(); reloadForNewVersion(); });
 
 let matchToken = 0;
 let loadStatus = { total: 0, done: 0, failed: 0, error: null };

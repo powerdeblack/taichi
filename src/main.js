@@ -534,6 +534,7 @@ function applyBleedFx(side, statusResults){
 }
 
 function setHintForResult(side, result){
+  if (result && result.dodged && !result.secret){ ui.setHint(`${side === 'you' ? 'You' : 'The rival'}: ${result.card.name} was dodged!`); return; }
   const who = side === 'you' ? 'You' : 'The rival';
   if (!result) return; // no card affordable right now -- not worth a hint, it happens constantly
   if (result.fizzled){ ui.setHint(result.interrupted ? `${who}: ${result.card.name} was INTERRUPTED — its caster is stunned.` : `${who}: ${result.card.name} fizzled — its caster fell.`); return; }

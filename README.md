@@ -566,6 +566,16 @@ plano (com limite de tempo), um aviso no tabuleiro mostra "Loading 3D
 Axies n/6…" ou o erro exato, e uma falha ao baixar o manifesto é tentada
 de novo na próxima partida.
 
+**Por que os modelos não carregavam no celular** (achado pelo aviso na
+tela): o toolkit carrega parte do código sob demanda (materiais Místicos,
+partículas) em arquivos JS separados com hash no nome. Cada deploy troca
+esses arquivos, então uma página aberta — ou em cache/instalada — antes de
+um deploy pedia arquivos que já não existiam ("Failed to fetch dynamically
+imported module") e nenhum modelo 3D carregava. Agora o build junta tudo
+num único bundle (`vite.config.js` `inlineDynamicImports`), e se ainda
+assim uma versão antiga for detectada (`vite:preloadError` ou esse erro
+no carregamento) a página recarrega sozinha uma vez.
+
 **O que o jogo usa do toolkit** (`src/axieLook.js`, compartilhado pelo
 tabuleiro e pela prévia do time):
 - **Cor de corpo por classe** — índice no catálogo de cores do toolkit
