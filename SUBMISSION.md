@@ -118,8 +118,9 @@ is a snowy Lunacia hall with the Lunacia sigil on the floor.
   simulator and the 2,000-team tournament and applied the tuning; drove
   automated browser tests with Playwright (phone viewports, touch, screenshots)
   and asset-pack trimming; wrote the documentation.
-- **TODO** — add any other AI assistant you used (for example the one that
-  prepared the submission guide) and what it was used for.
+- **Claude (claude.ai chat, Anthropic)** — researched the Vibeathon rules and
+  judging criteria and prepared the submission/compliance guide (deadlines,
+  required fields, rights checklist) that this kit follows.
 
 Suggested sentence:
 
