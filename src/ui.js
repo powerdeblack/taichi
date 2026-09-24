@@ -3,8 +3,8 @@
 import { MAX_ENERGY, LOADOUT_SIZE, SQUAD_SIZE } from './game.js';
 import { portraitHTML } from './axieArt.js';
 import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive, moveLaneVisual, setLaneLivePosition, setLaneRoaming, spawnImpact as spawnImpact3D, setTauntRing, showAim, hideAim,
-  startCastFX, launchCastFX, landCastFX, clearCastsFX } from './board3d.js';
-export { setTauntRing, showAim, hideAim, startCastFX, launchCastFX, landCastFX, clearCastsFX };
+  startCastFX, launchCastFX, landCastFX, clearCastsFX, setBlizzard } from './board3d.js';
+export { setTauntRing, showAim, hideAim, startCastFX, launchCastFX, landCastFX, clearCastsFX, setBlizzard };
 
 const rosterGrid = document.getElementById('rosterGrid');
 const squadListEl = document.getElementById('squadList');
@@ -39,9 +39,25 @@ export function renderRoster(axies, squad, onAdd){
 }
 
 const archetypeRow = document.getElementById('archetypeRow');
-export function renderArchetypes(archetypes, axies, sets, onUse, activeId){
+const metaNoteEl = document.getElementById('metaNote');
+const metaMatrixEl = document.getElementById('metaMatrix');
+
+function archChips(ids, byId){
+  if (!ids.length) return '<span class="arch-none">—</span>';
+  return ids.map(id => `<span class="arch-chip" title="${byId[id].name}">${byId[id].icon} ${byId[id].name}</span>`).join('');
+}
+
+// `meta` is the simulator output (src/metaData.js): cards are shown in
+// ranking order with their tier, win rate, and who they beat / lose to.
+export function renderArchetypes(archetypes, axies, sets, onUse, activeId, meta){
+  const byId = Object.fromEntries(archetypes.map(a => [a.id, a]));
+  const ordered = meta.ranked.map(id => byId[id]).filter(Boolean);
+  metaNoteEl.textContent = `Tiers from ${(meta.gamesPerPair * ordered.length * (ordered.length - 1) / 2).toLocaleString('en')} simulated AI-vs-AI duels. ` +
+    `S = the current meta; a counter-meta team beats at least one S team. "Beats" = wins that matchup at least ${Math.round(meta.beatsAt * 100)}% of the time.`;
   archetypeRow.innerHTML = '';
-  archetypes.forEach(arch => {
+  ordered.forEach(arch => {
+    const tier = meta.tier[arch.id];
+    const counterVs = meta.counterMetaVs[arch.id];
     const card = document.createElement('div');
     card.className = 'arch-card' + (arch.id === activeId ? ' active' : '');
     card.style.setProperty('--arch-color', arch.color);
@@ -54,15 +70,71 @@ export function renderArchetypes(archetypes, axies, sets, onUse, activeId){
         ${p.isTank ? '<div class="arch-tank">🎯 Tank</div>' : ''}
       </div>`;
     }).join('');
+    const badge = tier === 'S'
+      ? '<span class="meta-badge">🏆 META</span>'
+      : counterVs.length ? `<span class="counter-badge">🎯 COUNTER-META vs ${counterVs.map(id => byId[id].icon + ' ' + byId[id].name).join(', ')}</span>` : '';
     card.innerHTML = `
-      <div class="arch-head"><span class="arch-icon">${arch.icon}</span><span class="arch-name">${arch.name}</span></div>
+      <div class="arch-head">
+        <span class="arch-icon">${arch.icon}</span><span class="arch-name">${arch.name}</span>
+        <span class="tier-badge tier-${tier}" title="Tier ${tier}">${tier}</span>
+      </div>
+      <div class="arch-meta-line">${badge}<span class="arch-winrate">${Math.round(meta.winRate[arch.id] * 100)}% win rate</span></div>
       <div class="arch-tags">${arch.tags.map(t => `<span>${t}</span>`).join('')}</div>
       <div class="arch-members">${members}</div>
       <p class="arch-how">${arch.how}</p>
+      <div class="arch-vs"><b>✅ Beats</b>${archChips(meta.beats[arch.id], byId)}</div>
+      <div class="arch-vs"><b>❌ Countered by</b>${archChips(meta.counteredBy[arch.id], byId)}</div>
       <button type="button" class="arch-use">${arch.id === activeId ? '✓ Loaded' : 'Use this team'}</button>
     `;
     card.querySelector('.arch-use').addEventListener('click', () => onUse(arch));
     archetypeRow.appendChild(card);
+  });
+  renderMetaMatrix(ordered, meta);
+}
+
+// Diverging scale around 50%: blue = the row archetype wins the matchup,
+// red = it loses, neutral gray = even. Full color at +/-15 points.
+const DIV_MID = [0x38, 0x38, 0x35];
+const DIV_WIN = [0x39, 0x87, 0xe5];
+const DIV_LOSE = [0xe6, 0x67, 0x67];
+function divergingColor(rate){
+  const t = Math.min(1, Math.abs(rate - 0.5) / 0.15);
+  const pole = rate >= 0.5 ? DIV_WIN : DIV_LOSE;
+  const c = DIV_MID.map((m, i) => Math.round(m + (pole[i] - m) * t));
+  return `rgb(${c.join(',')})`;
+}
+
+function renderMetaMatrix(ordered, meta){
+  const head = ordered.map(a => `<th scope="col" title="${a.name}">${a.icon}</th>`).join('');
+  const rows = ordered.map(row => {
+    const cells = ordered.map(col => {
+      if (row.id === col.id) return '<td class="mm-self">—</td>';
+      const r = meta.matrix[row.id][col.id];
+      const pct = Math.round(r * 100);
+      const label = `${row.name} vs ${col.name}: wins ${pct}%`;
+      // Only lopsided matchups get their number printed; hover/tap shows all.
+      const strong = Math.abs(r - 0.5) >= 0.05;
+      return `<td style="background:${divergingColor(r)}" title="${label}" aria-label="${label}" data-tip="${label}">${strong ? pct : ''}</td>`;
+    }).join('');
+    return `<tr><th scope="row" title="${row.name}">${row.icon} <span>${row.name}</span></th>${cells}</tr>`;
+  }).join('');
+  metaMatrixEl.innerHTML = `
+    <div class="mm-legend"><span class="mm-swatch" style="background:${divergingColor(0.35)}"></span>row loses
+      <span class="mm-swatch" style="background:${divergingColor(0.5)}"></span>even
+      <span class="mm-swatch" style="background:${divergingColor(0.65)}"></span>row wins</div>
+    <div class="mm-scroll"><table class="mm-table"><thead><tr><th></th>${head}</tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="mm-tip" aria-live="polite">Tap a cell to read the matchup.</div>
+    <p class="mm-foot">Each row is one archetype's win rate against each column (${meta.gamesPerPair} duels per pairing, both sides of the board). Average duel: ${Math.round(meta.avgDuelSeconds / 6) / 10} min.</p>
+  `;
+  const tip = metaMatrixEl.querySelector('.mm-tip');
+  metaMatrixEl.querySelectorAll('td[data-tip]').forEach(td => {
+    const show = () => {
+      tip.textContent = td.dataset.tip;
+      metaMatrixEl.querySelectorAll('td.mm-hot').forEach(x => x.classList.remove('mm-hot'));
+      td.classList.add('mm-hot');
+    };
+    td.addEventListener('pointerenter', show);
+    td.addEventListener('click', show);
   });
 }
 

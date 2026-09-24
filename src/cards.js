@@ -81,6 +81,8 @@ export const CARD_SETS = [
       desc:'Guard: blocks 50% of the next hit taken. Reversed on an enemy: Vulnerable, +30% damage taken for its next 2 hits.' },
     healCard: { id:'bencao', name:'Bênção', range:'own', role:'heal', cost:2, heal:26,
       desc:'A priest’s biggest single heal -- 26 HP right away (scaled by MP). Reversed on an enemy: Reverse Heal, deals that much damage instead.' },
+    signatureDefenseCard: { id:'purificacao', name:'Purificação', range:'own', role:'defense', cost:1, effect:'bulwark_cleanse', hits:2,
+      desc:'Plant-born Priest signature. Cleanse: removes Bleed, Poison and Deathmark from an ally, then Bulwark (next 2 hits taken -25%). Reversed on an enemy: Vulnerable instead.' },
     signatureHealCard: { id:'brotos_curativos', name:'Brotos Curativos', range:'own', role:'heal', cost:1, effect:'regen', regenTicks:3,
       desc:'Plant-born Priest signature. Regeneration: heals a little HP (scaled by MP) every tick for 3 ticks, blossoming from your own vitality. Reversed on an enemy: the same as damage over time instead.' },
   },
@@ -143,8 +145,8 @@ export const CARD_SETS = [
     ],
     signatureCard: { id:'presas_ancestrais', name:'Presas Ancestrais', range:'short', role:'attack', cost:0, dmg:10, effect:'deathmark',
       desc:'Reptile-born Shaman signature. Short range. Ancestral fangs mark the prey: applies Deathmark.' },
-    defenseCard: { id:'vinculo_espiritual', name:'Vínculo Espiritual', range:'own', role:'defense', cost:2, effect:'thorns', hits:2, pct:0.4,
-      desc:'Thorns: reflects 40% of the damage from the next 2 hits taken back onto whoever landed them. Reversed on an enemy: Vulnerable instead.' },
+    defenseCard: { id:'vinculo_espiritual', name:'Vínculo Espiritual', range:'own', role:'defense', cost:2, effect:'thorns', hits:3, pct:0.6,
+      desc:'Thorns: reflects 60% of the damage from the next 3 hits taken back onto whoever landed them. Reversed on an enemy: Vulnerable instead.' },
     healCard: { id:'comunhao_ancestral', name:'Comunhão Ancestral', range:'own', role:'heal', cost:2, effect:'regen', regenTicks:4,
       desc:'Regeneration: heals a little HP (scaled by MP) every tick for 4 ticks -- the longest regeneration around. Reversed on an enemy: the same as damage over time instead, for the full duration -- a true curse.' },
   },
@@ -245,12 +247,12 @@ export const ARCHETYPES = [
   },
   {
     id: 'poison', name: 'Plague', icon: '☠️', color: '#8e5cc9',
-    tags: ['Poison', 'Long range', 'Sustain'],
-    how: 'Rogue and Mage stack Poison from long range: each hit adds 3 stacks (up to 9), a tick deals 2 per stack and then fades by one -- a full stack does about 90 damage over time. Stay back and keep re-applying it while the Priest Tank shields itself and heals through the pressure.',
+    tags: ['Poison', 'Long range', 'Kite'],
+    how: 'Rogue and Mage stack Poison from long range: each hit adds 3 stacks (up to 9), a tick deals 2 per stack and then fades by one -- a full stack does about 90 damage over time. Stay back and keep re-applying it while the Shaman Tank regenerates and punishes anyone who rushes it with Thorns.',
     picks: [
-      { classId: 'Plant', setId: 'priest', isTank: true, evolved: false, counts: { attack: 1, defense: 2, heal: 2 } },
+      { classId: 'Reptile', setId: 'shaman', isTank: true, evolved: false, counts: { attack: 1, defense: 2, heal: 2 } },
       { classId: 'Bug', setId: 'rogue', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
-      { classId: 'Aqua', setId: 'mage', isTank: false, evolved: false, counts: { attack: 3, defense: 1, heal: 1 } },
+      { classId: 'Aqua', setId: 'mage', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
     ],
   },
   {
@@ -271,6 +273,66 @@ export const ARCHETYPES = [
       { classId: 'Reptile', setId: 'shaman', isTank: true, evolved: false, counts: { attack: 0, defense: 3, heal: 2 } },
       { classId: 'Plant', setId: 'priest', isTank: false, evolved: false, counts: { attack: 1, defense: 0, heal: 4 } },
       { classId: 'Bird', setId: 'ranger', isTank: false, evolved: false, counts: { attack: 3, defense: 1, heal: 1 } },
+    ],
+  },
+  {
+    id: 'thorns', name: 'Thorn Wall', icon: '🌵', color: '#7c9a3c',
+    tags: ['Thorns', 'Taunt', 'Anti-melee'],
+    how: 'Bait them in: the Shaman Tank keeps Thorns up (60% of each of the next 3 hits it takes goes back to the attacker) and Taunt forces anyone who walks close to swing at it -- melee squads end up hitting the wall and hurting themselves. Behind it, the Warrior and the Ranger hit hard.',
+    picks: [
+      { classId: 'Reptile', setId: 'shaman', isTank: true, evolved: false, counts: { attack: 1, defense: 3, heal: 1 } },
+      { classId: 'Beast', setId: 'warrior', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
+      { classId: 'Bird', setId: 'ranger', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
+    ],
+  },
+  {
+    id: 'mirage', name: 'Mirage', icon: '💨', color: '#6ab7d9',
+    tags: ['Evasion', 'Anti-burst', 'Poison'],
+    how: 'Hard to hit: the Ranger Tank stacks Evasion (50% to dodge each of the next 2 hits) and the Rogue drops Smoke on it (the next hit is dodged for sure). A dodged hit deals nothing -- big single blows are wasted. Meanwhile arrows and poisoned blades chip away.',
+    picks: [
+      { classId: 'Bird', setId: 'ranger', isTank: true, evolved: false, counts: { attack: 1, defense: 3, heal: 1 } },
+      { classId: 'Bug', setId: 'rogue', isTank: false, evolved: false, counts: { attack: 3, defense: 2, heal: 0 } },
+      { classId: 'Bird', setId: 'ranger', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
+    ],
+  },
+  {
+    id: 'bastion', name: 'Arcane Bastion', icon: '🔵', color: '#3f7fd1',
+    tags: ['Barrier', 'Shield', 'Sustain'],
+    how: 'Layers of protection: the Mage Tank throws up Barriers (absorb the next 22 damage), the Priest adds Guard (halves the next hit) and big heals. Burst gets soaked before it reaches HP, while the Mage behind trades Arcane Blasts. Weak spot: Bleed and Poison ticks go straight through barriers.',
+    picks: [
+      { classId: 'Aqua', setId: 'mage', isTank: true, evolved: false, counts: { attack: 1, defense: 3, heal: 1 } },
+      { classId: 'Plant', setId: 'priest', isTank: false, evolved: false, counts: { attack: 1, defense: 2, heal: 2 } },
+      { classId: 'Aqua', setId: 'mage', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
+    ],
+  },
+  {
+    id: 'deathmark', name: 'Deathmark Hunt', icon: '💀', color: '#9a6bd1',
+    tags: ['Deathmark', 'Execute', 'Damage'],
+    how: 'Mark, then crush: Shaman Fangs and Priest Final Judgment apply Deathmark (the next hit on that Axie deals +10), and the Warrior follows with Brutal Charge (20) or a Savage Fury. Focus one target at a time and it drops fast.',
+    picks: [
+      { classId: 'Reptile', setId: 'shaman', isTank: true, evolved: false, counts: { attack: 3, defense: 2, heal: 0 } },
+      { classId: 'Plant', setId: 'priest', isTank: false, evolved: false, counts: { attack: 3, defense: 1, heal: 1 } },
+      { classId: 'Beast', setId: 'warrior', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
+    ],
+  },
+  {
+    id: 'toxic', name: 'Toxic Rush', icon: '🐍', color: '#5fa84a',
+    tags: ['Poison', 'Rush', 'Anti-heal'],
+    how: 'Three Rogues flood the enemy with Poison: every blade adds 3 stacks (up to 9, about 90 damage over time) faster than healers can undo it. Rush in, spread poison on the Tank, and let it tick while Smoke keeps your own Tank from being hit.',
+    picks: [
+      { classId: 'Bug', setId: 'rogue', isTank: true, evolved: false, counts: { attack: 2, defense: 2, heal: 1 } },
+      { classId: 'Bug', setId: 'rogue', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
+      { classId: 'Bug', setId: 'rogue', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
+    ],
+  },
+  {
+    id: 'hybrid', name: 'Blood & Venom', icon: '🧪', color: '#c0478c',
+    tags: ['Bleed', 'Poison', 'Hybrid DOT'],
+    how: 'Two damage-over-time effects at once: the Mage applies both Bleed (short) and Poison (long), the Rogue stacks more Poison, and they tick independently every 2s. The Warrior Tank holds the line with Bulwark (next 3 hits taken -25%).',
+    picks: [
+      { classId: 'Beast', setId: 'warrior', isTank: true, evolved: false, counts: { attack: 2, defense: 3, heal: 0 } },
+      { classId: 'Aqua', setId: 'mage', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
+      { classId: 'Bug', setId: 'rogue', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
     ],
   },
 ];

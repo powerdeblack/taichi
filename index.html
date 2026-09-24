@@ -11,7 +11,10 @@
 <div class="stage">
   <h1>Axie Duel</h1>
   <p class="subtitle">Build your squad of 3 — kill the enemy Tank to win</p>
-  <button class="help-btn" id="helpBtn" type="button">❓ How to Play</button>
+  <div class="top-btns">
+    <button class="help-btn" id="helpBtn" type="button">❓ How to Play</button>
+    <button class="help-btn hidden" id="tutorialSmallBtn" type="button">🎓 Tutorial</button>
+  </div>
 
   <!-- ===================== TEAM PICKER SCREEN ===================== -->
   <div id="deckScreen" class="deck-panel">
@@ -19,13 +22,25 @@
       <div class="deck-title">Build your team</div>
       <div class="deck-count" id="deckCount">0 / 3 Axies picked</div>
     </div>
+    <div class="tutorial-cta" id="tutorialCta">
+      <span id="tutorialCtaText">New here? Learn by playing a short guided duel.</span>
+      <div class="tutorial-cta-actions">
+        <button type="button" class="tutorial-dismiss" id="tutorialDismiss">Not now</button>
+        <button type="button" id="tutorialBtn">🎓 Play tutorial</button>
+      </div>
+    </div>
     <p class="deck-hint">Freely pick 3 Axies (classes can repeat) — each starts with a preset 5-card loadout of Attack/Defense/Heal matching its card set's own style, which you can still fine-tune with the steppers. Exactly 1 Axie must be marked as Tank. Each Axie also picks a card set (Warrior, Priest, Mage, Ranger, Rogue, Shaman): that's what actually decides its cards, not its species. Pairing a species with its own native set (⭐, e.g. Bird+Ranger) unlocks a bonus signature card. The duel's goal is to kill the rival's Tank.</p>
     <div class="preview3d-wrap">
       <canvas id="preview3dCanvas"></canvas>
       <div class="preview3d-label" id="preview3dLabel">Click an Axie to see it in 3D</div>
     </div>
-    <div class="section-label">Archetypes — ready-made synergies</div>
+    <div class="section-label">Archetypes &amp; meta</div>
+    <p class="meta-note" id="metaNote"></p>
     <div class="arch-row" id="archetypeRow"></div>
+    <details class="meta-matrix">
+      <summary>Full matchup table — who beats whom</summary>
+      <div id="metaMatrix"></div>
+    </details>
     <div class="effect-legend">
       <span><b>🩸 Bleed</b> each hit adds a stack (max 3); every 2s tick deals 4 per stack, for 3 ticks.</span>
       <span><b>☠️ Poison</b> each hit adds 3 stacks (max 9); a tick deals 2 per stack, then fades by 1.</span>
@@ -51,6 +66,14 @@
         <div class="board-overlay" id="boardOverlay"></div>
       </div>
       <div class="banner" id="banner">Game over<span class="sub" id="bannerSub"></span></div>
+      <div class="coach hidden" id="coach" role="dialog" aria-live="polite">
+        <div class="coach-step" id="coachStep"></div>
+        <p class="coach-text" id="coachText"></p>
+        <div class="coach-actions">
+          <button type="button" class="coach-skip" id="coachSkip">Skip tutorial</button>
+          <button type="button" class="coach-next" id="coachNext">Next</button>
+        </div>
+      </div>
     </div>
 
     <div class="controls">
@@ -108,7 +131,10 @@
       <h3>4. Effects and archetypes</h3>
       <p><b>🩸 Bleed</b> stacks up to 3 and deals 4 per stack every 2s tick for 3 ticks. <b>☠️ Poison</b> adds 3 stacks per hit (max 9), deals 2 per stack each tick and fades by one. <b>⚔️ Damage</b> is the direct hit of an attack card. <b>💚 Heal</b> restores HP right away (stronger with more MP); <b>Regen</b> heals a little every tick. The Archetypes on the team screen are ready-made squads built around one of these — tap "Use this team" to load one, then tweak it if you like.</p>
 
-      <h3>5. Tank, Taunt, and movement</h3>
+      <h3>5. Meta, counters and the Blizzard</h3>
+      <p>The Archetypes are ranked from thousands of simulated duels: <b>S</b> is the current meta, a <b>counter-meta</b> team beats at least one S team, and each card lists who it beats and who counters it (open the matchup table for the numbers). After <b>2 minutes</b> a <b>Blizzard</b> hits every Axie each tick and halves all healing, so every duel ends.</p>
+
+      <h3>6. Tank, Taunt, and movement</h3>
       <p>The Tank sits at the center and "taunts" — anyone attacking from close to it is forced to hit the Tank instead of picking freely, win or lose. Hold the joystick to walk the Tank anywhere on the snowfield; the other 2 Axies escort it automatically, keeping formation around wherever it goes. Use "Move an Axie" (a short cooldown) to swap two of your own lanes instead — handy for ducking out of Taunt range or lining up a short-range hit.</p>
     </div>
   </div>

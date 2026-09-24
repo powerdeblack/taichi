@@ -4,9 +4,11 @@ import { AXIES, CARD_SETS, setById, ARCHETYPES, copyArchetypePicks } from './car
 import * as game from './game.js';
 import * as ui from './ui.js';
 import * as render from './render.js';
-import { aiBeginCard } from './ai.js';
+import { aiBeginCard, aiMoveIntent } from './ai.js';
 import { initPreview, showAxie } from './axie3d.js';
 import * as sfx from './sfx.js';
+import { META } from './metaData.js';
+import { createTutorial, tutorialDone, tutorialDismissed, dismissTutorialInvite } from './tutorial.js';
 
 const deckScreen = document.getElementById('deckScreen');
 const duelScreen = document.getElementById('duelScreen');
@@ -30,6 +32,7 @@ let selectedTarget = null; // { side, laneIndex } -- tap-target-first flow, see 
 let moveMode = false;
 let moveSource = null; // laneIndex of the Axie picked up, mid move-selection
 let matchFinished = false;
+let blizzardAnnounced = false;
 const koPlayed = new WeakSet();
 
 // ================= Team builder =================
@@ -48,7 +51,7 @@ function renderTeamScreen(){
     const arch = ARCHETYPES.find(a => a.id === loadedArchetype);
     if (JSON.stringify(arch.picks) !== JSON.stringify(squad)) loadedArchetype = null;
   }
-  ui.renderArchetypes(ARCHETYPES, AXIES, CARD_SETS, useArchetype, loadedArchetype);
+  ui.renderArchetypes(ARCHETYPES, AXIES, CARD_SETS, useArchetype, loadedArchetype, META);
   ui.renderRoster(AXIES, squad, addToSquad);
   ui.renderSquad(squad, AXIES, CARD_SETS, { onAdjust: adjustCount, onToggleTank: toggleTank, onToggleEvolve: toggleEvolve, onSetChange: changeSet, onRemove: removeFromSquad });
   ui.renderSquadHeader(squad, game.SQUAD_SIZE);
@@ -130,10 +133,50 @@ startDuelBtn.addEventListener('click', () => {
   beginMatch(squad.slice(), copyArchetypePicks(rivalArch));
 });
 switchDeckBtn.addEventListener('click', () => {
+  endTutorial();
   duelScreen.classList.add('hidden');
   deckScreen.classList.remove('hidden');
 });
-resetBtn.addEventListener('click', () => beginMatch(lastYouSquad, lastRivalSquad));
+
+// ================= Tutorial =================
+// A guided duel: the player gets Steel Rain (long range, so the first
+// cards reach from the start) against Deathmark Hunt, and the coach
+// bubble (tutorial.js) gates each step on the player actually doing it.
+let tutorial = null;
+const tutorialBtn = document.getElementById('tutorialBtn');
+const tutorialSmallBtn = document.getElementById('tutorialSmallBtn');
+const tutorialCta = document.getElementById('tutorialCta');
+const tutorialCtaText = document.getElementById('tutorialCtaText');
+// The invite is shown until the player finishes the tutorial or taps
+// "Not now"; after that only the small header button offers it.
+function renderTutorialCta(){
+  const done = tutorialDone();
+  const hideInvite = done || tutorialDismissed();
+  tutorialCta.classList.toggle('hidden', hideInvite);
+  tutorialSmallBtn.classList.toggle('hidden', !hideInvite);
+  tutorialCtaText.textContent = 'New here? Learn by playing a short guided duel — optional.';
+}
+document.getElementById('tutorialDismiss').addEventListener('click', () => {
+  dismissTutorialInvite();
+  renderTutorialCta();
+});
+renderTutorialCta();
+function endTutorial(){
+  if (tutorial) tutorial.end();
+  tutorial = null;
+  renderTutorialCta();
+}
+function startTutorial(){
+  deckScreen.classList.add('hidden');
+  duelScreen.classList.remove('hidden');
+  const you = copyArchetypePicks(ARCHETYPES.find(a => a.id === 'damage'));
+  const rival = copyArchetypePicks(ARCHETYPES.find(a => a.id === 'deathmark'));
+  beginMatch(you, rival);
+  tutorial = createTutorial(() => state);
+}
+tutorialBtn.addEventListener('click', startTutorial);
+tutorialSmallBtn.addEventListener('click', startTutorial);
+resetBtn.addEventListener('click', () => { endTutorial(); beginMatch(lastYouSquad, lastRivalSquad); });
 
 // ================= Help modal =================
 helpBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
@@ -173,6 +216,8 @@ function beginMatch(youSquad, rivalSquad){
   aiMoveTimer = 1 + Math.random() * 1.5;
   aiWandering = false;
   aiThinkTimer = 2.5; // let both squads finish walking in first
+  blizzardAnnounced = false;
+  ui.setBlizzard(false);
   clearCasts();
   ui.hideBanner();
   ui.buildBoard(state, onUnitClick);
@@ -314,9 +359,9 @@ function applyBleedFx(side, statusResults){
       return;
     }
     render.flashHit(el);
-    const icon = kind === 'poison' ? '☠️' : (kind === 'regenRot' ? '🥀' : '🩸');
-    render.spawnFloatingText(el, '-'+dmg+' '+icon, 'text-bleed');
-    ui.spawnImpact(side, laneIndex, kind === 'poison' ? 'poison' : 'bleed');
+    const icon = { poison: '☠️', regenRot: '🥀', blizzard: '❄️' }[kind] || '🩸';
+    render.spawnFloatingText(el, '-'+dmg+' '+icon, kind === 'blizzard' ? 'text-shield' : 'text-bleed');
+    ui.spawnImpact(side, laneIndex, { poison: 'poison', blizzard: 'frost' }[kind] || 'bleed');
     playKOIfDied(side, laneIndex);
   });
 }
@@ -343,6 +388,7 @@ function finishMatch(){
   if (matchFinished) return;
   matchFinished = true;
   clearCasts();
+  endTutorial();
   if (state.winner === 'draw') ui.showBanner('Draw!', 'Both Tanks fell together.');
   else if (state.winner === 'you') ui.showBanner('You won the duel!', 'The rival Tank was defeated.');
   else ui.showBanner('You lost the duel.', 'Your Tank was defeated.');
@@ -367,6 +413,7 @@ function onUnitClick(side, laneIndex){
   selectedTarget = { side, laneIndex };
   ui.markSelectedTarget(side, laneIndex, true);
   sfx.playSelect();
+  if (tutorial && side === 'rival') tutorial.notify('selected');
   const who = side === 'you' ? `your ${lane.name}` : `the rival's ${lane.name}`;
   ui.setHint(`🎯 ${who} selected — now tap a card to use on it.`);
 }
@@ -413,6 +460,7 @@ function onCardPress(card){
   if (moveMode || state.gameOver) return;
   aiming = card;
   sfx.playSelect();
+  if (tutorial) tutorial.notify('aiming');
   updateAim();
   syncHand();
 }
@@ -510,6 +558,7 @@ function tickPendingCasts(dt){
     ui.landCastFX(c.id);
     const result = game.landCast(state, c.plan);
     applyResultFx(result);
+    if (tutorial && c.plan.side === 'you') tutorial.notify('landed');
     if (!aiming && (c.plan.side === 'you' || !moveMode)) setHintForResult(c.plan.side, result);
     syncUI();
     return false;
@@ -656,29 +705,29 @@ let aiMoveTimer = 1 + Math.random() * 1.5;
 let aiMoveDirX = 0, aiMoveDirZ = 0;
 let aiWandering = false;
 
-// Mostly closes in on the player's squad (its attacks need range too), now
-// and then drifts sideways or holds still so it isn't a straight charge.
-// The rival faces +world z toward the player, so its local offsets equal
-// world offsets.
+// Follows the squad AI's movement intent (melee squads close in, ranged
+// squads hold at long range and back off -- see ai.js aiMoveIntent),
+// re-deciding every half second or so, with an occasional sidestep so it
+// doesn't move like a rail.
 function pickAiWanderMove(){
   const wasWandering = aiWandering;
-  aiWandering = Math.random() < 0.7;
-  if (aiWandering){
-    const rivalTank = state.rivalLanes.findIndex(l => l.isTank && l.alive);
-    const youTank = state.youLanes.findIndex(l => l.isTank && l.alive);
-    let angle = Math.random() * Math.PI * 2;
-    if (rivalTank !== -1 && youTank !== -1 && Math.random() < 0.65){
-      const r = game.worldPos('rival', state.rivalLanes[rivalTank]);
-      const y = game.worldPos('you', state.youLanes[youTank]);
-      if (Math.hypot(y.x - r.x, y.z - r.z) > 2.2) angle = Math.atan2(y.z - r.z, y.x - r.x) + (Math.random() - 0.5) * 0.8;
-    }
+  const intent = aiMoveIntent(state, 'rival');
+  aiMoveTimer = 0.4 + Math.random() * 0.6;
+  if (intent && Math.random() < 0.85){
+    const jitter = (Math.random() - 0.5) * 0.5;
+    const angle = Math.atan2(intent.z, intent.x) + jitter;
     aiMoveDirX = Math.cos(angle);
     aiMoveDirZ = Math.sin(angle);
-    aiMoveTimer = 1.0 + Math.random() * 1.4;
+    aiWandering = true;
+  } else if (Math.random() < 0.3){
+    const angle = Math.random() * Math.PI * 2;
+    aiMoveDirX = Math.cos(angle);
+    aiMoveDirZ = Math.sin(angle);
+    aiWandering = true;
   } else {
-    aiMoveTimer = 0.6 + Math.random() * 1.0;
-    if (wasWandering) state.rivalLanes.forEach((lane, i) => { if (lane.alive) ui.endLiveLanePosition('rival', i); });
+    aiWandering = false;
   }
+  if (wasWandering && !aiWandering) state.rivalLanes.forEach((lane, i) => { if (lane.alive) ui.endLiveLanePosition('rival', i); });
 }
 
 // ================= Real-time game loop =================
@@ -705,6 +754,12 @@ function gameLoop(nowMs){
   game.tickEnergyRealtime(state, dt);
   game.tickMoveCooldown(state, dt);
   game.tickCasts(state, dt);
+  if (!blizzardAnnounced && game.isBlizzard(state)){
+    blizzardAnnounced = true;
+    ui.setBlizzard(true);
+    sfx.playBlizzard();
+    ui.setHint('❄️ BLIZZARD! The storm hurts every Axie each tick and heals are halved — finish it!');
+  }
   const statusResults = game.tickStatusTimer(state, dt);
   if (statusResults){
     applyBleedFx('you', statusResults.you);
@@ -716,12 +771,16 @@ function gameLoop(nowMs){
     const tankIdx = state.youLanes.findIndex(l => l.isTank);
     if (tankIdx !== -1 && state.youLanes[tankIdx].alive){
       game.moveSquadWithTank(state, 'you', joyDirX * UNIT_MOVE_SPEED * dt, joyDirZ * UNIT_MOVE_SPEED * dt);
+      if (tutorial) tutorial.notify('moved', Math.hypot(joyDirX, joyDirZ) * UNIT_MOVE_SPEED * dt);
       state.youLanes.forEach((lane, i) => { if (lane.alive) ui.setLiveLanePosition('you', i, lane.localPos); });
     }
   }
 
+  const rivalOn = !tutorial || tutorial.rivalActive();
+  if (tutorial) tutorial.tick();
   aiMoveTimer -= dt;
-  if (aiMoveTimer <= 0) pickAiWanderMove();
+  if (rivalOn && aiMoveTimer <= 0) pickAiWanderMove();
+  if (!rivalOn) aiWandering = false;
   if (aiWandering){
     const rivalTankIdx = state.rivalLanes.findIndex(l => l.isTank);
     if (rivalTankIdx !== -1 && state.rivalLanes[rivalTankIdx].alive){
@@ -732,7 +791,7 @@ function gameLoop(nowMs){
 
   // The rival waits out its own cast lock, then pauses a beat before the
   // next card so it doesn't fire the instant the lock clears.
-  if (state.castRival <= 0){
+  if (rivalOn && state.castRival <= 0){
     aiThinkTimer -= dt;
     if (aiThinkTimer <= 0){
       aiThinkTimer = AI_THINK_BASE + Math.random() * AI_THINK_JITTER;

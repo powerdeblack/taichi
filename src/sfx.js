@@ -190,6 +190,13 @@ export function playBleed(t = 0){
   tone({ type: 'sine', freq: 120, freqEnd: 60, t, peak: 0.15, decay: 0.12 });
 }
 
+// A rising howl of wind when the Blizzard starts.
+export function playBlizzard(){
+  if (!ready()) return;
+  noise({ peak: 0.25, attack: 0.6, decay: 1.6, filter: 'bandpass', freq: 300, freqEnd: 1400, q: 2 });
+  noise({ t: 0.4, peak: 0.18, attack: 0.5, decay: 1.4, filter: 'bandpass', freq: 600, freqEnd: 2400, q: 3 });
+}
+
 export function playKO(){
   if (!ready()) return;
   tone({ type: 'sine', freq: 110, freqEnd: 30, peak: 0.6, decay: 0.7 });

@@ -212,6 +212,7 @@ const IMPACT_STYLES = {
   shield: { color: 0x8fd0ff, count: 7, life: 0.55, speed: [0.2, 0.45], up: [0.3, 0.6], gravity: 1.0, spread: 0.25 },
   poison: { color: 0x9b6fd6, count: 9, life: 0.85, speed: [0.15, 0.4], up: [0.5, 1.0], gravity: 0.5, spread: 0.35 },
   bleed:  { color: 0xb8452f, count: 5, life: 0.55, speed: [0.25, 0.55], up: [0.1, 0.25], gravity: 3.2, spread: 0.4 },
+  frost:  { color: 0x5fb4ff, count: 8, life: 0.8,  speed: [0.6, 1.2], up: [-0.2, 0.3], gravity: 0.6, spread: 0.9 },
 };
 
 export function spawnImpact(side, laneIndex, kind = 'hit'){
@@ -529,6 +530,14 @@ let sigilRing = null;
 let sigilLight = null;
 let snowPoints = null;
 let snowDrift = null;
+let blizzard = false;
+
+// Sudden death look: snow falls hard and sideways, the haze closes in.
+export function setBlizzard(on){
+  blizzard = on;
+  if (scene && scene.fog){ scene.fog.near = on ? 8 : 15; scene.fog.far = on ? 24 : 34; }
+  if (snowPoints){ snowPoints.material.size = on ? 0.3 : 0.24; }
+}
 
 function buildHall(){
   scene.background = buildSkyTexture();
@@ -696,8 +705,9 @@ function tickScenery(dt){
     const arr = attr.array;
     for (let i = 0; i < SNOWFLAKE_COUNT; i++){
       const iy = i * 3 + 1;
-      arr[iy] -= dt * (0.6 + (i % 5) * 0.12);
-      arr[i * 3] += Math.sin(elapsedTime * 0.8 + snowDrift[i]) * dt * 0.25;
+      arr[iy] -= dt * (0.6 + (i % 5) * 0.12) * (blizzard ? 3.2 : 1);
+      arr[i * 3] += (Math.sin(elapsedTime * 0.8 + snowDrift[i]) * 0.25 + (blizzard ? 2.4 : 0)) * dt;
+      if (arr[i * 3] > SNOW_BOX.x) arr[i * 3] -= SNOW_BOX.x * 2;
       if (arr[iy] < -0.1){
         arr[iy] = SNOW_BOX.yTop;
         arr[i * 3] = (Math.random() * 2 - 1) * SNOW_BOX.x;

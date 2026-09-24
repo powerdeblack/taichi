@@ -85,6 +85,7 @@ export function freshState(youPicks, rivalPicks){
     castYou: 0,
     castRival: 0,
     statusTimer: 0,
+    elapsed: 0,
     deck, discard: [], hand,
     gameOver: false,
     winner: null,
@@ -471,9 +472,9 @@ function applyRegen(lane, ticks){
   lane.status.regen = Math.max(lane.status.regen || 0, ticks);
 }
 
-function tickRegen(lane, casterLane){
+function tickRegen(lane, casterLane, healScale = 1){
   if (lane.status.regen && lane.status.regen > 0){
-    const healed = applyHeal(lane, REGEN_HEAL_PER_TICK, casterLane || lane);
+    const healed = applyHeal(lane, REGEN_HEAL_PER_TICK * healScale, casterLane || lane);
     lane.status.regen -= 1;
     if (lane.status.regen <= 0) delete lane.status.regen;
     return healed;
@@ -576,7 +577,7 @@ export function resolveCard(state, side, card, casterIndex, targetIndex, targetS
     // heal role
     if (!reversed){
       if (card.effect === 'regen') applyRegen(targetLane, card.regenTicks || 3);
-      else result.healed = applyHeal(targetLane, card.heal, casterLane);
+      else result.healed = applyHeal(targetLane, card.heal * healScale(state), casterLane);
     } else {
       if (card.effect === 'regen') applyRegenRot(targetLane, card.regenTicks || 3);
       else {
@@ -669,7 +670,7 @@ export function landCast(state, plan){
   return resolveCard(state, plan.side, plan.card, plan.casterIndex, plan.targetIndex, plan.targetSide);
 }
 
-function tickStatuses(lanes){
+function tickStatuses(lanes, state){
   const results = [];
   lanes.filter(l => l.alive).forEach(l => {
     const bleedDmg = tickBleed(l);
@@ -678,7 +679,7 @@ function tickStatuses(lanes){
     if (poisonDmg > 0) results.push({ lane: l, dmg: poisonDmg, kind: 'poison' });
     const regenRotDmg = tickRegenRot(l);
     if (regenRotDmg > 0) results.push({ lane: l, dmg: regenRotDmg, kind: 'regenRot' });
-    const regenHeal = tickRegen(l);
+    const regenHeal = tickRegen(l, null, healScale(state));
     if (regenHeal > 0) results.push({ lane: l, dmg: regenHeal, kind: 'regen' });
   });
   return results;
@@ -701,14 +702,38 @@ export function tickEnergyRealtime(state, dt){
 // output) once STATUS_TICK_INTERVAL has elapsed, else null.
 export function tickStatusTimer(state, dt){
   if (state.gameOver) return null;
+  state.elapsed += dt;
   state.statusTimer += dt;
   if (state.statusTimer < STATUS_TICK_INTERVAL) return null;
   state.statusTimer -= STATUS_TICK_INTERVAL;
-  const you = tickStatuses(state.youLanes);
-  const rival = tickStatuses(state.rivalLanes);
+  const you = tickStatuses(state.youLanes, state);
+  const rival = tickStatuses(state.rivalLanes, state);
+  const storm = blizzardDamage(state);
+  if (storm > 0){
+    [[state.youLanes, you], [state.rivalLanes, rival]].forEach(([lanes, out]) => {
+      lanes.forEach(l => {
+        if (!l.alive) return;
+        l.hp = Math.max(0, l.hp - storm);
+        if (l.hp <= 0) l.alive = false;
+        out.push({ lane: l, dmg: storm, kind: 'blizzard' });
+      });
+    });
+  }
   checkGameOver(state);
   return { you, rival };
 }
+
+// Blizzard (sudden death): once a duel passes BLIZZARD_AT seconds the
+// storm closes in -- every status tick hurts every Axie on both sides,
+// harder the longer it lasts, and all healing is halved. Guarantees a
+// finish when two sustain squads would otherwise stall forever.
+export const BLIZZARD_AT = 120;
+export function isBlizzard(state){ return state.elapsed >= BLIZZARD_AT; }
+function blizzardDamage(state){
+  if (!isBlizzard(state)) return 0;
+  return 2 + 2 * Math.floor((state.elapsed - BLIZZARD_AT) / 20);
+}
+function healScale(state){ return isBlizzard(state) ? 0.5 : 1; }
 
 export function checkGameOver(state){
   const youTank = state.youLanes.find(l => l.isTank);

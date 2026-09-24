@@ -157,19 +157,58 @@ npm run preview
   (`setTauntRing`).
 - **Movimento discreto**: "Move" troca o slot de formação de dois dos seus
   Axies (cooldown de 4s), mantendo o esquadrão onde ele está.
-- **Arquétipos pré-montados**: na tela de montar time há 4 times prontos,
-  cada um construído em volta de uma sinergia, com a explicação de como
-  funciona e as tags (`cards.js`'s `ARCHETYPES`) — **🩸 Savage Bleed**
-  (Xamã Tanque com Espinhos + Guerreiro e Mago aplicando Bleed de perto),
-  **☠️ Plague** (Ladino e Mago acumulando Poison de longe, Sacerdote Tanque
-  se curando e se protegendo), **⚔️ Steel Rain** (dano bruto de longe:
-  flechas do Arqueiro, Explosão Arcana, Investida Brutal do Guerreiro
-  Tanque) e **💚 Sanctuary** (Sacerdote curando, Xamã Tanque com
-  Regeneração e Espinhos, Arqueiro causando dano). "Use this team" carrega
-  o time inteiro (espécie, conjunto nativo, loadout, Tanque); dá pra
-  ajustar depois. Uma legenda explica **Bleed**, **Poison**, **Dano** e
-  **Cura**, e o modal "How to Play" também. O **rival sempre entra com um
-  arquétipo** (diferente do seu quando possível).
+- **Arquétipos pré-montados (10)**: na tela de montar time há 10 times
+  prontos, cada um construído em volta de uma sinergia, com tags e "como
+  funciona" (`cards.js`'s `ARCHETYPES`): 🩸 Savage Bleed, ☠️ Plague,
+  ⚔️ Steel Rain, 💚 Sanctuary, 🌵 Thorn Wall (Espinhos + Provocação contra
+  corpo a corpo), 💨 Mirage (evasão contra golpes grandes), 🔵 Arcane
+  Bastion (Barreira/Guarda/Purificação contra burst e DOT), 💀 Deathmark
+  Hunt (marca e executa), 🐍 Toxic Rush (três Ladinos de Poison contra
+  cura) e 🧪 Blood & Venom (Bleed + Poison juntos). "Use this team" carrega
+  o time inteiro; dá pra ajustar depois. O rival sempre entra com um
+  arquétipo (diferente do seu quando possível).
+- **Meta e contra-meta (simulado, não chutado)**: `scripts/simulate-meta.mjs`
+  (`npm run meta`) joga **todos os arquétipos contra todos** com o motor
+  real (`game.js`) e a **mesma IA** do rival (`ai.js`) dos dois lados — 400
+  duelos por par, metade de cada lado do tabuleiro, semente fixa (sempre
+  gera o mesmo resultado) — e grava `src/metaData.js`: matriz de vitórias,
+  taxa de vitória geral, **tier** por ranking (S = top 2 = o meta, depois
+  A/B/C), **"Beats"** (vence o confronto em ≥55%), **"Countered by"** e
+  **contra-meta** (time fora do S que vence algum time S). A tela mostra
+  os arquétipos nessa ordem com selo de tier, % de vitória, 🏆 META ou
+  🎯 COUNTER-META, e uma **tabela de confrontos** (escala divergente: azul =
+  a linha vence, vermelho = perde, cinza = equilibrado; toque numa célula
+  pra ler o confronto). Rodar de novo depois de mexer em cartas/regras
+  atualiza tudo. Pra chegar num meta equilibrado (41–57% de vitória, sem
+  time invencível) a simulação expôs e levou a: IA que não reaplica uma
+  defesa ainda ativa e põe defesas no aliado mais ferido (Espinhos no
+  Tanque), Espinhos mais fortes (60% dos próximos 3 golpes), uma
+  carta-assinatura nova do Sacerdote nativo (**Purificação**: remove
+  Bleed/Poison/Deathmark e dá Bulwark — a IA só usa em quem tem DOT), e a
+  Nevasca (abaixo).
+- **IA por alcance**: `ai.js` serve pros dois lados. Times com maioria de
+  cartas curtas avançam até encostar; times de longe mantêm distância de
+  alcance longo e recuam se o inimigo chega perto (kite)
+  (`aiMoveIntent`). Cura vai no aliado mais ferido (cura instantânea só
+  abaixo de 85% de vida), defesa como descrito acima.
+- **Nevasca (morte súbita)**: a partir de **2 minutos** de duelo
+  (`BLIZZARD_AT`), a cada tique (2s) a tempestade causa dano a **todos** os
+  Axies dos dois lados (2, +2 a cada 20s) e **toda cura vale metade**. A
+  neve cai forte e de lado, a névoa fecha, toca um vento e aparece o aviso.
+  Sem isso, dois times de cura/barreira empatavam por mais de 5 minutos
+  (na simulação, 80% dos duelos Toxic Rush × Arcane Bastion estouravam o
+  limite); com ela, a média é ~2,6 min e nenhum duelo trava.
+- **Tutorial jogável (opcional)**: nunca abre sozinho. A tela de montar time
+  mostra um convite "🎓 Play tutorial" — com "Not now" pra dispensar de vez
+  (lembrado no `localStorage`) — e, depois de dispensado ou concluído, só
+  fica um botão pequeno "🎓 Tutorial" ao lado do "How to Play". Dentro dele
+  há "Skip tutorial" a qualquer momento. Ele abre um duelo guiado
+  (`src/tutorial.js`) — Steel Rain × Deathmark Hunt — com um balão que
+  explica um passo por vez e **só avança quando você faz a ação**: mover
+  com o joystick, tocar num inimigo, segurar uma carta (anel de alcance),
+  soltar e esperar ela aterrissar; o rival fica parado até o passo em que
+  ele começa a reagir. A parte da tela em foco pisca em dourado, e o balão
+  se posiciona sozinho num canto que não cubra o que ele está apontando.
 - **Bleed acumula**: cada acerto de Bleed soma um acúmulo (máx. 3) e
   renova a duração pra 3 tiques; cada tique (a cada 2s) causa 4 por
   acúmulo. **Poison**: +3 acúmulos por acerto (máx. 9), cada tique causa 2
@@ -335,6 +374,12 @@ Ainda não implementado:
   `main.js` — joga 1 carta afordável; ataques só se alguém estiver no
   alcance (mira via `pickAutoTarget`). O movimento do rival fica no
   `main.js` (`pickAiWanderMove`, que se aproxima do seu time)
+- `src/metaData.js` — **gerado** por `npm run meta` (não editar à mão):
+  matriz de vitórias, tiers, counters e contra-metas dos arquétipos
+- `src/tutorial.js` — o duelo guiado (balão, foco, passos que esperam a
+  ação do jogador)
+- `scripts/simulate-meta.mjs` — o simulador de meta (IA × IA com o motor
+  real, 400 duelos por par, semente fixa)
 - `src/sfx.js` — efeitos sonoros procedurais (Web Audio API): ataque por
   conjunto + impacto escalado pelo dano, cura, escudo, status, nocaute,
   vitória/derrota, e o mudo (`toggleMute`)
