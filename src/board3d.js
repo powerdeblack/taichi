@@ -413,7 +413,7 @@ function tickCasts(dt){
     cast.age += dt;
     if (cast.phase === 'aftermath'){
       const t = Math.min(1, cast.age / AFTERMATH_TIME);
-      cast.rune.scale.setScalar(1 + t * 5);
+      cast.rune.scale.setScalar(1 + t * 2);
       cast.rune.rotation.z += dt * 0.8;
       cast.rune.material.opacity = 0.85 * (1 - t);
       if (t >= 1){ disposeCast(cast); casts.delete(id); }

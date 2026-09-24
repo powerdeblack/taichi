@@ -1,6 +1,6 @@
 // All DOM rendering: team-builder roster/squad, the lane board, hand, energy
 // pips, pile counts, and the win/lose banner. No game rules live here.
-import { MAX_ENERGY, LOADOUT_SIZE, SQUAD_SIZE } from './game.js';
+import { MAX_ENERGY, LOADOUT_SIZE, SQUAD_SIZE, cardValues } from './game.js';
 import { portraitHTML } from './axieArt.js';
 import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive, moveLaneVisual, setLaneLivePosition, setLaneRoaming, spawnImpact as spawnImpact3D, setTauntRing, showAim, hideAim,
   startCastFX, launchCastFX, landCastFX, clearCastsFX, setBlizzard, hitSquash, cinematics } from './board3d.js';
@@ -420,7 +420,7 @@ export function markInRange(side, indices){
 // card visibly fail to respond. Keeping one persistent element per uid
 // means a click's target never gets pulled out from under it.
 const handNodes = new Map(); // card.uid -> element
-export function renderHand(state, { onPress, onRelease, onCancel, aimingUid }){
+export function renderHand(state, { onPress, onRelease, onCancel, aimingUid, reverseHeals = false }){
   const seen = new Set();
   state.hand.forEach((card, i) => {
     seen.add(card.uid);
@@ -436,13 +436,19 @@ export function renderHand(state, { onPress, onRelease, onCancel, aimingUid }){
       div = document.createElement('div');
       handNodes.set(card.uid, div);
     }
-    div.className = 'card' + (!playable ? ' disabled' : '') + (card.uid === aimingUid ? ' aiming' : '');
+    // A heal with the 🎯 on an enemy becomes Reverse Heal -- show it red,
+    // with the damage it would deal, before the player lets go.
+    const reversing = reverseHeals && card.role === 'heal';
+    const chips = cardValues(state, card, casterLane, reversing)
+      .map(c => `<span class="val val-${c.kind}">${c.icon}<b>${c.text}</b></span>`).join('');
+    div.className = 'card' + (!playable ? ' disabled' : '') + (card.uid === aimingUid ? ' aiming' : '') + (reversing ? ' reversing' : '');
     div.style.borderColor = card.color + '55';
     div.innerHTML = `
       <div class="card-top">
         <div class="card-name">${card.name}</div>
         <div class="card-cost">${card.cost}</div>
       </div>
+      <div class="card-vals">${reversing ? '<span class="val val-rev">↩ REVERSE</span>' : ''}${chips}</div>
       <div class="card-class" style="color:${card.color}">${card.setIcon ? card.setIcon+' ' : ''}${card.setName || card.cls} · ${rangeLabel}</div>
       <div class="card-desc">${card.desc}${!laneAlive ? ' <b>(lane destroyed)</b>' : ''}</div>
     `;

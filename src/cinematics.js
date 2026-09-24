@@ -19,9 +19,24 @@ function mat(color, opacity = 1, extra = {}){
   });
 }
 
-function spawn(update, objects){
+// `anchor` ({ side, i, p }) pins an effect to an Axie: every frame the
+// whole effect slides by however far that Axie moved, and `p` (the point
+// the effect's update code positions things from) moves with it -- so an
+// effect stays on the Axie while squads walk instead of being left behind
+// on the floor.
+function spawn(update, objects, anchor = null){
   objects.forEach(o => ctx.scene.add(o));
-  active.push({ t: 0, update, objects });
+  active.push({ t: 0, update, objects, anchor });
+}
+
+function follow(fx){
+  const a = fx.anchor;
+  const cur = ctx.lanePos(a.side, a.i);
+  if (!cur) return;
+  const dx = cur.x - a.p.x, dz = cur.z - a.p.z;
+  if (!dx && !dz) return;
+  fx.objects.forEach(o => { o.position.x += dx; o.position.z += dz; });
+  a.p.x += dx; a.p.z += dz;
 }
 
 function dispose(o){
@@ -35,6 +50,7 @@ export function tickCinematics(dt, realDt = dt){
   for (let i = active.length - 1; i >= 0; i--){
     const fx = active[i];
     fx.t += dt;
+    if (fx.anchor) follow(fx);
     if (fx.update(fx.t, dt) === false){
       fx.objects.forEach(dispose);
       active.splice(i, 1);
@@ -100,11 +116,12 @@ export function slash(side, i, color = 0xffffff, cross = false){
       if (k < 1) alive = true;
     });
     return alive;
-  }, [...strokes, ...core]);
+  }, [...strokes, ...core], { side, i, p });
 }
 
 // Arrows falling from the sky onto the target, one after another, then
 // staying stuck in the snow for a moment.
+const SKY = new THREE.Vector3(-1.2, 5.5, 1.2);
 export function arrowRain(side, i, count = 3, color = 0xd9b44a){
   const p = at(side, i, 0);
   if (!p) return;
@@ -117,8 +134,8 @@ export function arrowRain(side, i, count = 3, color = 0xd9b44a){
     const fletch = new THREE.Mesh(new THREE.PlaneGeometry(0.14, 0.2), mat(color));
     fletch.position.y = 0.36;
     g.add(shaft, tip, fletch);
-    const land = p.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.9, 0.35, (Math.random() - 0.5) * 0.7));
-    g.userData = { land, from: land.clone().add(new THREE.Vector3(-1.2, 5.5, 1.2)), delay: k * 0.14, puffed: false };
+    const off = new THREE.Vector3((Math.random() - 0.5) * 0.9, 0.35, (Math.random() - 0.5) * 0.7);
+    g.userData = { off, delay: k * 0.14, puffed: false };
     g.rotation.z = -0.2; g.rotation.x = 0.2;
     arrows.push(g);
   }
@@ -129,14 +146,43 @@ export function arrowRain(side, i, count = 3, color = 0xd9b44a){
       const k = (t - u.delay) / 0.32;
       if (k < 0){ a.visible = false; alive = true; return; }
       a.visible = true;
-      a.position.lerpVectors(u.from, u.land, Math.min(1, k));
-      if (k >= 1 && !u.puffed){ u.puffed = true; puff(u.land, 0xffffff, 6); }
+      const land = p.clone().add(u.off);
+      a.position.lerpVectors(land.clone().add(SKY), land, Math.min(1, k));
+      if (k >= 1 && !u.puffed){ u.puffed = true; puff(land, 0xffffff, 6); }
       const fade = (t - u.delay - 0.32 - 1.0) / 0.4;
       a.children.forEach(c => { c.material.opacity = fade > 0 ? Math.max(0, 1 - fade) : 1; });
       if (fade < 1) alive = true;
     });
     return alive;
-  }, arrows);
+  }, arrows, { side, i, p });
+}
+
+// A streak of light from the attacker to the target, drawn at impact so
+// every hit visibly connects the two Axies. Both ends follow their Axie.
+export function strikeTrail(fromSide, fromI, toSide, toI, color = 0xffffff){
+  if (!ctx?.lanePos(fromSide, fromI) || !ctx.lanePos(toSide, toI)) return;
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1, 8, 1, true), mat(color, 0.95, { depthTest: false }));
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1, 6, 1, true), mat(0xffffff, 1, { depthTest: false }));
+  beam.renderOrder = 9; core.renderOrder = 10;
+  const UP = new THREE.Vector3(0, 1, 0);
+  spawn(t => {
+    const a = ctx.lanePos(fromSide, fromI), b = ctx.lanePos(toSide, toI);
+    if (!a || !b) return false;
+    const from = new THREE.Vector3(a.x, 0.8, a.z), to = new THREE.Vector3(b.x, 0.8, b.z);
+    const k = t / 0.45;
+    // The streak shoots from the attacker to the target, then thins out.
+    const head = from.clone().lerp(to, Math.min(1, ease(k * 2.5)));
+    const len = Math.max(0.01, head.distanceTo(from));
+    const dir = head.clone().sub(from).normalize();
+    [beam, core].forEach(m => {
+      m.position.copy(from).lerp(head, 0.5);
+      m.quaternion.setFromUnitVectors(UP, dir.lengthSq() ? dir : UP);
+      m.scale.set(1 + (1 - k) * 1.5, len, 1 + (1 - k) * 1.5);
+    });
+    beam.material.opacity = Math.max(0, 0.95 * (1 - k));
+    core.material.opacity = Math.max(0, 1 - k);
+    return k < 1;
+  }, [beam, core]);
 }
 
 // A magic blast: a bright sphere that swells and pops, a light column and
@@ -157,10 +203,10 @@ export function arcaneBlast(side, i, color = 0x6fc3ff){
     ball.material.opacity = Math.max(0, 0.9 * (1 - k));
     pillar.scale.set(1 - k * 0.7, 1, 1 - k * 0.7);
     pillar.material.opacity = Math.max(0, 0.55 * (1 - k));
-    ring.scale.setScalar(1 + ease(k) * 3.5);
+    ring.scale.setScalar(1 + ease(k) * 1.6);
     ring.material.opacity = Math.max(0, 0.9 * (1 - k));
     return k < 1;
-  }, [ball, pillar, ring]);
+  }, [ball, pillar, ring], { side, i, p });
 }
 
 // Heavy-hit shockwave on the snow plus flying debris.
@@ -175,13 +221,13 @@ export function shockwave(side, i, color = 0xffd23f, strength = 1){
   for (let k = 0; k < 10 + strength * 6; k++){
     const d = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), mat(k % 3 ? 0xf2f7fc : 0x9ab8d6));
     d.position.copy(p).add(new THREE.Vector3(0, 0.1, 0));
-    const a = Math.random() * Math.PI * 2, sp = 1.5 + Math.random() * 2 * strength;
+    const a = Math.random() * Math.PI * 2, sp = 0.8 + Math.random() * 1.1 * strength;
     d.userData.v = new THREE.Vector3(Math.cos(a) * sp, 2 + Math.random() * 2.5, Math.sin(a) * sp);
     debris.push(d);
   }
   spawn((t, dt) => {
     const k = t / 0.9;
-    ring.scale.setScalar(1 + ease(k) * 6 * strength);
+    ring.scale.setScalar(1 + ease(k) * 2.2 * strength);
     ring.material.opacity = Math.max(0, 0.95 * (1 - k));
     inner.scale.setScalar(1 + ease(k * 2) * 2);
     inner.material.opacity = Math.max(0, 0.6 * (1 - k * 2));
@@ -193,7 +239,7 @@ export function shockwave(side, i, color = 0xffd23f, strength = 1){
       d.material.opacity = Math.max(0, 1 - k);
     });
     return k < 1;
-  }, [ring, inner, ...debris]);
+  }, [ring, inner, ...debris], { side, i, p });
 }
 
 function puff(pos, color, n){
@@ -226,7 +272,7 @@ export function bloodSplash(side, i){
   spawn(t => {
     blots.forEach((b, k) => { b.scale.setScalar(Math.max(0.01, Math.min(1, (t - k * 0.04) / 0.15))); b.material.opacity = t > 1.8 ? Math.max(0, 0.95 - (t - 1.8) * 1.5) : 0.95; });
     return t < 2.45;
-  }, blots);
+  }, blots, { side, i, p });
 }
 
 // A lingering toxic cloud: puffy green/purple spheres swelling and
@@ -249,7 +295,7 @@ export function poisonCloud(side, i){
       s.material.opacity = t < 1.4 ? 0.5 : Math.max(0, 0.5 - (t - 1.4) * 0.8);
     });
     return t < 2.05;
-  }, puffs);
+  }, puffs, { side, i, p });
 }
 
 // A skull hovering over the marked target, with a spinning purple ring.
@@ -268,7 +314,7 @@ export function deathmark(side, i){
     ring.scale.setScalar(1 + ease(t / 0.4) * 0.6);
     ring.material.opacity = skull.material.opacity * 0.9;
     return t < 2.2;
-  }, [skull, ring]);
+  }, [skull, ring], { side, i, p });
 }
 
 // Dodged: ghostly afterimage rings sliding aside plus speed streaks.
@@ -291,7 +337,7 @@ export function afterimage(side, i, color = 0xbfe6ff){
     ghosts.forEach(g => { g.position.x = p.x + dir * (0.25 + g.userData.k * 0.25) * ease(k); g.material.opacity = Math.max(0, (0.45 - g.userData.k * 0.12) * (1 - k)); });
     streaks.forEach((s, n) => { s.position.x = p.x - dir * ease(k) * (0.6 + n * 0.1); s.material.opacity = Math.max(0, 0.8 * (1 - k)); });
     return k < 1;
-  }, [...ghosts, ...streaks]);
+  }, [...ghosts, ...streaks], { side, i, p });
 }
 
 // ---------- defenses ----------
@@ -311,7 +357,7 @@ export function dome(side, i, color = 0x8fd0ff){
     wire.material.opacity = 0.55 * fade;
     wire.rotation.y += dt * 0.6;
     return t < 1.8;
-  }, [shell, wire]);
+  }, [shell, wire], { side, i, p });
 }
 
 // Bulwark: a golden hexagonal wall rising in front of the Axie.
@@ -329,7 +375,7 @@ export function bulwarkWall(side, i){
     wall.material.opacity = 0.55 * fade;
     rim.material.opacity = 0.95 * fade;
     return t < 1.7;
-  }, [wall, rim]);
+  }, [wall, rim], { side, i, p });
 }
 
 // Barrier: a bubble with a turning crystal lattice.
@@ -347,7 +393,7 @@ export function bubble(side, i){
     ball.material.opacity = 0.22 * fade;
     lattice.material.opacity = 0.7 * fade;
     return t < 2;
-  }, [ball, lattice]);
+  }, [ball, lattice], { side, i, p });
 }
 
 // Thorns: a ring of spikes bursting out of the snow.
@@ -367,7 +413,7 @@ export function thornSpikes(side, i){
     const grow = t < 0.2 ? ease(t / 0.2) : t > 1.1 ? Math.max(0.01, 1 - (t - 1.1) / 0.4) : 1;
     spikes.forEach(s => { s.scale.y = grow; s.position.y = 0.35 * grow; });
     return t < 1.5;
-  }, spikes);
+  }, spikes, { side, i, p });
 }
 
 // Cleanse: a white-gold column of light with a ring sweeping up it.
@@ -385,7 +431,7 @@ export function cleansePillar(side, i){
     ring.material.opacity = Math.max(0, 0.9 * (1 - k));
     beam.material.opacity = Math.max(0, 0.45 * (1 - k));
     return k < 1;
-  }, [beam, ring]);
+  }, [beam, ring], { side, i, p });
 }
 
 // ---------- heals ----------
@@ -406,7 +452,7 @@ export function healBeam(side, i){
     halo.material.opacity = Math.max(0, 0.8 * (1 - k));
     stepLeaves(leaves, t, dt, p, false);
     return k < 1;
-  }, [beam, halo, ...leaves]);
+  }, [beam, halo, ...leaves], { side, i, p });
 }
 
 // Regeneration: leaves spiraling up around the Axie.
@@ -414,7 +460,7 @@ export function regenSpiral(side, i){
   const p = at(side, i, 0);
   if (!p) return;
   const leaves = leafSwarm(p, 12);
-  spawn((t, dt) => { stepLeaves(leaves, t, dt, p, true); return t < 1.8; }, leaves);
+  spawn((t, dt) => { stepLeaves(leaves, t, dt, p, true); return t < 1.8; }, leaves, { side, i, p });
 }
 
 function leafSwarm(p, n){
@@ -463,7 +509,7 @@ export function vulnerable(side, i){
     ring.material.opacity = o;
     cracks.forEach(c => { c.scale.x = ease(k * 1.5); c.material.opacity = o; });
     return k < 1;
-  }, [ring, ...cracks]);
+  }, [ring, ...cracks], { side, i, p });
 }
 
 // Reverse heal / rot: a dark column pulling motes out of the target.
@@ -483,7 +529,7 @@ export function drainBeam(side, i){
     beam.material.opacity = Math.max(0, 0.55 * (1 - k));
     motes.forEach(m => { m.position.y += dt * 2.5; m.material.opacity = Math.max(0, 0.9 * (1 - k)); });
     return k < 1;
-  }, [beam, ...motes]);
+  }, [beam, ...motes], { side, i, p });
 }
 
 // ---------- camera, time and screen ----------

@@ -735,3 +735,60 @@ export function checkGameOver(state){
     state.winner = Math.abs(youShare - rivalShare) < 0.005 ? 'draw' : (youShare > rivalShare ? 'you' : 'rival');
   }
 }
+
+// ================= Card numbers shown in the hand =================
+// What a card will actually do when played by its own Axie, with that
+// Axie's multipliers applied (Power for damage, MP for heals); the class
+// triangle and the target's defenses still adjust the final hit. Returns
+// short chips like { icon:'⚔️', text:'21', kind:'dmg' } for ui.renderHand.
+// `reversed` = a heal card aimed at an enemy (Reverse Heal).
+export function cardValues(state, card, casterLane, reversed = false){
+  if (!casterLane) return [];
+  const chips = [];
+  const scale = healScale(state);
+  const mp = casterLane.mp / BASE_MP;
+  if (card.role === 'attack'){
+    const dmg = Math.round(card.dmg * casterLane.powerMult);
+    chips.push({ icon: '⚔️', text: String(dmg), kind: 'dmg' });
+    if (card.effect === 'ambush') chips.push({ icon: '⚡', text: '×2 1st hit', kind: 'fx' });
+    if (card.effect === 'multi') chips.push({ icon: '🏹', text: '+' + Math.round(card.dmg * 0.5 * casterLane.powerMult), kind: 'dmg' });
+    if (card.effect === 'bleed') chips.push({ icon: '🩸', text: BLEED_PER_STACK + '×' + BLEED_TICKS, kind: 'fx' });
+    if (card.effect === 'poison') chips.push({ icon: '☠️', text: '+' + POISON_STACK, kind: 'fx' });
+    if (card.effect === 'deathmark') chips.push({ icon: '💀', text: '+10', kind: 'fx' });
+    if (card.effect === 'retain') chips.push({ icon: '♻️', text: 'keeps', kind: 'fx' });
+    return chips;
+  }
+  if (card.role === 'heal'){
+    if (card.effect === 'regen'){
+      const ticks = card.regenTicks || 3;
+      if (reversed) chips.push({ icon: '🥀', text: '-' + REGEN_ROT_PER_TICK + '×' + ticks, kind: 'dmg' });
+      else chips.push({ icon: '🌿', text: '+' + Math.round(REGEN_HEAL_PER_TICK * scale) + '×' + ticks, kind: 'heal' });
+    } else if (reversed){
+      chips.push({ icon: '🩸', text: '-' + Math.round(card.heal * casterLane.powerMult), kind: 'dmg' });
+    } else {
+      chips.push({ icon: '💚', text: '+' + Math.round(card.heal * mp * scale), kind: 'heal' });
+    }
+    return chips;
+  }
+  switch (card.effect){
+    case 'bulwark_cleanse':
+      chips.push({ icon: '✨', text: 'cleanse', kind: 'def' });
+      chips.push({ icon: '🛡️', text: '-' + Math.round(BULWARK_REDUCTION * 100) + '%×' + (card.hits || BULWARK_HITS), kind: 'def' });
+      break;
+    case 'bulwark':
+      chips.push({ icon: '🛡️', text: '-' + Math.round(BULWARK_REDUCTION * 100) + '%×' + (card.hits || BULWARK_HITS), kind: 'def' });
+      break;
+    case 'barrier':
+      chips.push({ icon: '🔵', text: String(card.amount || 20), kind: 'def' });
+      break;
+    case 'dodge':
+      chips.push({ icon: '💨', text: Math.round((card.chance != null ? card.chance : 1) * 100) + '%×' + (card.charges || 1), kind: 'def' });
+      break;
+    case 'thorns':
+      chips.push({ icon: '🌵', text: Math.round((card.pct != null ? card.pct : 0.4) * 100) + '%×' + (card.hits || 2), kind: 'def' });
+      break;
+    default:
+      chips.push({ icon: '🛡️', text: '-50%', kind: 'def' });
+  }
+  return chips;
+}

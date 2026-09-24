@@ -117,11 +117,24 @@ npm run preview
   alvo marcado lá longe não faz todo ataque errar enquanto tem outro
   inimigo do seu lado); só quando ninguém está no alcance ela mira (e
   erra) no selecionado/mais próximo. Quem está dentro do raio de
-  Provocação do Tanque inimigo sempre mira no Tanque. Cartas de **Defesa/Cura** não têm limite de alcance: aliado
-  selecionado = efeito normal, inimigo = **revertido** (Cura Reversa, igual
-  ao Origin — Guarda/Bulwark/Barreira/Evasão/Espinhos viram
-  **Vulnerável**, Cura/Regeneração viram **dano/DOT**); sem seleção, vai no
-  próprio Axie da carta.
+  Provocação do Tanque inimigo sempre mira no Tanque. Cartas de **Defesa/Cura** não têm limite de alcance.
+  **Defesa vai sempre num aliado** do jogador: o aliado com 🎯, ou (🎯 no
+  inimigo / sem 🎯) o que mais precisa — Espinhos no Tanque, as outras no
+  aliado mais ferido que ainda não tem aquela proteção
+  (`main.js`'s `supportTargetFor`). **Cura segue o 🎯**: num aliado cura;
+  num inimigo vira **Cura Reversa** (Cura → dano, Regeneração → DOT). Pra
+  não pegar ninguém de surpresa, com o 🎯 num inimigo a carta de cura fica
+  **vermelha com "↩ REVERSE"** e o número de dano que vai causar (antes o
+  🎯 grudado num inimigo pra atacar transformava toda cura em dano sem
+  aviso — parecia que a cura não funcionava). Sem 🎯, a cura vai no aliado
+  mais ferido.
+- **Números nas cartas** (`game.js`'s `cardValues`, desenhados em
+  `ui.renderHand`): cada carta mostra o que faz já com os multiplicadores
+  do Axie dono — ⚔️ dano (× Power), 🏹 bônus do combo de flechas, 🩸/☠️/💀
+  do status, 💚 cura (× MP; metade na Nevasca), 🌿 regeneração por tick ×
+  ticks, 🛡️ redução × golpes, 🔵 absorção da Barreira, 💨 chance ×
+  cargas, 🌵 reflexo × golpes. O triângulo de classes e as defesas do alvo
+  ainda ajustam o golpe final.
 - **Conjuração de ~5s por carta (ritmo mais lento)**: ao soltar uma carta
   ela não aplica na hora. São três tempos (`game.js`'s `CAST_LAUNCH_AT` =
   1.2s, `CAST_IMPACT_AT` = 3.2s, `CAST_TIME` = 5s):
@@ -315,15 +328,20 @@ npm run preview
   e o fim da partida baixa **barras de cinema** (letterbox). A câmera
   lenta desacelera também as regras (o `gameLoop` multiplica o `dt` pelo
   `getTimeScale()`), então barras de cast e timers ficam em sincronia com
-  a cena.
+  a cena. Cada efeito é **ancorado no Axie** (`spawn(..., { side, i, p })`):
+  se o Axie anda, o efeito anda junto em vez de ficar largado no chão da
+  arena; os anéis de chão (onda de choque, explosão, runa do cast) são
+  compactos pra ficar em volta do personagem. Todo acerto também dispara
+  um **rastro de luz do atacante até o alvo** (`strikeTrail`), ligando os
+  dois Axies.
 - Status effects em cartas de Ataque: Bleed, **Poison** (empilha, bate 2x a
   stack atual e decai 1 stack por tick — mais forte no início, some
   sozinho), Deathmark, Retain, Ambush (2x dano no 1º acerto) e o combo de
   flechas. Toda carta de Defesa/Cura, de qualquer conjunto, tem uma
-  mecânica nomeada própria — normal num aliado, **revertida** num inimigo
-  (ver mira de Defesa/Cura acima). No inimigo, **toda** carta de Defesa vira
-  **Vulnerável** (independente da mecânica normal), e toda carta de Cura
-  vira dano/DOT equivalente (Cura Reversa):
+  mecânica nomeada própria. Cura num inimigo vira dano/DOT equivalente
+  (Cura Reversa, ver mira acima); Defesa o jogador só usa em aliados (o
+  motor ainda tem a forma revertida, **Vulnerável**, mas nenhuma mira
+  leva uma Defesa até um inimigo):
   - **Guarda** (Sacerdote): bloqueia 50% do próximo golpe.
   - **Bastião** (Guerreiro): reduz os próximos 3 golpes recebidos em 25%
     cada, sem limpar status (mais golpes que o Limpeza+Bastião antigo, sem

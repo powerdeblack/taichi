@@ -423,6 +423,7 @@ function projectileStyle(card){
 function attackCinematic(result){
   const { card, targetSide: ts, targetIndex: ti } = result;
   const color = castColor(card);
+  cine.strikeTrail(result.side, result.casterIndex, ts, ti, color);
   if (card.setId === 'ranger') cine.arrowRain(ts, ti, card.effect === 'multi' ? 5 : 2, color);
   else if (card.setId === 'warrior' || card.setId === 'rogue') cine.slash(ts, ti, color, !!result.ambush || result.dmg >= 18);
   else cine.arcaneBlast(ts, ti, color);
@@ -531,7 +532,10 @@ function onUnitClick(side, laneIndex){
   sfx.playSelect();
   if (tutorial && side === 'rival') tutorial.notify('selected');
   const who = side === 'you' ? `your ${lane.name}` : `the rival's ${lane.name}`;
-  ui.setHint(`🎯 ${who} selected — now tap a card to use on it.`);
+  ui.setHint(side === 'you'
+    ? `🎯 ${who} selected — heals and defenses go to it.`
+    : `🎯 ${who} selected — attacks go to it; a heal played now becomes Reverse Heal (damage).`);
+  syncHand();
 }
 
 function clearTargetSelection(){
@@ -576,8 +580,34 @@ function aimFor(card){
     return { targetSide: 'rival', targetIndex, legal, taunted: taunt !== -1,
       inRange: targetIndex >= 0 && legal.includes(targetIndex) };
   }
-  if (selectedTarget) return { targetSide: selectedTarget.side, targetIndex: selectedTarget.laneIndex, legal: [selectedTarget.laneIndex], inRange: true };
-  return { targetSide: 'you', targetIndex: caster, legal: [caster], inRange: true };
+  // Heal cards follow the 🎯 to either side: on an ally they heal, on an
+  // enemy they turn into Reverse Heal (damage) -- the card turns red while
+  // that is what it would do (see ui.renderHand). Defense cards only ever
+  // go to your own squad. With no 🎯 on a valid target, both pick the ally
+  // that needs them most.
+  if (card.role === 'heal' && selectedTarget && selectedTarget.side === 'rival' && state.rivalLanes[selectedTarget.laneIndex]?.alive){
+    return { targetSide: 'rival', targetIndex: selectedTarget.laneIndex, legal: [selectedTarget.laneIndex], inRange: true, reversed: true };
+  }
+  const targetIndex = selectedTarget && selectedTarget.side === 'you' && state.youLanes[selectedTarget.laneIndex]?.alive
+    ? selectedTarget.laneIndex : supportTargetFor(card, caster);
+  return { targetSide: 'you', targetIndex, legal: [targetIndex], inRange: true };
+}
+
+// Heal: the most hurt ally (lowest HP share). Thorns: the Tank, who draws
+// the hits. Other defenses: the most hurt ally not already carrying that
+// protection. Ties keep the card's own Axie.
+function supportTargetFor(card, caster){
+  const alive = state.youLanes.map((l, i) => ({ l, i })).filter(x => x.l.alive);
+  if (card.role === 'defense' && card.effect === 'thorns'){
+    const tank = alive.find(x => x.l.isTank);
+    if (tank) return tank.i;
+  }
+  const statusKey = { shield: 'shield', bulwark: 'bulwark', bulwark_cleanse: 'bulwark', barrier: 'barrier', dodge: 'dodgeCharges' }[card.effect] || (card.role === 'defense' ? 'shield' : null);
+  const pool = card.role === 'defense' ? alive.filter(x => !x.l.status[statusKey]) : alive;
+  const list = pool.length ? pool : alive;
+  let best = list.find(x => x.i === caster) || list[0];
+  list.forEach(x => { if (x.l.hp / x.l.maxHp < best.l.hp / best.l.maxHp - 0.001) best = x; });
+  return best ? best.i : caster;
 }
 
 function onCardPress(card){
@@ -607,7 +637,9 @@ function updateAim(){
   ui.markInRange(a.targetSide, isAttack ? a.legal : []);
   if (!isAttack){
     const onSelf = a.targetSide === 'you';
-    ui.setHint(`${card.name} → ${onSelf ? 'your' : "the rival's"} ${target.name}${onSelf ? '' : ' (reversed!)'} — release to use.`);
+    ui.setHint(onSelf
+      ? `${card.name} → your ${target.name} — release to use.`
+      : `↩ ${card.name} → the rival's ${target.name}: REVERSE HEAL, deals damage — release to use. (Tap one of yours to heal instead.)`);
   } else if (a.taunted){
     ui.setHint(`🛡️ Taunted! ${card.name} can only hit the enemy Tank — release to strike.`);
   } else if (a.inRange){
@@ -643,7 +675,8 @@ function onCardCancel(card){
 }
 
 function syncHand(){
-  ui.renderHand(state, { onPress: onCardPress, onRelease: onCardRelease, onCancel: onCardCancel, aimingUid: aiming && aiming.uid });
+  const reverseHeals = !!(selectedTarget && selectedTarget.side === 'rival' && state.rivalLanes[selectedTarget.laneIndex]?.alive);
+  ui.renderHand(state, { onPress: onCardPress, onRelease: onCardRelease, onCancel: onCardCancel, aimingUid: aiming && aiming.uid, reverseHeals });
 }
 
 // ================= Cast timeline =================

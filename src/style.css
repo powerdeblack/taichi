@@ -169,6 +169,18 @@ h1{
 }
 .card-class{font-size:.6rem; font-weight:700; letter-spacing:.3px; text-transform:uppercase; opacity:.8; margin-bottom:3px;}
 .card-desc{font-size:.66rem; line-height:1.25; color:var(--text-dim);}
+.card-vals{ display:flex; flex-wrap:wrap; gap:3px; margin:0 0 3px; }
+.val{
+  display:inline-flex; align-items:center; gap:2px; padding:1px 5px; border-radius:8px;
+  font-size:.66rem; line-height:1.3; white-space:nowrap; background:#ffffff14; border:1px solid #ffffff22;
+}
+.val b{ font-family:'Baloo 2',sans-serif; font-weight:800; font-size:.78rem; }
+.val-dmg{ background:#ff5a4a2a; border-color:#ff7a6a66; color:#ffd2cc; }
+.val-heal{ background:#4fd06a2a; border-color:#7be08c66; color:#d4ffd9; }
+.val-def{ background:#4aa8ff2a; border-color:#7cc2ff66; color:#d6ecff; }
+.val-fx{ background:#b07aff24; border-color:#c9a2ff55; color:#eadcff; }
+.val-rev{ background:#d7263d; border-color:#ff8a8a; color:#fff; font-weight:800; font-size:.58rem; letter-spacing:.3px; }
+.card.reversing{ border-color:#ff5a5aaa !important; box-shadow:0 0 0 1px #ff5a5a66, 0 0 14px -4px #ff3b3b; }
 .card-pick-badge{
   position:absolute; top:-6px; right:-6px;
   min-width:20px; height:20px; border-radius:50%;
