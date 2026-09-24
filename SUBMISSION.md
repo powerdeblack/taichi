@@ -85,7 +85,11 @@ of its duels, and each has at least one counter.
   finger off the card** to cancel.
 - Defense cards go to your own Axies; heals follow the 🎯 (on an enemy they
   become Reverse Heal).
-- Win by defeating the rival **Tank**. Mouse works the same way on desktop.
+- **On a computer:** move with **W A S D** (or the arrow keys); click a card
+  (press to aim, release to play), or hold **1 / 2 / 3** to aim the matching
+  card and release to play it; **Esc** cancels. Touch controls on phones are
+  unchanged.
+- Win by defeating the rival **Tank**.
 
 ## Axie Core fit
 

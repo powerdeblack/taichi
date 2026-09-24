@@ -161,6 +161,14 @@ npm run preview
   duelos por par): todos os arquétipos entre 38% e 62%, Fear virou janela
   de 4s pra não anular golpe demais, e o Chill virou o counter natural da
   esquiva (Miragem).
+- **Controles no computador** (`main.js`, bloco "Keyboard"): **W A S D** ou
+  setas movem o esquadrão igual ao joystick (W = na direção do inimigo; o
+  manche na tela acompanha); **1 / 2 / 3** seguram a carta correspondente
+  (mostra o alcance e a prévia) e soltar a tecla joga; **Esc** cancela;
+  clicar na carta com o mouse funciona como tocar. Perder o foco da janela
+  solta tudo. Dicas "W A S D" e o número em cada carta só aparecem em
+  aparelhos com mouse (`@media (hover:hover) and (pointer:fine)`); no
+  celular continua tudo por toque, sem mudança.
 - **Clareza ao soltar uma carta** (principalmente curto × longo alcance):
   cada carta na mão diz ao vivo se alcança (`main.js`'s `reachFor`: "✅
   hits Shell" ou "❌ Shell 3.1 away · reach 2.3") e fica com borda vermelha

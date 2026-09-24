@@ -1025,6 +1025,65 @@ function endJoystickDrag(){
 joystickBase.addEventListener('pointerup', endJoystickDrag);
 joystickBase.addEventListener('pointercancel', endJoystickDrag);
 
+// ================= Keyboard (computers) =================
+// W A S D (or the arrow keys) drive the squad exactly like the joystick:
+// W / up = toward the enemy. The on-screen stick mirrors the direction.
+// 1 / 2 / 3 hold the matching card in hand (showing its reach) and fire
+// it on release, the same as pressing and letting go of it with the mouse.
+const MOVE_KEYS = {
+  KeyW: [0, 1], ArrowUp: [0, 1], KeyS: [0, -1], ArrowDown: [0, -1],
+  KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0],
+};
+const keysDown = new Set();
+let keyMoving = false;
+let keyDirX = 0, keyDirZ = 0;
+const heldCardKeys = new Map(); // key code -> card being aimed with it
+
+function inDuel(){ return document.body.classList.contains('in-duel') && state && !matchFinished; }
+
+function updateKeyMove(){
+  let x = 0, z = 0;
+  keysDown.forEach(code => { const d = MOVE_KEYS[code]; if (d){ x += d[0]; z += d[1]; } });
+  const len = Math.hypot(x, z);
+  keyDirX = len ? x / len : 0;
+  keyDirZ = len ? z / len : 0;
+  const was = keyMoving;
+  keyMoving = len > 0 && !joystickWrap.classList.contains('disabled');
+  if (keyMoving){
+    if (!was) cancelMoveMode();
+    joystickKnob.style.transform = `translate(${keyDirX * JOY_MAX_PX}px, ${-keyDirZ * JOY_MAX_PX}px)`;
+  } else if (was){
+    if (!joyHolding) joystickKnob.style.transform = '';
+    state.youLanes.forEach((lane, i) => { if (lane.alive) ui.endLiveLanePosition('you', i); });
+  }
+}
+
+window.addEventListener('keydown', (e) => {
+  if (!inDuel() || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (MOVE_KEYS[e.code]){
+    e.preventDefault();
+    keysDown.add(e.code);
+    updateKeyMove();
+    return;
+  }
+  const slot = { Digit1: 0, Digit2: 1, Digit3: 2, Numpad1: 0, Numpad2: 1, Numpad3: 2 }[e.code];
+  if (slot !== undefined && !e.repeat && !heldCardKeys.has(e.code)){
+    const card = state.hand[slot];
+    const lane = card && state.youLanes[card.laneIndex];
+    if (!card || aiming || state.castYou > 0 || state.energyYou < card.cost || !lane?.alive || lane.status.stun > 0) return;
+    heldCardKeys.set(e.code, card);
+    onCardPress(card);
+  }
+  if (e.code === 'Escape' && aiming){ heldCardKeys.clear(); cancelAim(); }
+});
+window.addEventListener('keyup', (e) => {
+  if (MOVE_KEYS[e.code]){ keysDown.delete(e.code); if (state) updateKeyMove(); return; }
+  const card = heldCardKeys.get(e.code);
+  if (card){ heldCardKeys.delete(e.code); onCardRelease(card); }
+});
+// Losing focus (alt-tab) must not leave the squad walking forever.
+window.addEventListener('blur', () => { keysDown.clear(); heldCardKeys.clear(); if (state) updateKeyMove(); if (aiming) cancelAim(); });
+
 // ================= Rival wander (autonomous Tank+escort movement) =================
 // The rival's Tank -- and its escort, same as the player's -- roams the
 // hall on its own timer instead of standing still: drives the exact same
@@ -1099,11 +1158,12 @@ function gameLoop(nowMs){
   }
   game.cullDeadHand(state);
 
-  if (joyHolding){
+  if (joyHolding || keyMoving){
+    const dirX = joyHolding ? joyDirX : keyDirX, dirZ = joyHolding ? joyDirZ : keyDirZ;
     const tankIdx = state.youLanes.findIndex(l => l.isTank);
     if (tankIdx !== -1 && state.youLanes[tankIdx].alive){
-      game.moveSquadWithTank(state, 'you', joyDirX * UNIT_MOVE_SPEED * dt, joyDirZ * UNIT_MOVE_SPEED * dt);
-      if (tutorial) tutorial.notify('moved', Math.hypot(joyDirX, joyDirZ) * UNIT_MOVE_SPEED * dt);
+      game.moveSquadWithTank(state, 'you', dirX * UNIT_MOVE_SPEED * dt, dirZ * UNIT_MOVE_SPEED * dt);
+      if (tutorial) tutorial.notify('moved', Math.hypot(dirX, dirZ) * UNIT_MOVE_SPEED * dt);
       state.youLanes.forEach((lane, i) => { if (lane.alive) ui.setLiveLanePosition('you', i, lane.localPos); });
     }
   }
