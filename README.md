@@ -292,6 +292,30 @@ npm run preview
   ativações estavam rápidas demais pra acompanhar. (Um popup de
   ícone+nome da carta foi tentado aqui e removido de novo — atrapalhava
   a visão do tabuleiro.)
+- **Animações cinematográficas por função de carta** (`src/cinematics.js`,
+  disparadas em `main.js`'s `applyResultFx`): cada carta mostra em 3D o
+  que ela faz. O projétil já sai com a cara do conjunto — **flecha** que
+  aponta pra onde voa num arco baixo (Arqueiro), **lâmina giratória**
+  arremessada rente ao chão (Guerreiro/Ladino), **orbe** num arco alto
+  (Mago/Sacerdote/Xamã). No impacto: **chuva de flechas** (5 no combo de
+  flechas), **corte em crescente** (em X no Ambush ou golpe pesado),
+  **explosão arcana** com coluna de luz; Bleed espirra **sangue** na neve,
+  Poison deixa uma **nuvem tóxica**, Deathmark pendura uma **caveira 💀**.
+  Cada defesa tem sua forma: **domo** (Guard), **muralha hexagonal
+  dourada** (Bulwark), **bolha de cristal** (Barreira), **imagens
+  residuais** (Esquiva), **espinhos** saindo do chão (Thorns, que também
+  estouram no atacante quando refletem), **pilar de luz** (Purificação).
+  Cura é um **feixe do céu com folhas**; Regen, **folhas em espiral**; as
+  versões revertidas viram **anel vermelho rachando** (Vulnerável) e
+  **feixe sombrio drenando** (Cura Reversa). O Axie atingido faz um
+  squash-and-stretch (`hitSquash`). Golpes pesados (≥18 de dano, Ambush,
+  combo, Deathmark) somam **onda de choque**, tremor de câmera, **zoom
+  punch** e um **hit-stop** curtinho; um **nocaute** vira **câmera lenta**
+  + flash + onda de choque grande com a câmera inclinando pro Axie caído,
+  e o fim da partida baixa **barras de cinema** (letterbox). A câmera
+  lenta desacelera também as regras (o `gameLoop` multiplica o `dt` pelo
+  `getTimeScale()`), então barras de cast e timers ficam em sincronia com
+  a cena.
 - Status effects em cartas de Ataque: Bleed, **Poison** (empilha, bate 2x a
   stack atual e decai 1 stack por tick — mais forte no início, some
   sozinho), Deathmark, Retain, Ambush (2x dano no 1º acerto) e o combo de
@@ -408,6 +432,11 @@ Ainda não implementado:
 - `src/sfx.js` — efeitos sonoros procedurais (Web Audio API): ataque por
   conjunto + impacto escalado pelo dano, cura, escudo, status, nocaute,
   vitória/derrota, e o mudo (`toggleMute`)
+- `src/cinematics.js` — as cenas 3D curtas de cada carta (corte, flechas,
+  explosão, sangue, veneno, caveira, domo, muralha, bolha, espinhos,
+  pilar, feixe de cura, espiral, vulnerável, dreno) + câmera (tremor, zoom
+  punch, foco), câmera lenta/hit-stop, flash e letterbox; `board3d.js`
+  inicializa e alimenta com cena/câmera
 - `src/render.js` — feedback visual via DOM: números flutuantes, flash de
   acerto/cura, shake do tabuleiro (durações alongadas de propósito, ver
   seção acima); o burst de impacto em 3D é `board3d.js`'s `spawnImpact`,

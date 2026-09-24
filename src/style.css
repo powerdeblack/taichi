@@ -379,6 +379,24 @@ h1{
   75%{ transform:translate(-3px,1px); }
 }
 #board3dCanvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+/* Cinematic layer (cinematics.js): a full-board flash for knockouts and
+   big hits, and letterbox bars that slide in when the match ends. */
+.cine-overlay{ position:absolute; inset:0; pointer-events:none; z-index:5; overflow:hidden; }
+.cine-overlay::before, .cine-overlay::after{
+  content:''; position:absolute; left:0; right:0; height:11%; background:#05070c;
+  transform:scaleY(0); transition:transform .6s cubic-bezier(.2,.8,.2,1);
+}
+.cine-overlay::before{ top:0; transform-origin:top; }
+.cine-overlay::after{ bottom:0; transform-origin:bottom; }
+.cine-overlay.letterbox::before, .cine-overlay.letterbox::after{ transform:scaleY(1); }
+.cine-overlay.flashing{ animation:cine-flash .45s ease-out; }
+@keyframes cine-flash{
+  from{ background:color-mix(in srgb, var(--flash-color, #fff) calc(var(--flash-strength, .7) * 100%), transparent); }
+  to{ background:transparent; }
+}
+@media (prefers-reduced-motion: reduce){
+  .cine-overlay.flashing{ animation-duration:.2s; }
+}
 .board-overlay{ position:absolute; inset:0; pointer-events:none; }
 .board-overlay.overlay-intro{ animation:overlay-intro-fade .6s ease 2s both; }
 @keyframes overlay-intro-fade{

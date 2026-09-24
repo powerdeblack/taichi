@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { createAxieMixer3D } from '@jaatster/threejs-axie-mixer3d-public';
 import { ROW_Z, TAUNT_RADIUS } from './game.js';
+import * as cine from './cinematics.js';
 
 const NEED_TYPES = ['eye', 'mouth', 'ear', 'horn', 'back', 'tail'];
 // Our roster uses 'Aqua'; the asset pack's class id is 'Aquatic'.
@@ -110,6 +111,16 @@ export function initBoard3D(canvas){
   dir.position.set(3, 6, 3);
   scene.add(dir);
   clock = new THREE.Clock();
+  // Screen-space layer for the cinematic flash / letterbox bars, above the
+  // canvas and the name/HP tags but under the HUD.
+  const cineOverlay = document.createElement('div');
+  cineOverlay.className = 'cine-overlay';
+  canvas.parentElement?.appendChild(cineOverlay);
+  cine.initCinematics({
+    scene, camera, overlay: cineOverlay,
+    lanePos: (side, i) => slotWorld(side, i),
+    cameraBase: { pos: camera.position.clone(), target: new THREE.Vector3(0, 0, 0.2), fov: camera.fov },
+  });
   buildHall();
   buildTauntRings();
   resizeBoard3D();
@@ -126,7 +137,11 @@ export function initBoard3D(canvas){
 
 function animate(){
   requestAnimationFrame(animate);
-  const dt = clock ? Math.min(0.05, clock.getDelta()) : 0;
+  // Real frame time drives the slow-motion clock; everything visual runs
+  // on the scaled time so a KO slow-mo / hit-stop freezes the whole scene.
+  const realDt = clock ? Math.min(0.05, clock.getDelta()) : 0;
+  cine.tickTime(realDt);
+  const dt = realDt * cine.getTimeScale();
   elapsedTime += dt;
   slots.forEach(s => {
     if (s.axie && !s.axie.disposed) s.axie.update(dt);
@@ -173,6 +188,8 @@ function animate(){
   tickImpacts(dt);
   tickCasts(dt);
   tickScenery(dt);
+  tickSquash(dt);
+  if (scene) cine.tickCinematics(dt, realDt);
   if (renderer && scene && camera) renderer.render(scene, camera);
 }
 
@@ -262,6 +279,7 @@ export function spawnImpact(side, laneIndex, kind = 'hit'){
 // Self-targeted cards skip the flight and just keep charging until impact.
 const casts = new Map();
 const AFTERMATH_TIME = 1.8;
+const ARROW_UP = new THREE.Vector3(0, 1, 0);
 
 // Normal (not additive) blending: additive glow washes out to white
 // against the bright snow, solid color reads.
@@ -297,12 +315,64 @@ export function startCastFX(id, side, laneIndex, color, chargeTime){
   casts.set(id, { side, laneIndex, age: 0, chargeTime, phase: 'charge', rune, column, orb, halo, motes, proj: null });
 }
 
-export function launchCastFX(id, toSide, toIndex, duration, miss){
+// `style` shapes the projectile after the card's set: 'arrow' (Ranger) is
+// a real arrow on a flat, fast arc that points where it flies; 'blade'
+// (Warrior/Rogue) is a spinning crescent thrown low; 'orb' (magic sets)
+// keeps the glowing orb on a high lob.
+export function launchCastFX(id, toSide, toIndex, duration, miss, style = 'orb'){
   const cast = casts.get(id);
   if (!cast) return;
   const side = new THREE.Vector3((Math.random() < 0.5 ? -1 : 1) * 1.1, 0, 0.4);
-  cast.proj = { toSide, toIndex, dur: duration, t: 0, from: cast.orb.position.clone(), miss, offset: miss ? side : new THREE.Vector3() };
+  cast.proj = {
+    toSide, toIndex, dur: duration, t: 0, from: cast.orb.position.clone(), miss, style,
+    offset: miss ? side : new THREE.Vector3(), arc: style === 'arrow' ? 0.7 : style === 'blade' ? 0.45 : 1.3,
+  };
+  if (style !== 'orb'){
+    const color = cast.halo.material.color.clone();
+    cast.shape = style === 'arrow' ? buildArrow(color) : buildBlade(color);
+    cast.shape.position.copy(cast.orb.position);
+    cast.shape.renderOrder = 7;
+    scene.add(cast.shape);
+    cast.orb.visible = false;
+    cast.halo.material.opacity = 0.3;
+  }
   cast.phase = 'fly';
+}
+
+function buildArrow(color){
+  const g = new THREE.Group();
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 6), castMaterial(0x6b4a2b, 1));
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.22, 8), castMaterial(0xe8eef5, 1));
+  tip.position.y = 0.55;
+  const fletch = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.24), castMaterial(color, 1));
+  fletch.position.y = -0.38;
+  const fletch2 = fletch.clone(); fletch2.material = fletch.material.clone(); fletch2.rotation.y = Math.PI / 2;
+  g.add(shaft, tip, fletch, fletch2);
+  return g;
+}
+
+function buildBlade(color){
+  const g = new THREE.Group();
+  const edge = new THREE.Mesh(new THREE.RingGeometry(0.28, 0.42, 24, 1, 0, Math.PI * 1.3), castMaterial(0xf4f7fb, 1));
+  const glow = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.48, 24, 1, 0, Math.PI * 1.3), castMaterial(color, 0.55));
+  [edge, glow].forEach(m => { m.rotation.x = -Math.PI / 2; g.add(m); });
+  return g;
+}
+
+// A quick squash-and-stretch on a struck Axie's model (base scale 0.62).
+const squashes = new Map();
+export function hitSquash(side, laneIndex, strength = 1){
+  const s = slots.get(slotKey(side, laneIndex));
+  if (s) squashes.set(s, { t: 0, strength });
+}
+function tickSquash(dt){
+  squashes.forEach((q, s) => {
+    q.t += dt;
+    const k = Math.min(1, q.t / 0.4);
+    const wob = Math.sin(k * Math.PI * 2.5) * (1 - k) * 0.22 * q.strength;
+    s.axie.wrapper.scale.set(0.62 * (1 + wob * 0.6), 0.62 * (1 - wob), 0.62 * (1 + wob * 0.6));
+    if (k >= 1){ s.axie.wrapper.scale.setScalar(0.62); squashes.delete(s); }
+  });
 }
 
 // Impact: drops the orb/column/motes and turns the rune into the slow
@@ -312,6 +382,7 @@ export function landCastFX(id){
   if (!cast) return;
   const at = cast.orb.position.clone();
   [cast.column, cast.orb, cast.halo, ...cast.motes].forEach(o => { scene.remove(o); o.geometry.dispose(); o.material.dispose(); });
+  if (cast.shape){ disposeGroup(cast.shape); cast.shape = null; }
   cast.column = cast.orb = cast.halo = null;
   cast.motes = [];
   cast.rune.position.set(at.x, -0.04, at.z);
@@ -319,7 +390,13 @@ export function landCastFX(id){
   cast.age = 0;
 }
 
+function disposeGroup(g){
+  scene.remove(g);
+  g.traverse(n => { n.geometry?.dispose(); n.material?.dispose(); });
+}
+
 function disposeCast(cast){
+  if (cast.shape) disposeGroup(cast.shape);
   [cast.rune, cast.column, cast.orb, cast.halo, ...cast.motes].forEach(o => {
     if (!o) return;
     scene.remove(o); o.geometry.dispose(); o.material.dispose();
@@ -382,11 +459,20 @@ function tickCasts(dt){
     to.y = 0.9;
     to.add(p.offset);
     const pos = p.from.clone().lerp(to, ease);
-    pos.y += Math.sin(Math.PI * t) * 1.3;
+    pos.y += Math.sin(Math.PI * t) * p.arc;
     const prev = cast.orb.position.clone();
     cast.orb.position.copy(pos);
+    if (cast.shape){
+      cast.shape.position.copy(pos);
+      if (p.style === 'arrow'){
+        const v = pos.clone().sub(prev);
+        if (v.lengthSq() > 1e-8) cast.shape.quaternion.setFromUnitVectors(ARROW_UP, v.normalize());
+      } else {
+        cast.shape.rotation.y += dt * 22;
+      }
+    }
     cast.halo.position.copy(pos);
-    cast.halo.scale.setScalar(1.6 + 0.4 * pulse);
+    cast.halo.scale.setScalar(p.style === 'orb' ? 1.6 + 0.4 * pulse : 0.9 + 0.2 * pulse);
     cast.column.material.opacity *= 0.9;
     cast.rune.material.opacity *= 0.93;
     let lead = prev;
@@ -949,3 +1035,7 @@ export function clearBoard3D(){
   slots.forEach(s => { scene.remove(s.axie.wrapper); s.axie.dispose(); });
   slots.clear();
 }
+
+// Card cinematics (see cinematics.js) -- re-exported so ui.js stays the
+// single facade main.js talks to.
+export const cinematics = cine;

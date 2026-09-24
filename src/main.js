@@ -239,6 +239,13 @@ function playKOIfDied(side, laneIndex){
   if (lane && !lane.alive && !koPlayed.has(lane)){
     koPlayed.add(lane);
     sfx.playKO();
+    // A knockout gets the full treatment: slow motion, a white flash, a
+    // big shockwave and the camera leaning in on the fallen Axie.
+    cine.slowMo(0.3, lane.isTank ? 1.4 : 0.9);
+    cine.flash(lane.isTank ? '#ffffff' : '#ffe9c4', lane.isTank ? 0.85 : 0.5);
+    cine.shockwave(side, laneIndex, side === 'you' ? '#ff6b6b' : '#ffd23f', 2);
+    cine.shake(0.3, 0.6);
+    cine.zoomPunch(side, laneIndex, 4);
   }
 }
 helpCloseBtn.addEventListener('click', () => helpModal.classList.add('hidden'));
@@ -259,6 +266,8 @@ function beginMatch(youSquad, rivalSquad){
   blizzardAnnounced = false;
   ui.setBlizzard(false);
   clearCasts();
+  cine.clearCinematics();
+  cine.letterbox(false);
   ui.hideBanner();
   ui.buildBoard(state, onUnitClick);
   syncUI();
@@ -298,6 +307,7 @@ function applyResultFx(result){
   if (result.fizzled) return;
 
   if (result.missed){
+    if (result.targetIndex >= 0) cine.afterimage(result.targetSide, result.targetIndex, '#ffffff');
     const el = result.targetIndex >= 0
       ? ui.getLaneSideEl(result.targetSide, result.targetIndex)
       : ui.getLaneSideEl(side, casterIndex);
@@ -316,6 +326,8 @@ function applyResultFx(result){
     const el = ui.getLaneSideEl(result.targetSide, result.targetIndex);
     if (card.role === 'defense'){
       if (result.reversed){
+        cine.vulnerable(result.targetSide, result.targetIndex);
+        ui.hitSquash(result.targetSide, result.targetIndex, 0.6);
         render.flashHit(el);
         render.spawnFloatingText(el, 'VULNERABLE!', 'text-block');
         sfx.playDebuff();
@@ -326,6 +338,7 @@ function applyResultFx(result){
           barrier: 'BARRIER!', dodge: 'EVASION!', thorns: 'THORNS!',
         };
         render.spawnFloatingText(el, labels[card.effect] || 'GUARD!', 'text-shield');
+        defenseCinematic(card, result.targetSide, result.targetIndex);
         ui.spawnImpact(result.targetSide, result.targetIndex, 'shield');
         sfx.playShield();
       }
@@ -333,6 +346,9 @@ function applyResultFx(result){
     }
     // heal role
     if (result.reversed){
+      cine.drainBeam(result.targetSide, result.targetIndex);
+      ui.hitSquash(result.targetSide, result.targetIndex, 0.8);
+      cine.shake(0.08, 0.25);
       render.flashHit(el);
       render.shakeBoard(boardEl);
       render.spawnFloatingText(el, (card.effect === 'regen' ? 'ROT! -' : 'REVERSE HEAL! -')+result.dmg, 'text-dmg');
@@ -340,6 +356,8 @@ function applyResultFx(result){
       sfx.playAttack(card, result.dmg);
       playKOIfDied(result.targetSide, result.targetIndex);
     } else {
+      if (card.effect === 'regen') cine.regenSpiral(result.targetSide, result.targetIndex);
+      else cine.healBeam(result.targetSide, result.targetIndex);
       render.flashHeal(el);
       render.spawnFloatingText(el, card.effect === 'regen' ? 'REGEN!' : (result.healed > 0 ? '+'+result.healed : 'FULL HP'), 'text-heal');
       ui.spawnImpact(result.targetSide, result.targetIndex, 'heal');
@@ -356,9 +374,11 @@ function applyResultFx(result){
   }
   const el = ui.getLaneSideEl(result.targetSide, result.targetIndex);
   if (result.dodged){
+    cine.afterimage(result.targetSide, result.targetIndex);
     render.spawnFloatingText(el, 'DODGED!', 'text-block');
     sfx.playDodge();
   } else {
+    attackCinematic(result);
     sfx.playAttack(card, result.dmg);
     playKOIfDied(result.targetSide, result.targetIndex);
     render.flashHit(el);
@@ -378,8 +398,57 @@ function applyResultFx(result){
     render.flashHit(casterEl);
     render.spawnFloatingText(casterEl, '-'+result.thornReflected+' 🌵', 'text-dmg');
     ui.spawnImpact(result.side, result.casterIndex, 'hit');
+    cine.thornSpikes(result.side, result.casterIndex);
+    ui.hitSquash(result.side, result.casterIndex, 0.7);
     sfx.playBleed(0.15);
     playKOIfDied(result.side, result.casterIndex);
+  }
+}
+
+// ================= Card cinematics =================
+// Every card plays a short 3D scene that shows WHAT it does (cinematics.js):
+// Rangers rain arrows, Warriors/Rogues slash, magic sets blast; bleed
+// splashes blood, poison leaves a toxic cloud, Deathmark hangs a skull;
+// each defense raises its own shield shape and heals pour light or leaves.
+// Heavy hits add a shockwave, camera shake, a zoom punch and a hit-stop.
+const cine = ui.cinematics;
+
+function projectileStyle(card){
+  if (card.role !== 'attack') return 'orb';
+  if (card.setId === 'ranger') return 'arrow';
+  if (card.setId === 'warrior' || card.setId === 'rogue') return 'blade';
+  return 'orb';
+}
+
+function attackCinematic(result){
+  const { card, targetSide: ts, targetIndex: ti } = result;
+  const color = castColor(card);
+  if (card.setId === 'ranger') cine.arrowRain(ts, ti, card.effect === 'multi' ? 5 : 2, color);
+  else if (card.setId === 'warrior' || card.setId === 'rogue') cine.slash(ts, ti, color, !!result.ambush || result.dmg >= 18);
+  else cine.arcaneBlast(ts, ti, color);
+  if (card.effect === 'bleed') cine.bloodSplash(ts, ti);
+  if (card.effect === 'poison') cine.poisonCloud(ts, ti);
+  if (card.effect === 'deathmark') cine.deathmark(ts, ti);
+  if (result.deathmarked) cine.flash('#9f7aea', 0.35);
+  ui.hitSquash(ts, ti, Math.min(1.6, 0.6 + result.dmg / 20));
+  if (result.dmg >= 18 || result.ambush || result.comboBonus || result.deathmarked){
+    cine.shockwave(ts, ti, color, 1);
+    cine.shake(0.2, 0.4);
+    cine.zoomPunch(ts, ti, 2.5);
+    cine.hitStop(0.12);
+  } else {
+    cine.shake(0.06, 0.2);
+  }
+}
+
+function defenseCinematic(card, side, index){
+  switch (card.effect){
+    case 'bulwark': cine.bulwarkWall(side, index); break;
+    case 'bulwark_cleanse': cine.cleansePillar(side, index); cine.bulwarkWall(side, index); break;
+    case 'barrier': cine.bubble(side, index); break;
+    case 'dodge': cine.afterimage(side, index); break;
+    case 'thorns': cine.thornSpikes(side, index); break;
+    default: cine.dome(side, index);
   }
 }
 
@@ -430,6 +499,8 @@ function finishMatch(){
   matchFinished = true;
   clearCasts();
   endTutorial();
+  cine.letterbox(true);
+  cine.slowMo(0.25, 1.6);
   if (state.timeUp){
     if (state.winner === 'draw') ui.showBanner('Time up — draw!', 'Both Tanks ended with the same HP share.');
     else if (state.winner === 'you') ui.showBanner('Time up — you win!', 'Your Tank had more HP left at 3:20.');
@@ -604,7 +675,7 @@ function tickPendingCasts(dt){
     c.age += dt;
     if (c.travels && !c.launched && c.age >= game.CAST_LAUNCH_AT){
       c.launched = true;
-      ui.launchCastFX(c.id, c.plan.targetSide, c.plan.targetIndex, game.CAST_IMPACT_AT - game.CAST_LAUNCH_AT, c.plan.missed);
+      ui.launchCastFX(c.id, c.plan.targetSide, c.plan.targetIndex, game.CAST_IMPACT_AT - game.CAST_LAUNCH_AT, c.plan.missed, projectileStyle(c.plan.card));
       sfx.playLaunch(c.plan.card);
     }
     if (c.age < game.CAST_IMPACT_AT) return true;
@@ -800,7 +871,9 @@ function gameLoop(nowMs){
   requestAnimationFrame(gameLoop);
   if (!state || matchFinished){ lastFrameMs = nowMs; return; }
   if (lastFrameMs == null) lastFrameMs = nowMs;
-  const dt = Math.min(0.1, (nowMs - lastFrameMs) / 1000);
+  // Slow motion (a KO, a heavy hit's hit-stop) slows the rules too, so the
+  // cast bars, timers and movement stay in step with the 3D scene.
+  const dt = Math.min(0.1, (nowMs - lastFrameMs) / 1000) * cine.getTimeScale();
   lastFrameMs = nowMs;
   if (state.gameOver){ finishMatch(); return; }
 
