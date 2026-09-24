@@ -378,8 +378,13 @@ Ainda não implementado:
   matriz de vitórias, tiers, counters e contra-metas dos arquétipos
 - `src/tutorial.js` — o duelo guiado (balão, foco, passos que esperam a
   ação do jogador)
-- `scripts/simulate-meta.mjs` — o simulador de meta (IA × IA com o motor
-  real, 400 duelos por par, semente fixa)
+- `scripts/simulate-meta.mjs` — o simulador de meta (400 duelos por par)
+- `scripts/duel-sim.mjs` — um duelo IA × IA sem renderização (motor real +
+  IA do jogo), compartilhado pelos dois scripts abaixo; semente fixa
+- `scripts/tournament.mjs` — `npm run tournament -- 200 11 out.json`:
+  torneio suíço com N cópias de cada arquétipo (200 × 10 = 2.000 times),
+  11 rodadas, desempate Buchholz; grava o ranking e a composição do top
+  100/top 10
 - `src/sfx.js` — efeitos sonoros procedurais (Web Audio API): ataque por
   conjunto + impacto escalado pelo dano, cura, escudo, status, nocaute,
   vitória/derrota, e o mudo (`toggleMute`)
