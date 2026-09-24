@@ -54,35 +54,35 @@ export const CARD_SETS = [
     id: 'warrior', name: 'Guerreiro', icon: '⚔️', color: '#c97b3d', nativeClassId: 'Beast',
     defaultCounts: { attack: 4, defense: 1, heal: 0 },
     attackCards: [
-      { id:'corte_selvagem', name:'Corte Selvagem', range:'short', role:'attack', cost:0, dmg:14, effect:'ambush',
+      { id:'corte_selvagem', name:'Corte Selvagem', range:'short', role:'attack', cost:0, dmg:21, effect:'ambush',
         desc:'Short range. Ambush: doubles damage on the match’s first hit.' },
-      { id:'investida_brutal', name:'Investida Brutal', range:'long', role:'attack', cost:0, dmg:20, effect:'none',
+      { id:'investida_brutal', name:'Investida Brutal', range:'long', role:'attack', cost:0, dmg:32, effect:'none',
         desc:'Long range. Heavy hit, targets the weakest enemy lane.' },
     ],
-    signatureCard: { id:'furia_selvagem', name:'Fúria Selvagem', range:'short', role:'attack', cost:0, dmg:15, effect:'bleed',
+    signatureCard: { id:'furia_selvagem', name:'Fúria Selvagem', range:'short', role:'attack', cost:0, dmg:20, effect:'bleed',
       desc:'Beast-born Warrior signature. Short range. Bites deep: applies Bleed on top of a heavy hit.' },
     defenseCard: { id:'postura_defensiva', name:'Postura Defensiva', range:'own', role:'defense', cost:2, effect:'bulwark', hits:3,
-      desc:'Bulwark: reduces the next 3 hits taken by 25% each, no cleanse.' },
-    healCard: { id:'grito_de_guerra', name:'Grito de Guerra', range:'own', role:'heal', cost:1, heal:12,
-      desc:'A battle cry that mends wounds -- heals 12 HP right away (scaled by MP). Reversed on an enemy: Reverse Heal, deals that much damage instead.' },
+      desc:'Bulwark: reduces the next 3 hits taken by 35% each, no cleanse.' },
+    healCard: { id:'grito_de_guerra', name:'Grito de Guerra', range:'own', role:'heal', cost:1, heal:17,
+      desc:'A battle cry that mends wounds -- heals 17 HP right away (scaled by MP). Reversed on an enemy: Reverse Heal, deals that much damage instead.' },
   },
   {
     id: 'priest', name: 'Sacerdote', icon: '🙏', color: '#3f6b4a', nativeClassId: 'Plant',
     defaultCounts: { attack: 1, defense: 0, heal: 4 },
     attackCards: [
-      { id:'punicao_sagrada', name:'Punição Sagrada', range:'short', role:'attack', cost:0, dmg:8, effect:'retain',
+      { id:'punicao_sagrada', name:'Punição Sagrada', range:'short', role:'attack', cost:0, dmg:14, effect:'retain',
         desc:'Short range. Retain: never leaves your hand, hit or miss.' },
-      { id:'julgamento_final', name:'Julgamento Final', range:'long', role:'attack', cost:0, dmg:9, effect:'deathmark',
-        desc:'Long range. Applies Deathmark: the next hit it takes deals +10 pure damage.' },
+      { id:'julgamento_final', name:'Julgamento Final', range:'long', role:'attack', cost:0, dmg:16, effect:'deathmark',
+        desc:'Long range. Applies Deathmark: the next 2 hits it takes deal +20 pure damage each.' },
     ],
-    signatureCard: { id:'espinhos_da_fe', name:'Espinhos da Fé', range:'short', role:'attack', cost:0, dmg:10, effect:'retain',
+    signatureCard: { id:'espinhos_da_fe', name:'Espinhos da Fé', range:'short', role:'attack', cost:0, dmg:15, effect:'retain',
       desc:'Plant-born Priest signature. Short range. Thorny faith: Retain, never leaves your hand, hit or miss.' },
     defenseCard: { id:'protecao_divina', name:'Proteção Divina', range:'own', role:'defense', cost:1, effect:'shield',
-      desc:'Guard: blocks 50% of the next hit taken.' },
-    healCard: { id:'bencao', name:'Bênção', range:'own', role:'heal', cost:2, heal:26,
-      desc:'A priest’s biggest single heal -- 26 HP right away (scaled by MP). Reversed on an enemy: Reverse Heal, deals that much damage instead.' },
+      desc:'Guard: blocks 60% of the next hit taken.' },
+    healCard: { id:'bencao', name:'Bênção', range:'own', role:'heal', cost:2, heal:30,
+      desc:'A priest’s biggest single heal -- 30 HP right away (scaled by MP). Reversed on an enemy: Reverse Heal, deals that much damage instead.' },
     signatureDefenseCard: { id:'purificacao', name:'Purificação', range:'own', role:'defense', cost:1, effect:'bulwark_cleanse', hits:2,
-      desc:'Plant-born Priest signature. Cleanse: removes Bleed, Poison and Deathmark from an ally, then Bulwark (next 2 hits taken -25%).' },
+      desc:'Plant-born Priest signature. Cleanse: removes Bleed, Poison and Deathmark from an ally, then Bulwark (next 2 hits taken -35%).' },
     signatureHealCard: { id:'brotos_curativos', name:'Brotos Curativos', range:'own', role:'heal', cost:1, effect:'regen', regenTicks:3,
       desc:'Plant-born Priest signature. Regeneration: heals a little HP (scaled by MP) every tick for 3 ticks, blossoming from your own vitality. Reversed on an enemy: the same as damage over time instead.' },
   },
@@ -90,44 +90,44 @@ export const CARD_SETS = [
     id: 'mage', name: 'Mago', icon: '🔮', color: '#4c8fb0', nativeClassId: 'Aqua',
     defaultCounts: { attack: 3, defense: 2, heal: 0 },
     attackCards: [
-      { id:'centelha_arcana', name:'Centelha Arcana', range:'short', role:'attack', cost:0, dmg:9, effect:'bleed',
+      { id:'centelha_arcana', name:'Centelha Arcana', range:'short', role:'attack', cost:0, dmg:12, effect:'bleed',
         desc:'Short range. Applies Bleed: arcane burns that linger for 2 rounds.' },
-      { id:'explosao_arcana', name:'Explosão Arcana', range:'long', role:'attack', cost:0, dmg:16, effect:'none',
+      { id:'explosao_arcana', name:'Explosão Arcana', range:'long', role:'attack', cost:0, dmg:20, effect:'none',
         desc:'Long range. Heavy nuke, targets the weakest enemy lane.' },
     ],
-    signatureCard: { id:'mare_arcana', name:'Maré Arcana', range:'long', role:'attack', cost:0, dmg:12, effect:'poison',
+    signatureCard: { id:'mare_arcana', name:'Maré Arcana', range:'long', role:'attack', cost:0, dmg:16, effect:'poison',
       desc:'Aqua-born Mage signature. Long range. A corrosive arcane tide: applies Poison.' },
-    defenseCard: { id:'barreira_arcana', name:'Barreira Arcana', range:'own', role:'defense', cost:2, effect:'barrier', amount:22,
-      desc:'Barrier: absorbs the next 22 damage taken, no matter how many hits it takes to burn through.' },
-    healCard: { id:'dreno_vital', name:'Dreno Vital', range:'own', role:'heal', cost:1, heal:15,
-      desc:'Channels life force -- heals an ally for 15 HP (scaled by MP), or drains an enemy for the same amount as damage instead (Reverse Heal).' },
+    defenseCard: { id:'barreira_arcana', name:'Barreira Arcana', range:'own', role:'defense', cost:2, effect:'barrier', amount:26,
+      desc:'Barrier: absorbs the next 26 damage taken, no matter how many hits it takes to burn through.' },
+    healCard: { id:'dreno_vital', name:'Dreno Vital', range:'own', role:'heal', cost:1, heal:21,
+      desc:'Channels life force -- heals an ally for 21 HP (scaled by MP), or drains an enemy for the same amount as damage instead (Reverse Heal).' },
   },
   {
     id: 'ranger', name: 'Arqueiro', icon: '🏹', color: '#d9b44a', nativeClassId: 'Bird',
     defaultCounts: { attack: 3, defense: 1, heal: 1 },
     attackCards: [
-      { id:'tiro_certeiro', name:'Tiro Certeiro', range:'short', role:'attack', cost:0, dmg:10, effect:'none',
+      { id:'tiro_certeiro', name:'Tiro Certeiro', range:'short', role:'attack', cost:0, dmg:20, effect:'none',
         desc:'Short range. A precise, direct shot.' },
-      { id:'chuva_de_flechas', name:'Chuva de Flechas', range:'long', role:'attack', cost:0, dmg:6, effect:'multi',
+      { id:'chuva_de_flechas', name:'Chuva de Flechas', range:'long', role:'attack', cost:0, dmg:12, effect:'multi',
         desc:'Long range. 3 arrows: +50% bonus damage if 2+ land.' },
     ],
-    signatureCard: { id:'voo_certeiro', name:'Voo Certeiro', range:'long', role:'attack', cost:0, dmg:7, effect:'multi',
+    signatureCard: { id:'voo_certeiro', name:'Voo Certeiro', range:'long', role:'attack', cost:0, dmg:12, effect:'multi',
       desc:'Bird-born Ranger signature. Long range. A second arrow-rain: 3 more arrows, +50% bonus if 2+ land.' },
-    defenseCard: { id:'reflexos_ageis', name:'Reflexos Ágeis', range:'own', role:'defense', cost:2, effect:'dodge', charges:2, chance:0.5,
-      desc:'Evasion: 50% chance to fully dodge each of the next 2 hits taken.' },
-    healCard: { id:'kit_medico', name:'Kit Médico', range:'own', role:'heal', cost:1, heal:15,
-      desc:'A quick field patch -- heals 15 HP right away (scaled by MP). Reversed on an enemy: Reverse Heal, deals that much damage instead.' },
+    defenseCard: { id:'reflexos_ageis', name:'Reflexos Ágeis', range:'own', role:'defense', cost:2, effect:'dodge', charges:3, chance:0.5,
+      desc:'Evasion: 50% chance to fully dodge each of the next 3 hits taken.' },
+    healCard: { id:'kit_medico', name:'Kit Médico', range:'own', role:'heal', cost:1, heal:21,
+      desc:'A quick field patch -- heals 21 HP right away (scaled by MP). Reversed on an enemy: Reverse Heal, deals that much damage instead.' },
   },
   {
     id: 'rogue', name: 'Ladino', icon: '🗡️', color: '#7a5c9e', nativeClassId: 'Bug',
     defaultCounts: { attack: 3, defense: 1, heal: 1 },
     attackCards: [
-      { id:'facada_nas_costas', name:'Facada nas Costas', range:'short', role:'attack', cost:0, dmg:7, effect:'none',
+      { id:'facada_nas_costas', name:'Facada nas Costas', range:'short', role:'attack', cost:0, dmg:16, effect:'none',
         desc:'Short range. Cheap and direct.' },
-      { id:'lamina_envenenada', name:'Lâmina Envenenada', range:'long', role:'attack', cost:0, dmg:9, effect:'poison',
+      { id:'lamina_envenenada', name:'Lâmina Envenenada', range:'long', role:'attack', cost:0, dmg:16, effect:'poison',
         desc:'Long range. Applies Poison: fading damage that stacks with itself.' },
     ],
-    signatureCard: { id:'ferroada', name:'Ferroada', range:'short', role:'attack', cost:0, dmg:8, effect:'poison',
+    signatureCard: { id:'ferroada', name:'Ferroada', range:'short', role:'attack', cost:0, dmg:14, effect:'poison',
       desc:'Bug-born Rogue signature. Short range. A venomous sting: applies Poison up close.' },
     defenseCard: { id:'cortina_de_fumaca', name:'Cortina de Fumaça', range:'own', role:'defense', cost:1, effect:'dodge', charges:1, chance:1,
       desc:'Smoke bomb: guaranteed dodge of the next hit taken.' },
@@ -138,12 +138,12 @@ export const CARD_SETS = [
     id: 'shaman', name: 'Xamã', icon: '🪶', color: '#8a8f5c', nativeClassId: 'Reptile',
     defaultCounts: { attack: 2, defense: 2, heal: 1 },
     attackCards: [
-      { id:'toque_espiritual', name:'Toque Espiritual', range:'short', role:'attack', cost:0, dmg:9, effect:'none',
+      { id:'toque_espiritual', name:'Toque Espiritual', range:'short', role:'attack', cost:0, dmg:14, effect:'none',
         desc:'Short range. A direct spiritual strike.' },
-      { id:'furia_ancestral', name:'Fúria Ancestral', range:'long', role:'attack', cost:0, dmg:11, effect:'none',
+      { id:'furia_ancestral', name:'Fúria Ancestral', range:'long', role:'attack', cost:0, dmg:16, effect:'none',
         desc:'Long range. Channels ancestral fury, targets the weakest enemy lane.' },
     ],
-    signatureCard: { id:'presas_ancestrais', name:'Presas Ancestrais', range:'short', role:'attack', cost:0, dmg:10, effect:'deathmark',
+    signatureCard: { id:'presas_ancestrais', name:'Presas Ancestrais', range:'short', role:'attack', cost:0, dmg:15, effect:'deathmark',
       desc:'Reptile-born Shaman signature. Short range. Ancestral fangs mark the prey: applies Deathmark.' },
     defenseCard: { id:'vinculo_espiritual', name:'Vínculo Espiritual', range:'own', role:'defense', cost:2, effect:'thorns', hits:3, pct:0.6,
       desc:'Thorns: reflects 60% of the damage from the next 3 hits taken back onto whoever landed them.' },
@@ -188,7 +188,7 @@ export function setById(setId){
 export const ALL_CLASSES = AXIES.map(a => a.classId);
 export const ALL_SETS = CARD_SETS.map(s => s.id);
 export const LOADOUT_SIZE = 5;
-export const BASE_HP = 100;
+export const BASE_HP = 130;
 export const BASE_MP = 100;
 
 // Builds the actual card pool for one Axie's loadout: attackCount cards
@@ -225,7 +225,7 @@ export function computeLaneStats(counts, evolved){
   const mult = evolved ? (1 + EVOLVE_BONUS) : 1;
   const powerMult = (1 + counts.attack * 0.15) * mult;
   const damageReduction = Math.min(0.5, counts.defense * 0.06);
-  const maxHp = Math.round((BASE_HP + counts.defense * 10) * mult);
+  const maxHp = Math.round((BASE_HP + counts.defense * 13) * mult);
   const mp = Math.round((BASE_MP + counts.heal * 20) * mult);
   return { powerMult, damageReduction, maxHp, mp };
 }
@@ -238,7 +238,7 @@ export const ARCHETYPES = [
   {
     id: 'bleed', name: 'Savage Bleed', icon: '🩸', color: '#d9534f',
     tags: ['Bleed', 'Burst', 'Melee'],
-    how: 'Warrior and Mage cut the same target up close: every Bleed hit adds a stack (up to 3) and each stack bleeds 4 every tick. The Shaman Tank walks in front, taunting attackers onto itself and reflecting their damage back with Thorns. Charge forward -- the Bleed hits are short range.',
+    how: 'Warrior and Mage cut the same target up close: every Bleed hit adds a stack (up to 3) and each stack bleeds 5 every tick. The Shaman Tank walks in front, taunting attackers onto itself and reflecting their damage back with Thorns. Charge forward -- the Bleed hits are short range.',
     picks: [
       { classId: 'Reptile', setId: 'shaman', isTank: true, evolved: false, counts: { attack: 1, defense: 3, heal: 1 } },
       { classId: 'Beast', setId: 'warrior', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
@@ -248,7 +248,7 @@ export const ARCHETYPES = [
   {
     id: 'poison', name: 'Plague', icon: '☠️', color: '#8e5cc9',
     tags: ['Poison', 'Long range', 'Kite'],
-    how: 'Rogue and Mage stack Poison from long range: each hit adds 3 stacks (up to 9), a tick deals 2 per stack and then fades by one -- a full stack does about 90 damage over time. Stay back and keep re-applying it while the Shaman Tank regenerates and punishes anyone who rushes it with Thorns.',
+    how: 'Rogue and Mage stack Poison from long range: each hit adds 3 stacks (up to 9), a tick deals 3 per stack and then fades by one -- a full stack does about 135 damage over time. Stay back and keep re-applying it while the Shaman Tank regenerates and punishes anyone who rushes it with Thorns.',
     picks: [
       { classId: 'Reptile', setId: 'shaman', isTank: true, evolved: false, counts: { attack: 1, defense: 2, heal: 2 } },
       { classId: 'Bug', setId: 'rogue', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
@@ -288,7 +288,7 @@ export const ARCHETYPES = [
   {
     id: 'mirage', name: 'Mirage', icon: '💨', color: '#6ab7d9',
     tags: ['Evasion', 'Anti-burst', 'Poison'],
-    how: 'Hard to hit: the Ranger Tank stacks Evasion (50% to dodge each of the next 2 hits) and the Rogue drops Smoke on it (the next hit is dodged for sure). A dodged hit deals nothing -- big single blows are wasted. Meanwhile arrows and poisoned blades chip away.',
+    how: 'Hard to hit: the Ranger Tank stacks Evasion (50% to dodge each of the next 3 hits) and the Rogue drops Smoke on it (the next hit is dodged for sure). A dodged hit deals nothing -- big single blows are wasted. Meanwhile arrows and poisoned blades chip away.',
     picks: [
       { classId: 'Bird', setId: 'ranger', isTank: true, evolved: false, counts: { attack: 1, defense: 3, heal: 1 } },
       { classId: 'Bug', setId: 'rogue', isTank: false, evolved: false, counts: { attack: 3, defense: 2, heal: 0 } },
@@ -298,7 +298,7 @@ export const ARCHETYPES = [
   {
     id: 'bastion', name: 'Arcane Bastion', icon: '🔵', color: '#3f7fd1',
     tags: ['Barrier', 'Shield', 'Sustain'],
-    how: 'Layers of protection: the Mage Tank throws up Barriers (absorb the next 22 damage), the Priest adds Guard (halves the next hit) and big heals. Burst gets soaked before it reaches HP, while the Mage behind trades Arcane Blasts. Weak spot: Bleed and Poison ticks go straight through barriers.',
+    how: 'Layers of protection: the Mage Tank throws up Barriers (absorb the next 26 damage), the Priest adds Guard (blocks 60% of the next hit) and big heals. Burst gets soaked before it reaches HP, while the Mage behind trades Arcane Blasts. Weak spot: Bleed and Poison ticks go straight through barriers.',
     picks: [
       { classId: 'Aqua', setId: 'mage', isTank: true, evolved: false, counts: { attack: 1, defense: 3, heal: 1 } },
       { classId: 'Plant', setId: 'priest', isTank: false, evolved: false, counts: { attack: 1, defense: 2, heal: 2 } },
@@ -308,17 +308,17 @@ export const ARCHETYPES = [
   {
     id: 'deathmark', name: 'Deathmark Hunt', icon: '💀', color: '#9a6bd1',
     tags: ['Deathmark', 'Execute', 'Damage'],
-    how: 'Mark, then crush: Shaman Fangs and Priest Final Judgment apply Deathmark (the next hit on that Axie deals +10), and the Warrior follows with Brutal Charge (20) or a Savage Fury. Focus one target at a time and it drops fast.',
+    how: 'Mark, then crush: Shaman Fangs and Priest Final Judgment apply Deathmark (the next 2 hits on that Axie deal +20 each), and the Warrior follows with Brutal Charge (32) or a Savage Fury. Focus one target at a time and it drops fast.',
     picks: [
-      { classId: 'Reptile', setId: 'shaman', isTank: true, evolved: false, counts: { attack: 3, defense: 2, heal: 0 } },
-      { classId: 'Plant', setId: 'priest', isTank: false, evolved: false, counts: { attack: 3, defense: 1, heal: 1 } },
+      { classId: 'Plant', setId: 'priest', isTank: true, evolved: false, counts: { attack: 2, defense: 3, heal: 0 } },
+      { classId: 'Reptile', setId: 'shaman', isTank: false, evolved: false, counts: { attack: 3, defense: 1, heal: 1 } },
       { classId: 'Beast', setId: 'warrior', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
     ],
   },
   {
     id: 'toxic', name: 'Toxic Rush', icon: '🐍', color: '#5fa84a',
     tags: ['Poison', 'Rush', 'Anti-heal'],
-    how: 'Three Rogues flood the enemy with Poison: every blade adds 3 stacks (up to 9, about 90 damage over time) faster than healers can undo it. Rush in, spread poison on the Tank, and let it tick while Smoke keeps your own Tank from being hit.',
+    how: 'Three Rogues flood the enemy with Poison: every blade adds 3 stacks (up to 9, about 135 damage over time) faster than healers can undo it. Rush in, spread poison on the Tank, and let it tick while Smoke keeps your own Tank from being hit.',
     picks: [
       { classId: 'Bug', setId: 'rogue', isTank: true, evolved: false, counts: { attack: 2, defense: 2, heal: 1 } },
       { classId: 'Bug', setId: 'rogue', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
@@ -328,7 +328,7 @@ export const ARCHETYPES = [
   {
     id: 'hybrid', name: 'Blood & Venom', icon: '🧪', color: '#c0478c',
     tags: ['Bleed', 'Poison', 'Hybrid DOT'],
-    how: 'Two damage-over-time effects at once: the Mage applies both Bleed (short) and Poison (long), the Rogue stacks more Poison, and they tick independently every 2s. The Warrior Tank holds the line with Bulwark (next 3 hits taken -25%).',
+    how: 'Two damage-over-time effects at once: the Mage applies both Bleed (short) and Poison (long), the Rogue stacks more Poison, and they tick independently every 2s. The Warrior Tank holds the line with Bulwark (next 3 hits taken -35%).',
     picks: [
       { classId: 'Beast', setId: 'warrior', isTank: true, evolved: false, counts: { attack: 2, defense: 3, heal: 0 } },
       { classId: 'Aqua', setId: 'mage', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },

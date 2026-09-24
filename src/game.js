@@ -273,7 +273,10 @@ export function moveSquadWithTank(state, side, dx, dz){
   placeSquad(lanes, localFromWorld(side, w));
 }
 
-const BULWARK_REDUCTION = 0.25;
+const BULWARK_REDUCTION = 0.35;
+export const SHIELD_BLOCK = 0.6; // Guard: share of the next hit it blocks
+export const DEATHMARK_BONUS = 20; // pure damage added to each marked hit
+export const DEATHMARK_HITS = 2; // how many hits a Deathmark lasts
 const VULNERABLE_BONUS = 0.3;
 
 // Dodge is checked FIRST and short-circuits everything else: a dodged hit
@@ -297,8 +300,12 @@ function applyDamage(lane, amount, attackerClassId, casterLane){
     }
   }
 
-  if (lane.status.deathmark){ dmg += 10; delete lane.status.deathmark; deathmarked = true; }
-  if (lane.status.shield){ dmg *= 0.5; delete lane.status.shield; shielded = true; }
+  if (lane.status.deathmark > 0){
+    dmg += DEATHMARK_BONUS; deathmarked = true;
+    lane.status.deathmark -= 1;
+    if (lane.status.deathmark <= 0) delete lane.status.deathmark;
+  }
+  if (lane.status.shield){ dmg *= 1 - SHIELD_BLOCK; delete lane.status.shield; shielded = true; }
   if (lane.status.bulwark && lane.status.bulwark > 0){
     dmg *= (1 - BULWARK_REDUCTION);
     lane.status.bulwark -= 1;
@@ -340,7 +347,7 @@ function applyDamage(lane, amount, attackerClassId, casterLane){
 // Bleed: each hit adds a stack (max 3) and refreshes the duration to 3
 // ticks; every tick deals 4 per stack. One cut is a light DOT, repeated
 // cuts on the same target (the Bleed archetype) snowball.
-const BLEED_PER_STACK = 4;
+const BLEED_PER_STACK = 5;
 const BLEED_CAP = 3;
 const BLEED_TICKS = 3;
 function applyBleed(lane){
@@ -364,6 +371,7 @@ function tickBleed(lane){
 // stack count each tick, then fades by 1 stack -- distinct from Bleed's
 // fixed-length DOT, it front-loads damage and tapers off.
 const POISON_STACK = 3;
+const POISON_PER_STACK = 3; // damage per stack each tick
 const POISON_CAP = 9;
 function applyPoison(lane){
   lane.status.poison = Math.min(POISON_CAP, (lane.status.poison || 0) + POISON_STACK);
@@ -371,7 +379,7 @@ function applyPoison(lane){
 
 function tickPoison(lane){
   if (lane.status.poison && lane.status.poison > 0){
-    const dmg = lane.status.poison * 2;
+    const dmg = lane.status.poison * POISON_PER_STACK;
     lane.hp = Math.max(0, lane.hp - dmg);
     lane.status.poison -= 1;
     if (lane.status.poison <= 0) delete lane.status.poison;
@@ -448,7 +456,7 @@ function applyGuardianCleanse(lane){
 
 // Regeneration: Trevo's normal effect -- heals a flat MP-scaled amount each
 // STATUS_TICK_INTERVAL tick for `ticks` ticks (see tickRegen).
-const REGEN_HEAL_PER_TICK = 8;
+const REGEN_HEAL_PER_TICK = 11;
 function applyRegen(lane, ticks){
   lane.status.regen = Math.max(lane.status.regen || 0, ticks);
 }
@@ -466,7 +474,7 @@ function tickRegen(lane, casterLane, healScale = 1){
 // Poison-equivalent DOT used by Trevo's reversed (enemy-cast) form: same
 // shape as applyPoison/tickPoison but stored separately so it doesn't
 // interact with the class's normal Poison stacking/cap.
-const REGEN_ROT_PER_TICK = 8;
+const REGEN_ROT_PER_TICK = 11;
 function applyRegenRot(lane, ticks){
   lane.status.regenRot = Math.max(lane.status.regenRot || 0, ticks);
 }
@@ -581,7 +589,7 @@ export function resolveCard(state, side, card, casterIndex, targetIndex, targetS
   if (dmg > 0) state.firstHitDone = true;
   if (card.effect === 'bleed' && !dodged) applyBleed(targetLane);
   if (card.effect === 'poison' && !dodged) applyPoison(targetLane);
-  if (card.effect === 'deathmark' && !dodged) targetLane.status.deathmark = true;
+  if (card.effect === 'deathmark' && !dodged) targetLane.status.deathmark = Math.max(targetLane.status.deathmark || 0, DEATHMARK_HITS);
 
   Object.assign(result, { targetIndex, dmg, ambush, deathmarked, shielded, bulwarked, dodged, thornReflected });
 
@@ -714,7 +722,7 @@ export const MATCH_LIMIT = 200;
 export function isBlizzard(state){ return state.elapsed >= BLIZZARD_AT; }
 function blizzardDamage(state){
   if (!isBlizzard(state)) return 0;
-  return 2 + 3 * Math.floor((state.elapsed - BLIZZARD_AT) / 15);
+  return 3 + 4 * Math.floor((state.elapsed - BLIZZARD_AT) / 15);
 }
 function healScale(state){ return isBlizzard(state) ? 0.5 : 1; }
 
@@ -754,7 +762,7 @@ export function cardValues(state, card, casterLane, reversed = false){
     if (card.effect === 'multi') chips.push({ icon: '🏹', text: '+' + Math.round(card.dmg * 0.5 * casterLane.powerMult), kind: 'dmg' });
     if (card.effect === 'bleed') chips.push({ icon: '🩸', text: BLEED_PER_STACK + '×' + BLEED_TICKS, kind: 'fx' });
     if (card.effect === 'poison') chips.push({ icon: '☠️', text: '+' + POISON_STACK, kind: 'fx' });
-    if (card.effect === 'deathmark') chips.push({ icon: '💀', text: '+10', kind: 'fx' });
+    if (card.effect === 'deathmark') chips.push({ icon: '💀', text: '+' + DEATHMARK_BONUS + '×' + DEATHMARK_HITS, kind: 'fx' });
     if (card.effect === 'retain') chips.push({ icon: '♻️', text: 'keeps', kind: 'fx' });
     return chips;
   }
@@ -788,7 +796,7 @@ export function cardValues(state, card, casterLane, reversed = false){
       chips.push({ icon: '🌵', text: Math.round((card.pct != null ? card.pct : 0.4) * 100) + '%×' + (card.hits || 2), kind: 'def' });
       break;
     default:
-      chips.push({ icon: '🛡️', text: '-50%', kind: 'def' });
+      chips.push({ icon: '🛡️', text: '-' + Math.round(SHIELD_BLOCK * 100) + '%', kind: 'def' });
   }
   return chips;
 }

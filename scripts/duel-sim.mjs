@@ -21,6 +21,8 @@ const AI_SPEED = 1.3; // same as the in-game rival
 
 const CAST = { you: 'castYou', rival: 'castRival' };
 export const duelStats = { duels: 0, seconds: 0, timeouts: 0 };
+// Optional diagnostics hook: onLand(state, plan, result) after every cast lands.
+export const simHooks = { onLand: null };
 
 // Returns 1 if `you` wins, 0 if `rival` wins, 0.5 for a draw/timeout.
 export function playDuel(youPicks, rivalPicks){
@@ -53,7 +55,8 @@ export function playDuel(youPicks, rivalPicks){
     }
     for (let i = pending.length - 1; i >= 0; i--){
       if (t >= pending[i].at){
-        game.landCast(st, pending[i].plan);
+        const result = game.landCast(st, pending[i].plan);
+        simHooks.onLand?.(st, pending[i].plan, result);
         pending.splice(i, 1);
       }
     }

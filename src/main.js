@@ -390,7 +390,7 @@ function applyResultFx(result){
     if (result.ambush) render.spawnFloatingText(el, 'AMBUSH! x2', 'text-ambush');
     if (result.shielded) render.spawnFloatingText(el, 'BLOCKED!', 'text-block');
     if (result.bulwarked) render.spawnFloatingText(el, 'BULWARK!', 'text-block');
-    if (result.deathmarked) render.spawnFloatingText(el, '+10 MARK', 'text-mark');
+    if (result.deathmarked) render.spawnFloatingText(el, '+'+game.DEATHMARK_BONUS+' MARK', 'text-mark');
     if (result.comboBonus) render.spawnFloatingText(el, 'COMBO! -'+result.comboBonus, 'text-combo');
   }
   if (result.thornReflected > 0){
