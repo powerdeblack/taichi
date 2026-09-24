@@ -807,3 +807,14 @@ h1{
 @keyframes preview-pop{ from{ transform:translateY(6px) scale(.96); opacity:0; } to{ transform:none; opacity:1; } }
 
 .cast-bar.miss .cast-bar-fill{ background:linear-gradient(90deg,#ff4a4a,#ff9a8a); }
+
+/* 3D model loading state (board3d.js renderLoadPill): shown while the
+   toolkit models download, or as a warning if they couldn't load. */
+.load-pill{
+  display:none; position:absolute; left:50%; bottom:10px; transform:translateX(-50%); z-index:6;
+  max-width:90%; padding:4px 12px; border-radius:12px; pointer-events:none; text-align:center;
+  font-size:.7rem; font-weight:700; color:#fff; background:#1c130cd0; border:1px solid #ffd23f80;
+}
+.load-pill.show{ display:block; }
+.load-pill.warn{ border-color:#ff8a5a; background:#3a1a10e0; }
+body.in-duel .load-pill{ top:56px; bottom:auto; }

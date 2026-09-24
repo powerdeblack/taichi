@@ -63,6 +63,9 @@ function ensureMixer(){
       });
       return createAxieMixer3D({ manifest, assetBaseUrl: base, renderer });
     })();
+    // A failed download (flaky mobile data) is retried on the next match
+    // instead of leaving the board without models for the whole session.
+    mixerPromise.catch(() => { mixerPromise = null; });
   }
   return mixerPromise;
 }
@@ -77,7 +80,7 @@ export function resizeBoard3D(){
 }
 
 export function initBoard3D(canvas){
-  if (mixerPromise) return mixerPromise; // already initialized once
+  if (renderer) return ensureMixer(); // already initialized once
   canvasEl = canvas;
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -104,6 +107,9 @@ export function initBoard3D(canvas){
   const cineOverlay = document.createElement('div');
   cineOverlay.className = 'cine-overlay';
   canvas.parentElement?.appendChild(cineOverlay);
+  loadPill = document.createElement('div');
+  loadPill.className = 'load-pill';
+  canvas.parentElement?.appendChild(loadPill);
   cine.initCinematics({
     scene, camera, overlay: cineOverlay,
     lanePos: (side, i) => slotWorld(side, i),
@@ -994,41 +1000,107 @@ export function projectLane(side, localXZ){
 // walk in to it (see animate()'s introWalk handling) -- an entrance into
 // the hall instead of popping in already face to face.
 export async function syncBoardAxies(youLanes, rivalLanes){
-  const mixer = await ensureMixer();
+  const token = ++matchToken;
   clearBoard3D();
-  // Load all up-to-10 models concurrently (not one-by-one) so the board
-  // pops in together instead of unit-by-unit over several seconds.
-  const spawn = (side, lane, i) => (async () => {
-    const descriptor = buildDescriptor(lane.classId, { evolved: lane.evolved });
-    const axie = await mixer.create({ descriptor, quality: 'balanced', artMode: 'faithful', strict: true });
-    await equipSetWeapon(axie, lane.setId, lane.evolved);
+  // 1) Right away, a simple marker in the Axie's class colour stands at its
+  // real (rules) position. The fight -- aim line, projectiles, card effects
+  // -- is anchored to the right spot from the first frame, even while the
+  // 3D models are still downloading on a slow phone, or if they never load.
+  const lanes = [...youLanes.map((lane, i) => ({ side: 'you', lane, i })), ...rivalLanes.map((lane, i) => ({ side: 'rival', lane, i }))];
+  lanes.forEach(({ side, lane, i }) => {
     const basePos = laneWorldPos(side, lane.localPos);
     const introOffset = new THREE.Vector3(0, 0, side === 'you' ? INTRO_SPAWN_OFFSET : -INTRO_SPAWN_OFFSET);
     const spawnPos = basePos.clone().add(introOffset);
     const walking = lane.alive;
     const baseRotation = side === 'you' ? Math.PI : 0;
-    axie.wrapper.position.copy(spawnPos);
-    axie.wrapper.scale.setScalar(0.62);
-    axie.wrapper.rotation.y = baseRotation;
-    axie.wrapper.visible = lane.alive;
-    scene.add(axie.wrapper);
-    trySetLocomotion(axie, walking ? 'walk' : 'idle');
+    const marker = makeMarker(lane.color);
+    marker.wrapper.position.copy(spawnPos);
+    marker.wrapper.scale.setScalar(0.62);
+    marker.wrapper.rotation.y = baseRotation;
+    marker.wrapper.visible = lane.alive;
+    scene.add(marker.wrapper);
     slots.set(slotKey(side, i), {
-      axie, side, laneIndex: i, targetPos: walking ? basePos.clone() : null, live: false,
+      axie: marker, side, laneIndex: i, targetPos: walking ? basePos.clone() : null, live: false,
       basePos: spawnPos.clone(), phase: Math.random() * Math.PI * 2, introWalk: walking,
       baseRotation, lastPos: spawnPos.clone(), weapon: weaponPrefix(lane.setId),
-      alive: lane.alive, dying: false, diedAt: 0, gait: walking ? 'walk' : 'idle',
+      alive: lane.alive, dying: false, diedAt: 0, gait: null,
     });
-  })();
-  const jobs = [
-    ...youLanes.map((lane, i) => spawn('you', lane, i)),
-    ...rivalLanes.map((lane, i) => spawn('rival', lane, i)),
-  ];
-  await Promise.all(jobs);
-  // Portraits of the real models (with colour, weapon and Mystic glow) for
-  // the cards in hand -- rendered once per match.
-  portraits.clear();
-  slots.forEach((s, key) => { const url = renderPortrait(s.axie, renderer); if (url) portraits.set(key, url); });
+  });
+  loadStatus = { total: lanes.length, done: 0, failed: 0, error: null };
+  renderLoadPill();
+
+  // 2) The real toolkit models load concurrently and each replaces its
+  // marker in place (same position, facing and state) as soon as it's ready.
+  let mixer;
+  try { mixer = await ensureMixer(); }
+  catch (err){ loadStatus.failed = lanes.length; loadStatus.error = err?.message || String(err); renderLoadPill(); return; }
+  if (token !== matchToken) return;
+  await Promise.all(lanes.map(async ({ side, lane, i }) => {
+    let axie;
+    try {
+      axie = await mixer.create({ descriptor: buildDescriptor(lane.classId, { evolved: lane.evolved }), quality: 'balanced', artMode: 'faithful', strict: true });
+    } catch (err){
+      loadStatus.failed++; loadStatus.error = loadStatus.error || err?.message || String(err);
+      console.error('Axie model failed:', lane.classId, err);
+      renderLoadPill();
+      return;
+    }
+    const s = slots.get(slotKey(side, i));
+    if (token !== matchToken || !s){ axie.dispose(); return; }
+    const old = s.axie;
+    axie.wrapper.position.copy(old.wrapper.position);
+    axie.wrapper.rotation.y = old.wrapper.rotation.y;
+    axie.wrapper.scale.setScalar(0.62);
+    axie.wrapper.visible = old.wrapper.visible;
+    scene.remove(old.wrapper); old.dispose();
+    scene.add(axie.wrapper);
+    s.axie = axie;
+    s.gait = null;
+    trySetLocomotion(axie, s.introWalk ? 'walk' : 'idle');
+    loadStatus.done++;
+    renderLoadPill();
+    // The weapon never holds the model back: equip in the background (with
+    // a time limit), then take the card portrait with whatever it has.
+    await Promise.race([equipSetWeapon(axie, lane.setId, lane.evolved), new Promise(r => setTimeout(r, 6000))]);
+    if (token !== matchToken || axie.disposed) return;
+    const url = renderPortrait(axie, renderer);
+    if (url) portraits.set(slotKey(side, i), url);
+  }));
+}
+
+// Stand-in body (class-coloured sphere with eyes) used until -- or instead
+// of -- the real model. Same interface bits the board calls on a model.
+function makeMarker(color){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.62, 20, 14), new THREE.MeshLambertMaterial({ color: color || '#cccccc' }));
+  body.position.y = 0.6; body.scale.set(1, 0.9, 1);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1b1b1b });
+  const e1 = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), eyeMat);
+  e1.position.set(-0.22, 0.72, 0.52);
+  const e2 = e1.clone(); e2.position.x = 0.22;
+  g.add(body, e1, e2);
+  return {
+    wrapper: g, disposed: false, animationNames: [], isMarker: true,
+    update(){}, setLocomotion(){}, playAnimation(){ return false; },
+    dispose(){ this.disposed = true; body.geometry.dispose(); body.material.dispose(); e1.geometry.dispose(); eyeMat.dispose(); },
+  };
+}
+
+let matchToken = 0;
+let loadStatus = { total: 0, done: 0, failed: 0, error: null };
+let loadPill = null;
+function renderLoadPill(){
+  if (!loadPill) return;
+  const { total, done, failed, error } = loadStatus;
+  if (failed){
+    loadPill.textContent = `⚠️ ${failed} 3D model${failed > 1 ? 's' : ''} couldn't load (${String(error).slice(0, 80)}) — showing coloured markers`;
+    loadPill.className = 'load-pill show warn';
+  } else if (done < total){
+    loadPill.textContent = `Loading 3D Axies ${done}/${total}…`;
+    loadPill.className = 'load-pill show';
+  } else {
+    loadPill.className = 'load-pill';
+  }
 }
 
 const portraits = new Map();
@@ -1080,6 +1152,7 @@ export function setLaneRoaming(side, laneIndex, roaming){
 
 export function clearBoard3D(){
   clearCastsFX();
+  portraits.clear();
   slots.forEach(s => { scene.remove(s.axie.wrapper); s.axie.dispose(); });
   slots.clear();
 }

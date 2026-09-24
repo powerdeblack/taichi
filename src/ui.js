@@ -309,10 +309,10 @@ export function buildBoard(state, onUnitClick){
   // initBoard3D sets up the camera synchronously, so overlays can be
   // positioned right away -- they shouldn't wait on the 3D models (which
   // load asynchronously and pop in a moment later via syncBoardAxies).
-  if (!board3dReady) board3dReady = initBoard3D(board3dCanvas);
+  if (!board3dReady){ board3dReady = initBoard3D(board3dCanvas); board3dReady.catch(() => {}); }
   repositionUnits();
-  board3dReady
-    .then(() => syncBoardAxies(state.youLanes, state.rivalLanes))
+  // Markers appear at once; the real models replace them as they load.
+  syncBoardAxies(state.youLanes, state.rivalLanes)
     .catch(err => console.error('3D board failed:', err));
 
   if (!resizeListenerBound){

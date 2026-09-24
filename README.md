@@ -530,6 +530,17 @@ estilingue), mantido como referência histórica — não é mais o jogo atual.
 
 ## Axies 3D reais (Axie Mixer 3D)
 
+**Carregamento à prova de falha** (`board3d.js` `syncBoardAxies`): no
+início da partida cada Axie ganha na hora um **marcador** (bola na cor da
+classe) na posição real das regras; o modelo 3D do toolkit o substitui no
+mesmo lugar quando termina de baixar. Se o modelo demora (rede móvel) ou
+falha, o marcador fica — mira, projéteis e efeitos continuam saindo do
+Axie certo (antes, sem modelo, o efeito nascia na origem, **no centro da
+arena**, e parecia que o ataque errava). A arma é equipada em segundo
+plano (com limite de tempo), um aviso no tabuleiro mostra "Loading 3D
+Axies n/6…" ou o erro exato, e uma falha ao baixar o manifesto é tentada
+de novo na próxima partida.
+
 **O que o jogo usa do toolkit** (`src/axieLook.js`, compartilhado pelo
 tabuleiro e pela prévia do time):
 - **Cor de corpo por classe** — índice no catálogo de cores do toolkit
