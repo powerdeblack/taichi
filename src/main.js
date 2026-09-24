@@ -574,6 +574,33 @@ function dropDeadTarget(){
 // Tank). Aim for a defense/heal card: the selected Axie on either side,
 // otherwise the card's own Axie.
 let aiming = null; // the card currently held
+let aimCancelling = false; // finger dragged off the held card: letting go cancels
+let castAim = null; // your played card: its reach ring/line stay up until impact
+let previewTimer = 0; // how long the post-release confirmation stays up
+
+// Live answer, per card in hand, to "does it reach right now?": attacks
+// check their real reach (short 2.3 / long 6) against the Axie they'd hit.
+function reachFor(card){
+  const caster = state.youLanes[card.laneIndex];
+  if (!caster || !caster.alive) return null;
+  const a = aimFor(card);
+  const lanes = a.targetSide === 'you' ? state.youLanes : state.rivalLanes;
+  const target = lanes[a.targetIndex];
+  if (!target) return { ok: false, text: '❌ no target' };
+  if (card.role !== 'attack'){
+    return { ok: true, text: a.targetSide === 'you' ? `→ ${a.targetIndex === card.laneIndex ? 'itself' : target.name}` : `↩ → rival ${target.name}` };
+  }
+  const d = game.distanceBetween(state, 'you', card.laneIndex, 'rival', a.targetIndex);
+  const reach = game.cardRange(card);
+  if (a.inRange) return { ok: true, text: `${a.taunted ? '🛡️' : '✅'} hits ${target.name}` };
+  return { ok: false, text: `❌ ${target.name} ${d.toFixed(1)} away · reach ${reach}` };
+}
+
+// First value chip of a card (its damage / heal / protection) as text.
+function mainValue(card){
+  const v = game.cardValues(state, card, state.youLanes[card.laneIndex], card.role === 'heal' && aimFor(card).targetSide === 'rival')[0];
+  return v ? `${v.icon} ${v.text}` : '';
+}
 
 function aimFor(card){
   const caster = card.laneIndex;
@@ -650,6 +677,20 @@ function updateAim(){
     targetSide: a.targetSide, targetXZ: target ? target.localPos : null,
   });
   ui.markInRange(a.targetSide, isAttack ? a.legal : []);
+  // The big "if you let go now" bubble above the hand.
+  const tname = target ? target.name : 'nobody';
+  if (aimCancelling){
+    ui.showReleasePreview('✋ Let go to <b>cancel</b> — the card stays in your hand', 'cancel');
+  } else if (!isAttack){
+    const reversed = a.targetSide === 'rival';
+    ui.showReleasePreview(`Let go → <b>${mainValue(card)}</b> on ${reversed ? "the rival's" : 'your'} <b>${tname}</b>${reversed ? ' (REVERSE HEAL)' : ''}<small>drag off the card to cancel</small>`, reversed ? 'bad' : 'ok');
+  } else if (a.inRange){
+    ui.showReleasePreview(`Let go → <b>${mainValue(card)}</b> on <b>${tname}</b> ✅ in reach<small>${card.range === 'short' ? '🗡️ short' : '🏹 long'} reach ${game.cardRange(card)} · drag off to cancel</small>`, 'ok');
+  } else {
+    const d = target ? game.distanceBetween(state, 'you', card.laneIndex, 'rival', a.targetIndex) : 0;
+    const gap = Math.max(0, d - game.cardRange(card));
+    ui.showReleasePreview(`Let go → <b>❌ MISS</b>: ${tname} is ${d.toFixed(1)} away, ${card.range === 'short' ? '🗡️ short' : '🏹 long'} reach is ${game.cardRange(card)}<small>walk ${gap.toFixed(1)} closer first · drag off to cancel</small>`, 'bad');
+  }
   if (!isAttack){
     const onSelf = a.targetSide === 'you';
     ui.setHint(onSelf
@@ -667,10 +708,12 @@ function updateAim(){
 function hideAimVisuals(){
   ui.hideAim();
   ui.markInRange('rival', []);
+  ui.hideReleasePreview();
 }
 
 function cancelAim(){
   aiming = null;
+  aimCancelling = false;
   hideAimVisuals();
   syncHand();
 }
@@ -678,20 +721,60 @@ function cancelAim(){
 function onCardRelease(card){
   if (aiming !== card) return;
   const a = aimFor(card);
+  const value = mainValue(card);
   aiming = null;
+  aimCancelling = false;
   hideAimVisuals();
   const plan = state.gameOver ? null : game.playerBeginCard(state, card, a.targetIndex, a.targetSide);
-  if (plan) startCast(plan);
+  if (plan){
+    startCast(plan);
+    // Confirm what was just played, and keep its reach ring + line on the
+    // board (green = will land, red = will miss) until it hits.
+    const lanes = plan.targetSide === 'you' ? state.youLanes : state.rivalLanes;
+    const tname = lanes[plan.targetIndex]?.name || 'nobody';
+    castAim = { card, casterIndex: plan.casterIndex, targetSide: plan.targetSide, targetIndex: plan.targetIndex, missed: plan.missed };
+    ui.showReleasePreview(plan.missed
+      ? `❌ ${card.name} played <b>out of reach</b> — it will MISS ${tname}`
+      : `✔ ${card.name} → <b>${tname}</b> ${value} · lands in ${game.CAST_IMPACT_AT.toFixed(1)}s`, plan.missed ? 'bad' : 'ok');
+    previewTimer = 1.8;
+  }
   syncUI();
 }
 
-function onCardCancel(card){
-  if (aiming === card) cancelAim();
+function onCardCancel(card, byDrag){
+  if (aiming !== card) return;
+  cancelAim();
+  if (byDrag){ ui.showReleasePreview('Cancelled — card kept', 'cancel'); previewTimer = 1; }
+}
+
+function onCardDrag(card, cancelling){
+  if (aiming !== card) return;
+  aimCancelling = cancelling;
+  updateAim();
+}
+
+// Keeps a played card's reach ring and caster→target line up until impact.
+function updateCastAim(dt){
+  if (previewTimer > 0){ previewTimer -= dt; if (previewTimer <= 0 && !aiming) ui.hideReleasePreview(); }
+  if (!castAim || aiming) return;
+  const caster = state.youLanes[castAim.casterIndex];
+  const lanes = castAim.targetSide === 'you' ? state.youLanes : state.rivalLanes;
+  const target = lanes[castAim.targetIndex];
+  if (!caster || !caster.alive){ castAim = null; ui.hideAim(); return; }
+  const isAttack = castAim.card.role === 'attack';
+  ui.showAim({
+    side: 'you', casterXZ: caster.localPos,
+    radius: isAttack ? game.cardRange(castAim.card) : null,
+    state: isAttack ? (castAim.missed ? 'out' : 'ok') : 'support',
+    targetSide: castAim.targetSide, targetXZ: target && target.alive ? target.localPos : null,
+  });
 }
 
 function syncHand(){
   const reverseHeals = !!(selectedTarget && selectedTarget.side === 'rival' && state.rivalLanes[selectedTarget.laneIndex]?.alive);
-  ui.renderHand(state, { onPress: onCardPress, onRelease: onCardRelease, onCancel: onCardCancel, aimingUid: aiming && aiming.uid, reverseHeals });
+  const reach = {};
+  state.hand.forEach(c => { const r = reachFor(c); if (r) reach[c.uid] = r; });
+  ui.renderHand(state, { onPress: onCardPress, onRelease: onCardRelease, onCancel: onCardCancel, onDrag: onCardDrag, aimingUid: aiming && aiming.uid, reverseHeals, reach });
 }
 
 // ================= Cast timeline =================
@@ -733,6 +816,7 @@ function tickPendingCasts(dt){
     }
     if (c.age < game.CAST_IMPACT_AT) return true;
     ui.landCastFX(c.id);
+    if (castAim && c.plan.side === 'you'){ castAim = null; if (!aiming) ui.hideAim(); }
     const result = game.landCast(state, c.plan);
     applyResultFx(result);
     if (tutorial && c.plan.side === 'you') tutorial.notify('landed');
@@ -743,11 +827,20 @@ function tickPendingCasts(dt){
   ui.setCastBars(pendingCasts.map(c => ({
     side: c.plan.side, laneIndex: c.plan.casterIndex,
     frac: Math.min(1, c.age / game.CAST_IMPACT_AT),
-    label: `${c.plan.card.setIcon || ''} ${c.plan.card.name}`,
+    label: `${c.plan.card.setIcon || ''} ${c.plan.card.name} → ${targetName(c.plan)}`,
+    miss: c.plan.missed,
   })));
 }
 
+function targetName(plan){
+  const lanes = plan.targetSide === 'you' ? state.youLanes : state.rivalLanes;
+  const t = lanes[plan.targetIndex];
+  if (!t) return '—';
+  return plan.targetSide === plan.side ? (plan.targetIndex === plan.casterIndex ? 'self' : t.name) : t.name;
+}
+
 function clearCasts(){
+  castAim = null;
   pendingCasts = [];
   ui.clearCastsFX();
   ui.setCastBars([]);
@@ -983,6 +1076,7 @@ function gameLoop(nowMs){
 
   ui.updateBoard(state);
   updateAim();
+  updateCastAim(dt);
   ['you', 'rival'].forEach(side => {
     const tank = (side === 'you' ? state.youLanes : state.rivalLanes).find(l => l.isTank);
     ui.setTauntRing(side, tank.localPos, tank.alive);

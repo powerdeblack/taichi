@@ -776,3 +776,34 @@ h1{
   .unit-chip{ padding:3px 5px; }
   .mp-label{ display:none; }
 }
+
+/* ================= Release clarity =================
+   Each card says live whether it reaches (card-reach); holding one shows
+   what letting go will do (release-preview); a card that would miss is
+   flagged in red; your caster's cast bar turns red when the shot is
+   already out of reach. */
+.card-reach{
+  margin:0 0 3px; padding:1px 5px; border-radius:6px; font-size:.6rem; font-weight:700;
+  line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.card-reach.ok{ background:#3fbf5a26; color:#c9ffd3; }
+.card-reach.bad{ background:#ff4a4a33; color:#ffd0d0; }
+.hand .card.will-miss:not(.disabled){ border-color:#ff5a5a99 !important; }
+.hand .card.will-miss:not(.disabled) .card-name{ color:#ffd0d0; }
+
+.release-preview{
+  display:none; position:absolute; left:0; right:0; bottom:calc(100% + 8px); z-index:9;
+  margin:0 auto; width:max-content; max-width:min(96%, 420px); pointer-events:none;
+  padding:7px 12px; border-radius:14px; text-align:center;
+  font-family:'Baloo 2',sans-serif; font-size:.86rem; line-height:1.25; color:#fff;
+  background:#1c130cf0; border:2px solid #ffd23f; box-shadow:0 8px 22px -8px #000c;
+}
+.release-preview.show{ display:block; animation:preview-pop .16s ease-out; }
+.release-preview b{ font-weight:800; }
+.release-preview small{ display:block; font-size:.66rem; font-weight:600; opacity:.8; }
+.release-preview.ok{ border-color:#57d46f; }
+.release-preview.bad{ border-color:#ff5a5a; background:#3a1010f0; }
+.release-preview.cancel{ border-color:#9aa4b8; background:#20242cf0; }
+@keyframes preview-pop{ from{ transform:translateY(6px) scale(.96); opacity:0; } to{ transform:none; opacity:1; } }
+
+.cast-bar.miss .cast-bar-fill{ background:linear-gradient(90deg,#ff4a4a,#ff9a8a); }

@@ -128,6 +128,18 @@ npm run preview
   🎯 grudado num inimigo pra atacar transformava toda cura em dano sem
   aviso — parecia que a cura não funcionava). Sem 🎯, a cura vai no aliado
   mais ferido.
+- **Clareza ao soltar uma carta** (principalmente curto × longo alcance):
+  cada carta na mão diz ao vivo se alcança (`main.js`'s `reachFor`: "✅
+  hits Shell" ou "❌ Shell 3.1 away · reach 2.3") e fica com borda vermelha
+  quando erraria; o rótulo mostra o alcance ("🗡️ Short 2.3" / "🏹 Long 6").
+  Segurando a carta, um balão acima da mão diz exatamente o que acontece ao
+  soltar (dano/cura e em quem, ou "❌ MISS… walk 0.8 closer"); arrastar o
+  dedo pra fora da carta (>70px) cancela e a carta fica na mão. Depois de
+  soltar, um aviso confirma ("✔ Maré Arcana → Larva ⚔️ 26 · lands in
+  3.2s") e o anel de alcance + a linha até o alvo ficam no tabuleiro até o
+  impacto (verde = acerta, vermelho = erra); a barra de cast sobre o Axie
+  mostra "carta → alvo" e fica vermelha quando o tiro já saiu fora do
+  alcance.
 - **Números nas cartas** (`game.js`'s `cardValues`, desenhados em
   `ui.renderHand`): cada carta mostra o que faz já com os multiplicadores
   do Axie dono — ⚔️ dano (× Power), 🏹 bônus do combo de flechas, 🩸/☠️/💀

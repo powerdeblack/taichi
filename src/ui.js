@@ -220,6 +220,7 @@ export function setCastBars(bars){
       ref.castBar.classList.toggle('active', !!bar);
       if (!bar) return;
       ref.castFill.style.width = `${Math.round(bar.frac * 100)}%`;
+      ref.castBar.classList.toggle('miss', !!bar.miss);
       if (ref.castLabel.textContent !== bar.label) ref.castLabel.textContent = bar.label;
     });
   });
@@ -420,7 +421,7 @@ export function markInRange(side, indices){
 // card visibly fail to respond. Keeping one persistent element per uid
 // means a click's target never gets pulled out from under it.
 const handNodes = new Map(); // card.uid -> element
-export function renderHand(state, { onPress, onRelease, onCancel, aimingUid, reverseHeals = false }){
+export function renderHand(state, { onPress, onRelease, onCancel, onDrag, aimingUid, reverseHeals = false, reach = {} }){
   const seen = new Set();
   state.hand.forEach((card, i) => {
     seen.add(card.uid);
@@ -428,8 +429,10 @@ export function renderHand(state, { onPress, onRelease, onCancel, aimingUid, rev
     const laneAlive = casterLane && casterLane.alive;
     const affordable = state.energyYou >= card.cost;
     const playable = affordable && !state.gameOver && laneAlive && state.castYou <= 0;
-    const rangeLabel = card.range==='short' ? 'Short' : card.range==='long' ? 'Long'
+    const rangeLabel = card.range==='short' ? '🗡️ Short 2.3' : card.range==='long' ? '🏹 Long 6'
       : card.role==='heal' ? 'Heal' : 'Defense';
+    // Live answer to "does this card reach right now?" (see main.js reachFor).
+    const r = reach[card.uid];
 
     let div = handNodes.get(card.uid);
     if (!div){
@@ -443,7 +446,7 @@ export function renderHand(state, { onPress, onRelease, onCancel, aimingUid, rev
     const portrait = getLanePortrait('you', card.laneIndex);
     const chips = cardValues(state, card, casterLane, reversing)
       .map(c => `<span class="val val-${c.kind}">${c.icon}<b>${c.text}</b></span>`).join('');
-    div.className = 'card' + (!playable ? ' disabled' : '') + (card.uid === aimingUid ? ' aiming' : '') + (reversing ? ' reversing' : '');
+    div.className = 'card' + (!playable ? ' disabled' : '') + (card.uid === aimingUid ? ' aiming' : '') + (reversing ? ' reversing' : '') + (r && !r.ok ? ' will-miss' : '');
     div.style.borderColor = card.color + '55';
     div.innerHTML = `
       <div class="card-top">
@@ -452,19 +455,33 @@ export function renderHand(state, { onPress, onRelease, onCancel, aimingUid, rev
         <div class="card-cost">${card.cost}</div>
       </div>
       <div class="card-vals">${reversing ? '<span class="val val-rev">↩ REVERSE</span>' : ''}${chips}</div>
+      ${r ? `<div class="card-reach ${r.ok ? 'ok' : 'bad'}">${r.text}</div>` : ''}
       <div class="card-class" style="color:${card.color}">${card.setIcon ? card.setIcon+' ' : ''}${card.setName || card.cls} · ${rangeLabel}</div>
       <div class="card-desc">${card.desc}${!laneAlive ? ' <b>(lane destroyed)</b>' : ''}</div>
     `;
     // Hold to aim (shows the card's reach on the board), release to fire.
     // Pointer capture keeps the release on this card even if the finger
     // drifts off it.
+    // Dragging the finger well off the card cancels it (the card stays in
+    // hand); the release preview says so before you let go.
     div.onpointerdown = playable ? (e) => {
       e.preventDefault();
       div.setPointerCapture(e.pointerId);
+      div._drag = { x: e.clientX, y: e.clientY, cancelling: false };
       onPress(card);
     } : null;
-    div.onpointerup = () => onRelease(card);
-    div.onpointercancel = () => onCancel(card);
+    div.onpointermove = (e) => {
+      const d = div._drag;
+      if (!d) return;
+      const cancelling = Math.hypot(e.clientX - d.x, e.clientY - d.y) > CANCEL_DRAG_PX;
+      if (cancelling !== d.cancelling){ d.cancelling = cancelling; onDrag?.(card, cancelling); }
+    };
+    div.onpointerup = () => {
+      const d = div._drag;
+      div._drag = null;
+      if (d && d.cancelling) onCancel(card, true); else onRelease(card);
+    };
+    div.onpointercancel = () => { div._drag = null; onCancel(card); };
     if (handEl.children[i] !== div) handEl.insertBefore(div, handEl.children[i] || null);
   });
   for (const [uid, div] of handNodes){
@@ -474,6 +491,17 @@ export function renderHand(state, { onPress, onRelease, onCancel, aimingUid, rev
     }
   }
 }
+
+const CANCEL_DRAG_PX = 70;
+
+// The big "what happens if I let go" bubble above the hand while a card is
+// held, and a short confirmation right after it is played.
+const releasePreviewEl = document.getElementById('releasePreview');
+export function showReleasePreview(html, tone){
+  releasePreviewEl.innerHTML = html;
+  releasePreviewEl.className = 'release-preview show ' + (tone || '');
+}
+export function hideReleasePreview(){ releasePreviewEl.className = 'release-preview'; }
 
 // Countdown to the Blizzard, then the time left before the 3:20 limit.
 const matchClockEl = document.getElementById('matchClock');
