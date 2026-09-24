@@ -550,6 +550,13 @@ h1{
 .deck-status-row{
   display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;
 }
+.match-clock{
+  flex-shrink:0; font-family:'Baloo 2',sans-serif; font-weight:800; font-size:.78rem;
+  font-variant-numeric:tabular-nums; color:var(--text-light); background:#00000040;
+  border-radius:10px; padding:2px 8px; white-space:nowrap;
+}
+.match-clock.storm{ background:#2a6fb8; color:#fff; animation:stormPulse 1.2s ease-in-out infinite; }
+@keyframes stormPulse{ 0%,100%{ box-shadow:0 0 0 0 #5fb4ff80; } 50%{ box-shadow:0 0 0 4px #5fb4ff00; } }
 .mute-btn{
   flex-shrink:0; width:30px; height:30px; border-radius:50%; cursor:pointer;
   border:1px solid #ffffff25; background:#4a382480; font-size:.85rem; line-height:1;
@@ -681,8 +688,9 @@ h1{
     background:#1c130cd0; backdrop-filter:blur(4px); border-radius:10px; padding:4px 10px;
   }
   .pile-counts{ display:none; }
+  .energy-label{ display:none; }
   .hint{
-    position:absolute; top:6px; left:50%; transform:translateX(-50%); z-index:6;
+    position:absolute; top:46px; left:50%; transform:translateX(-50%); z-index:6;
     margin:0; max-width:42%; min-height:0;
     background:#1c130cb0; border-radius:10px; padding:4px 10px;
     text-align:center; font-size:.6rem; line-height:1.25;

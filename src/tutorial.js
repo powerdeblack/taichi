@@ -30,7 +30,7 @@ const STEPS = [
   { advance: 'next', rival: true, focus: rivalChips,
     text: 'Now the rival fights back! Watch the <b>bar above its Axies</b> — it shows which card is coming. Tip: Heal and Defense cards work on your own Axies too — select one of yours first.' },
   { advance: 'next', rival: true, focus: () => [],
-    text: 'Finish it: bring down the rival\'s 🎯 Tank! After 2 minutes a <b>Blizzard</b> hurts everyone and halves healing, so keep up the pressure. Good luck!' },
+    text: 'Finish it: bring down the rival\'s 🎯 Tank! At 2:00 a <b>Blizzard</b> hurts everyone and halves healing, and at <b>3:20</b> the match ends — the Tank with more HP left wins. The clock at the top shows how long you have. Good luck!' },
 ];
 
 export function tutorialDone(){

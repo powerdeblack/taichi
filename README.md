@@ -174,7 +174,7 @@ npm run preview
   gera o mesmo resultado) — e grava `src/metaData.js`: matriz de vitórias,
   taxa de vitória geral, **tier** por ranking (S = top 2 = o meta, depois
   A/B/C), **"Beats"** (vence o confronto em ≥55%), **"Countered by"** e
-  **contra-meta** (time fora do S que vence algum time S). A tela mostra
+  **contra-meta** (pra cada time S, a melhor resposta de fora do tier S — o que mais vence contra ele, desde que vença mais de 50%). A tela mostra
   os arquétipos nessa ordem com selo de tier, % de vitória, 🏆 META ou
   🎯 COUNTER-META, e uma **tabela de confrontos** (escala divergente: azul =
   a linha vence, vermelho = perde, cinza = equilibrado; toque numa célula
@@ -191,13 +191,17 @@ npm run preview
   alcance longo e recuam se o inimigo chega perto (kite)
   (`aiMoveIntent`). Cura vai no aliado mais ferido (cura instantânea só
   abaixo de 85% de vida), defesa como descrito acima.
-- **Nevasca (morte súbita)**: a partir de **2 minutos** de duelo
+- **Nevasca (morte súbita) e limite de 3:20**: a partir de **2 minutos**
   (`BLIZZARD_AT`), a cada tique (2s) a tempestade causa dano a **todos** os
-  Axies dos dois lados (2, +2 a cada 20s) e **toda cura vale metade**. A
+  Axies dos dois lados (2, +3 a cada 15s) e **toda cura vale metade**. A
   neve cai forte e de lado, a névoa fecha, toca um vento e aparece o aviso.
-  Sem isso, dois times de cura/barreira empatavam por mais de 5 minutos
-  (na simulação, 80% dos duelos Toxic Rush × Arcane Bastion estouravam o
-  limite); com ela, a média é ~2,6 min e nenhum duelo trava.
+  A partida **sempre termina até 3:20** (`MATCH_LIMIT`): se os dois Tanques
+  ainda estiverem de pé, vence o que tiver a maior % de vida ("Time up").
+  Um relógio ao lado da energia mostra quanto falta pra Nevasca e, depois,
+  pro fim. Na simulação (IA × IA) todo duelo já acaba sozinho antes disso:
+  média ~2,5 min, o mais longo 2m54s — o limite é garantia pra partidas
+  contra gente, que pode enrolar mais que a IA. Sem a Nevasca, dois times
+  de cura/barreira empatavam por mais de 5 minutos.
 - **Tutorial jogável (opcional)**: nunca abre sozinho. A tela de montar time
   mostra um convite "🎓 Play tutorial" — com "Not now" pra dispensar de vez
   (lembrado no `localStorage`) — e, depois de dispensado ou concluído, só

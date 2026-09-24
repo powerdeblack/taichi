@@ -725,13 +725,15 @@ export function tickStatusTimer(state, dt){
 
 // Blizzard (sudden death): once a duel passes BLIZZARD_AT seconds the
 // storm closes in -- every status tick hurts every Axie on both sides,
-// harder the longer it lasts, and all healing is halved. Guarantees a
-// finish when two sustain squads would otherwise stall forever.
+// harder the longer it lasts (+3 every 15s), and all healing is halved.
+// MATCH_LIMIT is the hard ceiling: if both Tanks are still standing at
+// 3:20, the Tank with the higher HP share wins (equal = draw).
 export const BLIZZARD_AT = 120;
+export const MATCH_LIMIT = 200;
 export function isBlizzard(state){ return state.elapsed >= BLIZZARD_AT; }
 function blizzardDamage(state){
   if (!isBlizzard(state)) return 0;
-  return 2 + 2 * Math.floor((state.elapsed - BLIZZARD_AT) / 20);
+  return 2 + 3 * Math.floor((state.elapsed - BLIZZARD_AT) / 15);
 }
 function healScale(state){ return isBlizzard(state) ? 0.5 : 1; }
 
@@ -743,5 +745,12 @@ export function checkGameOver(state){
   if (youDead || rivalDead){
     state.gameOver = true;
     state.winner = (youDead && rivalDead) ? 'draw' : (rivalDead ? 'you' : 'rival');
+    return;
+  }
+  if (state.elapsed >= MATCH_LIMIT){
+    const youShare = youTank.hp / youTank.maxHp, rivalShare = rivalTank.hp / rivalTank.maxHp;
+    state.gameOver = true;
+    state.timeUp = true;
+    state.winner = Math.abs(youShare - rivalShare) < 0.005 ? 'draw' : (youShare > rivalShare ? 'you' : 'rival');
   }
 }

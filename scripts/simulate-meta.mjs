@@ -50,7 +50,14 @@ const beats = {}, counteredBy = {}, counterMetaVs = {};
 ids.forEach(id => {
   beats[id] = ids.filter(o => o !== id && matrix[id][o] >= BEATS_AT).sort((a, b) => matrix[id][b] - matrix[id][a]);
   counteredBy[id] = ids.filter(o => o !== id && matrix[o][id] >= BEATS_AT).sort((a, b) => matrix[b][id] - matrix[a][id]);
-  counterMetaVs[id] = tier[id] === 'S' ? [] : beats[id].filter(o => tier[o] === 'S');
+  counterMetaVs[id] = [];
+});
+// Counter-meta: for each S team, the best answer from outside the S tier
+// -- the non-S archetype with the highest win rate against it, as long as
+// it wins that matchup more often than not.
+ids.filter(s => tier[s] === 'S').forEach(s => {
+  const best = ids.filter(o => tier[o] !== 'S').sort((a, b) => matrix[b][s] - matrix[a][s])[0];
+  if (best && matrix[best][s] > 0.5) counterMetaVs[best].push(s);
 });
 
 const { duels, timeouts } = duelStats;

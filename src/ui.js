@@ -53,7 +53,7 @@ export function renderArchetypes(archetypes, axies, sets, onUse, activeId, meta)
   const byId = Object.fromEntries(archetypes.map(a => [a.id, a]));
   const ordered = meta.ranked.map(id => byId[id]).filter(Boolean);
   metaNoteEl.textContent = `Tiers from ${(meta.gamesPerPair * ordered.length * (ordered.length - 1) / 2).toLocaleString('en')} simulated AI-vs-AI duels. ` +
-    `S = the current meta; a counter-meta team beats at least one S team. "Beats" = wins that matchup at least ${Math.round(meta.beatsAt * 100)}% of the time.`;
+    `S = the current meta; a counter-meta team is the best answer from outside the meta to an S team. "Beats" = wins that matchup at least ${Math.round(meta.beatsAt * 100)}% of the time.`;
   archetypeRow.innerHTML = '';
   ordered.forEach(arch => {
     const tier = meta.tier[arch.id];
@@ -533,6 +533,18 @@ export function renderHand(state, { onPress, onRelease, onCancel, aimingUid }){
       handNodes.delete(uid);
     }
   }
+}
+
+// Countdown to the Blizzard, then the time left before the 3:20 limit.
+const matchClockEl = document.getElementById('matchClock');
+const fmtClock = sec => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+export function renderMatchClock(elapsed, blizzardAt, limit){
+  const storm = elapsed >= blizzardAt;
+  matchClockEl.classList.toggle('storm', storm);
+  matchClockEl.textContent = storm
+    ? `⏱ ${fmtClock(Math.max(0, limit - elapsed))} left`
+    : `❄️ in ${fmtClock(Math.max(0, blizzardAt - elapsed))}`;
+  matchClockEl.title = storm ? 'Blizzard! The match ends at 3:20.' : 'Time until the Blizzard';
 }
 
 export function renderPips(state){

@@ -230,6 +230,7 @@ function syncUI(){
   ui.updateBoard(state);
   ui.renderPips(state);
   ui.renderPiles(state);
+  ui.renderMatchClock(state.elapsed, game.BLIZZARD_AT, game.MATCH_LIMIT);
   syncHand();
   updateMoveBtn();
   updateJoystick();
@@ -389,7 +390,11 @@ function finishMatch(){
   matchFinished = true;
   clearCasts();
   endTutorial();
-  if (state.winner === 'draw') ui.showBanner('Draw!', 'Both Tanks fell together.');
+  if (state.timeUp){
+    if (state.winner === 'draw') ui.showBanner('Time up — draw!', 'Both Tanks ended with the same HP share.');
+    else if (state.winner === 'you') ui.showBanner('Time up — you win!', 'Your Tank had more HP left at 3:20.');
+    else ui.showBanner('Time up — you lost.', 'The rival Tank had more HP left at 3:20.');
+  } else if (state.winner === 'draw') ui.showBanner('Draw!', 'Both Tanks fell together.');
   else if (state.winner === 'you') ui.showBanner('You won the duel!', 'The rival Tank was defeated.');
   else ui.showBanner('You lost the duel.', 'Your Tank was defeated.');
   // Let the final KO boom land before the fanfare.
@@ -814,6 +819,7 @@ function gameLoop(nowMs){
     uiRefreshTimer = 0;
     ui.renderPips(state);
     ui.renderPiles(state);
+    ui.renderMatchClock(state.elapsed, game.BLIZZARD_AT, game.MATCH_LIMIT);
     syncHand();
     updateMoveBtn();
     updateJoystick();
