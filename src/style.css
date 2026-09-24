@@ -826,15 +826,10 @@ body.in-duel .load-pill{ top:56px; bottom:auto; }
 
 /* Keyboard hints: only on computers (mouse/trackpad). Touch devices keep
    the joystick and tap controls without these labels. */
-.key-hint, .card-key{ display:none; }
+.key-hint{ display:none; }
 @media (hover:hover) and (pointer:fine){
   .key-hint{
     display:inline-block; margin-left:4px; padding:0 5px; border-radius:5px; font-size:.62rem;
     letter-spacing:1px; background:#ffffff1f; border:1px solid #ffffff40;
-  }
-  .card-key{
-    display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto;
-    width:16px; height:16px; margin-right:4px; border-radius:4px; font-size:.62rem; font-weight:800;
-    background:#ffffff22; border:1px solid #ffffff55; color:#fff;
   }
 }

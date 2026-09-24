@@ -457,7 +457,6 @@ export function renderHand(state, { onPress, onRelease, onCancel, onDrag, aiming
     div.style.borderColor = card.color + '55';
     div.innerHTML = `
       <div class="card-top">
-        <span class="card-key">${i + 1}</span>
         ${portrait ? `<img class="card-face" src="${portrait}" alt="">` : ''}
         <div class="card-name">${card.name}</div>
         <div class="card-cost">${card.cost}</div>

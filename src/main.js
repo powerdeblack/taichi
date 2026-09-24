@@ -1028,8 +1028,8 @@ joystickBase.addEventListener('pointercancel', endJoystickDrag);
 // ================= Keyboard (computers) =================
 // W A S D (or the arrow keys) drive the squad exactly like the joystick:
 // W / up = toward the enemy. The on-screen stick mirrors the direction.
-// 1 / 2 / 3 hold the matching card in hand (showing its reach) and fire
-// it on release, the same as pressing and letting go of it with the mouse.
+// Cards stay on the mouse: press a card to aim, release to play, drag off
+// it to cancel (Esc also cancels a held card).
 const MOVE_KEYS = {
   KeyW: [0, 1], ArrowUp: [0, 1], KeyS: [0, -1], ArrowDown: [0, -1],
   KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0],
@@ -1037,7 +1037,6 @@ const MOVE_KEYS = {
 const keysDown = new Set();
 let keyMoving = false;
 let keyDirX = 0, keyDirZ = 0;
-const heldCardKeys = new Map(); // key code -> card being aimed with it
 
 function inDuel(){ return document.body.classList.contains('in-duel') && state && !matchFinished; }
 
@@ -1066,23 +1065,13 @@ window.addEventListener('keydown', (e) => {
     updateKeyMove();
     return;
   }
-  const slot = { Digit1: 0, Digit2: 1, Digit3: 2, Numpad1: 0, Numpad2: 1, Numpad3: 2 }[e.code];
-  if (slot !== undefined && !e.repeat && !heldCardKeys.has(e.code)){
-    const card = state.hand[slot];
-    const lane = card && state.youLanes[card.laneIndex];
-    if (!card || aiming || state.castYou > 0 || state.energyYou < card.cost || !lane?.alive || lane.status.stun > 0) return;
-    heldCardKeys.set(e.code, card);
-    onCardPress(card);
-  }
-  if (e.code === 'Escape' && aiming){ heldCardKeys.clear(); cancelAim(); }
+  if (e.code === 'Escape' && aiming) cancelAim();
 });
 window.addEventListener('keyup', (e) => {
-  if (MOVE_KEYS[e.code]){ keysDown.delete(e.code); if (state) updateKeyMove(); return; }
-  const card = heldCardKeys.get(e.code);
-  if (card){ heldCardKeys.delete(e.code); onCardRelease(card); }
+  if (MOVE_KEYS[e.code]){ keysDown.delete(e.code); if (state) updateKeyMove(); }
 });
 // Losing focus (alt-tab) must not leave the squad walking forever.
-window.addEventListener('blur', () => { keysDown.clear(); heldCardKeys.clear(); if (state) updateKeyMove(); if (aiming) cancelAim(); });
+window.addEventListener('blur', () => { keysDown.clear(); if (state) updateKeyMove(); });
 
 // ================= Rival wander (autonomous Tank+escort movement) =================
 // The rival's Tank -- and its escort, same as the player's -- roams the
