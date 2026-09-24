@@ -29,6 +29,14 @@ team picker, cada
 Axie aparece como um modelo 3D real (Axie Mixer 3D oficial), não
 placeholder.
 
+## Submissão (Vibeathon)
+
+Textos prontos pro formulário (pitch, descrições, controles, Axie Core fit,
+ferramentas de IA, roteiro do vídeo de fallback e checklist de direitos) em
+[`SUBMISSION.md`](SUBMISSION.md); thumbnail 1280×720 em
+[`submission/thumbnail.png`](submission/thumbnail.png); avisos de terceiros
+em [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
 ## Rodando localmente
 
 ```bash
