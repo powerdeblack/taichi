@@ -550,3 +550,76 @@ export function showBanner(text, sub){
   bannerEl.appendChild(bannerSubEl);
   bannerEl.classList.add('show');
 }
+
+// ================= Team select (arena lobby) =================
+// Wooden team panels on the right; the chosen one's squad stands on the
+// 3D stage (teamStage.js). Faces start as the SVG class art and are
+// swapped for rendered 3D portraits as they become ready (fillTeamFaces).
+const tsListEl = document.getElementById('tsList');
+export function renderTeamList(teams, selectedId, onSelect){
+  tsListEl.innerHTML = '';
+  teams.forEach(team => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'ts-row' + (team.id === selectedId ? ' selected' : '') + (team.custom ? ' custom' : '');
+    row.setAttribute('role', 'option');
+    row.setAttribute('aria-selected', team.id === selectedId ? 'true' : 'false');
+    row.style.setProperty('--team-color', team.color || '#e8893a');
+    const faces = team.picks.map(p => `<span class="ts-face" data-class="${p.classId}" data-set="${p.setId}" data-evolved="${p.evolved ? 1 : 0}">
+        ${portraitHTML(p.classId, p.color || '#999', 'ts-face-svg')}${p.isTank ? '<i class="ts-face-tank">🛡️</i>' : ''}</span>`).join('');
+    row.innerHTML = `
+      <div class="ts-row-info">
+        <div class="ts-row-name"><span class="ts-row-icon">${team.icon}</span>${team.name}</div>
+        <div class="ts-row-tags">${team.tags.map(t => `<span>${t}</span>`).join('')}</div>
+        ${team.id === selectedId ? '<span class="ts-current">Selected</span>' : ''}
+      </div>
+      <div class="ts-row-faces">${faces}</div>`;
+    row.addEventListener('click', () => onSelect(team.id));
+    tsListEl.appendChild(row);
+  });
+}
+
+// Replaces SVG faces with 3D portraits: getPortrait(pick) -> Promise<url|null>.
+export function fillTeamFaces(getPortrait){
+  tsListEl.querySelectorAll('.ts-face').forEach(el => {
+    if (el.dataset.filled) return;
+    const pick = { classId: el.dataset.class, setId: el.dataset.set, evolved: el.dataset.evolved === '1' };
+    getPortrait(pick).then(url => {
+      if (!url || !el.isConnected) return;
+      el.dataset.filled = '1';
+      const svg = el.querySelector('.ts-face-svg');
+      const img = document.createElement('img');
+      img.className = 'ts-face-img'; img.alt = ''; img.src = url;
+      svg ? svg.replaceWith(img) : el.prepend(img);
+    });
+  });
+}
+
+export function renderTeamPlaque(team){
+  document.getElementById('tsTeamIcon').textContent = team.icon;
+  document.getElementById('tsTeamName').textContent = team.name;
+  document.getElementById('tsTeamTags').innerHTML = team.tags.map(t => `<span>${t}</span>`).join('');
+}
+
+export function setStageLoading(on){ document.getElementById('tsLoading').classList.toggle('hidden', !on); }
+
+// Team guide: how the team plays, then each Axie's role and cards.
+export function renderTeamGuide(team, members){
+  const roleIcon = { attack: '⚔️', defense: '🛡️', heal: '💚' };
+  document.getElementById('guideBody').innerHTML = `
+    <h2>${team.icon} ${team.name}</h2>
+    <div class="ts-row-tags guide-tags">${team.tags.map(t => `<span>${t}</span>`).join('')}</div>
+    <p class="guide-how">${team.how}</p>
+    <div class="guide-members">${members.map(m => `
+      <div class="guide-member">
+        <div class="guide-member-head">
+          ${portraitHTML(m.classId, m.color, 'guide-face')}
+          <div>
+            <div class="guide-member-name">${m.name}${m.isTank ? ' <span class="role-badge tank">🛡️ Tank</span>' : ''}${m.evolved ? ' <span class="role-badge evolved">✨ Mystic</span>' : ''}</div>
+            <div class="guide-member-set" style="color:${m.setColor}">${m.setIcon} ${m.setName} · ⚔️${m.counts.attack} 🛡️${m.counts.defense} 💚${m.counts.heal}</div>
+          </div>
+        </div>
+        <ul class="guide-cards">${m.cards.map(c => `<li><span>${roleIcon[c.role] || '•'}</span> <b>${c.name}</b> <small>${c.desc}</small></li>`).join('')}</ul>
+      </div>`).join('')}
+    </div>`;
+}

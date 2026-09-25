@@ -76,8 +76,10 @@ of its duels, and each has at least one counter.
 
 - Play in **landscape** on a phone (portrait and desktop also work; the ⛶
   button goes full screen).
-- **Team screen:** tap "Use this team" on an archetype, or add three Axies and
-  tweak them; then **Start Duel**. The tutorial is optional.
+- **Team screen (arena lobby):** pick a team from the wooden panels — its three
+  Axies appear in 3D on stone pedestals — then **⚔️ Battle!**. **📖 Team guide**
+  explains how it plays, **✎ Edit** opens the team editor, **✚ New Team**
+  builds your own (saved as "My Team"). The tutorial is optional.
 - **Left thumb — joystick:** moves your whole squad (the 🛡️ Tank leads).
 - **Tap an Axie** (yours or the rival's) to put the 🎯 on it.
 - **Right thumb — hold a card:** shows its reach ring and a preview of the

@@ -833,3 +833,202 @@ body.in-duel .load-pill{ top:56px; bottom:auto; }
     letter-spacing:1px; background:#ffffff1f; border:1px solid #ffffff40;
   }
 }
+
+/* ================= Team select: arena lobby =================
+   Full-screen "inside the game" menu: dark carved-wood backdrop, a hanging
+   wooden sign, chunky wooden buttons, wooden team panels on the right and
+   the squad on stone pedestals (3D, teamStage.js) on the left. All drawn
+   with CSS gradients -- no external art. */
+body.in-select{ padding:0; overflow:hidden; }
+body.in-select h1, body.in-select .subtitle, body.in-select .top-btns{ display:none; }
+
+.ts-screen{
+  position:fixed; inset:0; z-index:1; display:flex; flex-direction:column;
+  padding:env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  background-color:#3a2216;
+  background-image:
+    radial-gradient(ellipse at 30% 55%, rgba(255,190,120,.10) 0%, transparent 55%),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.10) 0 2px, transparent 2px 11px),
+    repeating-linear-gradient(90deg, rgba(255,220,180,.035) 0 1px, transparent 1px 37px),
+    linear-gradient(180deg, #4a2b1b 0%, #34200f 70%, #2a180c 100%);
+  overflow:hidden;
+}
+/* Carved ornamental strip along the floor, like a wooden frieze. */
+.ts-screen::after{
+  content:''; position:absolute; left:0; right:0; bottom:0; height:64px; pointer-events:none;
+  background:
+    radial-gradient(circle at 18px 32px, transparent 9px, rgba(0,0,0,.22) 10px, transparent 12px) 0 0/36px 64px,
+    radial-gradient(circle at 0 32px, transparent 9px, rgba(255,210,160,.05) 10px, transparent 12px) 0 0/36px 64px,
+    linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.35));
+  border-top:2px solid rgba(0,0,0,.35);
+}
+
+.ts-top{
+  position:relative; z-index:2; display:flex; align-items:center; justify-content:space-between;
+  gap:10px; padding:12px 16px 6px;
+}
+.ts-top-side{ display:flex; gap:8px; flex:1 1 0; min-width:0; }
+.ts-top-side.right{ justify-content:flex-end; }
+
+/* Hanging wooden sign with two ropes. */
+.wood-sign{
+  position:relative; flex:0 0 auto; padding:10px 42px 12px; border-radius:14px; margin-top:12px;
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,.07) 0 2px, transparent 2px 7px),
+    linear-gradient(180deg, #c3743f 0%, #a95c2c 60%, #914b22 100%);
+  box-shadow:inset 0 3px 0 #de925c, inset 0 -4px 0 #6d3316, 0 6px 0 #4a2210, 0 12px 20px rgba(0,0,0,.55);
+}
+.wood-sign::before, .wood-sign::after{
+  content:''; position:absolute; top:-26px; width:3px; height:30px; background:linear-gradient(#8a6a44, #c9a577);
+  border-radius:2px;
+}
+.wood-sign::before{ left:26px; } .wood-sign::after{ right:26px; }
+.wood-sign span{
+  font-family:'Baloo 2',sans-serif; font-weight:800; font-size:1.6rem; line-height:1; color:#fff3df;
+  text-shadow:0 2px 0 #6a2f12, 0 0 12px rgba(255,200,140,.25); white-space:nowrap;
+}
+
+/* Chunky wooden buttons. */
+.wood-btn{
+  position:relative; border:0; cursor:pointer; font-family:'Baloo 2',sans-serif; font-weight:800;
+  font-size:1rem; line-height:1.1; color:#fffaf0; padding:10px 20px; border-radius:12px; white-space:nowrap;
+  text-shadow:0 2px 0 #7a3413;
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,.06) 0 2px, transparent 2px 6px),
+    linear-gradient(180deg, #e3854f 0%, #c8662f 55%, #b1552a 100%);
+  box-shadow:inset 0 2px 0 #f7aa78, inset 0 -3px 0 #8a3c18, 0 4px 0 #5a2711, 0 8px 14px rgba(0,0,0,.45);
+  transition:transform .08s ease, box-shadow .08s ease, filter .15s ease;
+}
+.wood-btn:hover{ filter:brightness(1.07); }
+.wood-btn:active{ transform:translateY(3px); box-shadow:inset 0 2px 0 #f7aa78, inset 0 -2px 0 #8a3c18, 0 1px 0 #5a2711, 0 3px 8px rgba(0,0,0,.4); }
+.wood-btn.small{ font-size:.82rem; padding:7px 13px; border-radius:10px; }
+.wood-btn.go{
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,.05) 0 2px, transparent 2px 6px),
+    linear-gradient(180deg, #7fd05a 0%, #4fa637 55%, #3f8d2b 100%);
+  box-shadow:inset 0 2px 0 #b3ec8f, inset 0 -3px 0 #2e6a1f, 0 4px 0 #1f4a15, 0 8px 14px rgba(0,0,0,.45);
+  text-shadow:0 2px 0 #255c17; font-size:1.1rem; padding:10px 26px;
+}
+
+.ts-body{
+  position:relative; z-index:1; flex:1 1 auto; min-height:0; display:grid;
+  grid-template-columns:minmax(0, 1.2fr) minmax(0, 1fr); gap:14px; padding:4px 16px 14px;
+}
+.ts-stage{ position:relative; display:flex; flex-direction:column; min-height:0; }
+#stageCanvas{ flex:1 1 auto; min-height:0; width:100%; display:block; }
+.ts-loading{
+  position:absolute; top:38%; left:50%; transform:translateX(-50%); pointer-events:none;
+  font-family:'Baloo 2',sans-serif; font-weight:700; color:#f3dcc0; opacity:.85;
+  animation:ts-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ts-pulse{ 50%{ opacity:.35; } }
+
+/* Stone name plaque under the pedestals. */
+.ts-plaque{
+  align-self:center; width:min(92%, 470px); margin:-4px 0 10px; padding:6px 16px 7px; border-radius:12px;
+  text-align:center; color:#7c6a55;
+  background:linear-gradient(180deg, #f3ebdd 0%, #dccfb9 100%);
+  box-shadow:inset 0 -3px 0 #c3b294, inset 0 2px 0 #fffaf0, 0 6px 14px rgba(0,0,0,.45);
+}
+.ts-plaque-name{ font-family:'Baloo 2',sans-serif; font-weight:800; font-size:1.25rem; line-height:1.15; color:#8a7458; }
+.ts-plaque-tags span, .ts-row-tags span{
+  display:inline-block; margin:2px 3px 0 0; padding:0 7px; border-radius:8px; font-size:.64rem; font-weight:700;
+}
+.ts-plaque-tags span{ background:#c9b99b66; color:#6d5b44; }
+.ts-actions{ display:flex; justify-content:center; gap:10px; flex-wrap:wrap; }
+
+/* Team panels. */
+.ts-list{
+  min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:4px 6px 12px 2px;
+  scrollbar-width:thin; scrollbar-color:#8a5530 transparent;
+}
+.ts-row{
+  position:relative; display:flex; align-items:center; gap:10px; width:100%; flex:0 0 auto;
+  padding:10px 12px 10px 16px; border-radius:18px; cursor:pointer; text-align:left; font:inherit; color:#fff2df;
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,.07) 0 2px, transparent 2px 9px),
+    linear-gradient(180deg, #5d3522 0%, #45271a 100%);
+  border:3px solid #6f3f25;
+  box-shadow:inset 0 2px 0 rgba(255,190,140,.15), 0 5px 12px rgba(0,0,0,.45);
+  transition:border-color .15s ease, box-shadow .15s ease, transform .1s ease;
+}
+.ts-row::before{
+  content:''; position:absolute; inset:5px; border-radius:13px; pointer-events:none;
+  border:1px solid rgba(255,200,150,.12);
+}
+.ts-row:hover{ border-color:#9a5a30; }
+.ts-row:active{ transform:scale(.99); }
+.ts-row.selected{
+  border-color:#f39a45;
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,.06) 0 2px, transparent 2px 9px),
+    linear-gradient(180deg, #7a4428 0%, #5a321f 100%);
+  box-shadow:0 0 0 2px rgba(255,180,94,.35), 0 0 24px -4px #ff9a3c, 0 5px 12px rgba(0,0,0,.45);
+}
+.ts-row-info{ flex:1 1 auto; min-width:0; }
+.ts-row-name{
+  font-family:'Baloo 2',sans-serif; font-weight:800; font-size:1.02rem; line-height:1.15;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.ts-row-icon{ margin-right:6px; }
+.ts-row-tags span{ background:rgba(0,0,0,.28); color:#f1d9bd; }
+.ts-current{
+  display:inline-block; margin-top:5px; padding:1px 12px; border-radius:10px; font-size:.66rem; font-weight:800;
+  color:#e9fffb; background:linear-gradient(180deg, #2bb3a1, #1a8a7c); box-shadow:inset 0 -2px 0 #136b60;
+}
+.ts-row-faces{ display:flex; gap:2px; flex:0 0 auto; }
+.ts-face{ position:relative; width:48px; height:48px; display:flex; align-items:flex-end; justify-content:center; }
+.ts-face-img{ width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 3px 3px rgba(0,0,0,.5)); }
+.ts-face-svg{ width:40px; height:40px; opacity:.85; }
+.ts-face-tank{ position:absolute; right:-2px; bottom:0; font-style:normal; font-size:.62rem; }
+.ts-row.custom .ts-row-icon{ color:#ffd08a; }
+
+/* Builder: back to the lobby. */
+.builder-back{ margin:0 0 12px; }
+
+/* Team guide modal. */
+.guide-box{ max-width:640px; }
+.guide-box h2{ margin-bottom:4px; }
+.guide-tags{ margin-bottom:8px; }
+.guide-tags span{ background:#ffffff14; color:var(--text-dim); }
+.guide-how{ margin:0 0 12px !important; color:var(--text-light) !important; }
+.guide-members{ display:grid; gap:10px; }
+.guide-member{ background:#00000026; border:1px solid #ffffff18; border-radius:12px; padding:8px 10px; }
+.guide-member-head{ display:flex; align-items:center; gap:8px; }
+.guide-face{ width:40px; height:40px; flex:0 0 auto; }
+.guide-member-name{ font-family:'Baloo 2',sans-serif; font-weight:800; font-size:.95rem; }
+.guide-member-set{ font-size:.72rem; font-weight:700; }
+.guide-cards{ margin:6px 0 0; padding:0; list-style:none; display:grid; gap:3px; }
+.guide-cards li{ font-size:.72rem; line-height:1.3; color:var(--text-dim); }
+.guide-cards b{ color:var(--text-light); }
+.guide-cards small{ display:block; margin-left:20px; opacity:.85; }
+
+/* Short landscape phones: tighter chrome so the stage keeps its room. */
+@media (max-height:520px){
+  .ts-top{ padding:6px 12px 2px; }
+  .wood-sign{ padding:6px 26px 8px; margin-top:8px; }
+  .wood-sign::before, .wood-sign::after{ top:-18px; height:20px; }
+  .wood-sign span{ font-size:1.15rem; }
+  .wood-btn{ font-size:.85rem; padding:7px 14px; }
+  .wood-btn.small{ font-size:.72rem; padding:5px 10px; }
+  .wood-btn.go{ font-size:.95rem; padding:7px 18px; }
+  .ts-body{ padding:2px 12px 8px; gap:10px; }
+  .ts-plaque{ margin:-2px 0 6px; padding:3px 12px 4px; }
+  .ts-plaque-name{ font-size:1rem; }
+  .ts-row{ padding:6px 10px 6px 12px; border-radius:14px; }
+  .ts-row-name{ font-size:.88rem; }
+  .ts-face{ width:36px; height:36px; }
+  .ts-face-svg{ width:30px; height:30px; }
+  .ts-screen::after{ height:40px; }
+}
+/* Portrait / narrow: stage on top, list below. */
+@media (orientation:portrait), (max-width:640px){
+  .ts-body{ grid-template-columns:minmax(0, 1fr); grid-template-rows:minmax(0, 55%) minmax(0, 1fr); }
+  /* Sign on its own row, the buttons in a row under it. */
+  .ts-top{ flex-wrap:wrap; justify-content:space-between; padding-top:4px; }
+  .wood-sign{ order:-1; flex:1 1 100%; text-align:center; margin:18px 12px 4px; padding:8px 18px 10px; }
+  .ts-top-side{ flex:0 1 auto; }
+  .ts-top-side .wood-btn{ font-size:.72rem; padding:6px 10px; }
+  .wood-sign span{ font-size:1.05rem; }
+  .ts-actions .wood-btn{ font-size:.82rem; padding:8px 12px; }
+}

@@ -136,6 +136,22 @@ npm run preview
   🎯 grudado num inimigo pra atacar transformava toda cura em dano sem
   aviso — parecia que a cura não funcionava). Sem 🎯, a cura vai no aliado
   mais ferido.
+- **Tela de escolha de time (lobby da arena)** — primeira tela do jogo,
+  inspirada no "Meus Times" do Axie Origin mas com arte própria (tudo em
+  CSS + 3D): fundo de madeira escura entalhada, placa de madeira pendurada
+  "Choose your Team", botões de madeira em relevo. À esquerda os 3 Axies
+  do time selecionado em **3D sobre pedestais de pedra** (`src/teamStage.js`,
+  com cor da classe, arma do conjunto, brilho Místico e golpes de vitrine) e
+  uma placa de pedra com o nome e as tags; embaixo **📖 Team guide** (modal
+  com como o time joga e as cartas de cada Axie), **✎ Edit** (abre o editor
+  com o time carregado) e **⚔️ Battle!**. À direita, painéis de madeira com
+  os 10 arquétipos (o selecionado com borda laranja e selo "Selected") e
+  retratos 3D dos 3 Axies (renderizados um por vez, com a arte SVG até
+  ficarem prontos). **✚ New Team** abre o editor vazio; um time montado ou
+  editado à mão vira **"My Team"**, salvo no navegador e mostrado no topo da
+  lista. O editor antigo virou a tela de edição (botão "← Teams" volta), e
+  "Change team" no fim da partida volta pro lobby. Cabe na tela sem rolar em
+  celular deitado, em pé e no computador.
 - **Mecânicas do Axie Origin** (`game.js`): toda carta mostra seu tipo —
   **Attack** (com alcance), **Skill** (defesa/cura) ou **Secret**. Cada
   classe ganhou uma carta de **controle** (entra no pool de ataque depois

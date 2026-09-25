@@ -27,8 +27,39 @@
     <button class="help-btn hidden" id="tutorialSmallBtn" type="button">🎓 Tutorial</button>
   </div>
 
-  <!-- ===================== TEAM PICKER SCREEN ===================== -->
-  <div id="deckScreen" class="deck-panel">
+  <!-- ===================== TEAM SELECT (arena lobby) ===================== -->
+  <div id="teamSelectScreen" class="ts-screen">
+    <div class="ts-top">
+      <div class="ts-top-side">
+        <button type="button" class="wood-btn small" id="tsHelpBtn">❓ How to Play</button>
+        <button type="button" class="wood-btn small" id="tsTutorialBtn">🎓 Tutorial</button>
+      </div>
+      <div class="wood-sign"><span>Choose your Team</span></div>
+      <div class="ts-top-side right">
+        <button type="button" class="wood-btn" id="tsNewBtn">✚ New Team</button>
+      </div>
+    </div>
+    <div class="ts-body">
+      <div class="ts-stage">
+        <canvas id="stageCanvas"></canvas>
+        <div class="ts-loading" id="tsLoading">Summoning Axies…</div>
+        <div class="ts-plaque">
+          <div class="ts-plaque-name"><span id="tsTeamIcon"></span> <span id="tsTeamName"></span></div>
+          <div class="ts-plaque-tags" id="tsTeamTags"></div>
+        </div>
+        <div class="ts-actions">
+          <button type="button" class="wood-btn" id="tsGuideBtn">📖 Team guide</button>
+          <button type="button" class="wood-btn" id="tsEditBtn">✎ Edit</button>
+          <button type="button" class="wood-btn go" id="tsBattleBtn">⚔️ Battle!</button>
+        </div>
+      </div>
+      <div class="ts-list" id="tsList" role="listbox" aria-label="Teams"></div>
+    </div>
+  </div>
+
+  <!-- ===================== TEAM BUILDER SCREEN ===================== -->
+  <div id="deckScreen" class="deck-panel hidden">
+    <button type="button" class="wood-btn small builder-back" id="builderBackBtn">← Teams</button>
     <div class="deck-header">
       <div class="deck-title">Build your team</div>
       <div class="deck-count" id="deckCount">0 / 3 Axies picked</div>
@@ -119,6 +150,13 @@
     <div class="btn-row">
       <button class="reset-btn" id="resetBtn">Rematch (same team)</button>
       <button class="switch-deck-btn" id="switchDeckBtn">Change team</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="guideModal">
+    <div class="modal-box guide-box">
+      <button class="modal-close" id="guideCloseBtn" type="button" aria-label="Close">×</button>
+      <div id="guideBody"></div>
     </div>
   </div>
 

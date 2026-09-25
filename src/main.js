@@ -1,6 +1,7 @@
 // Entry point: DOM wiring for the team builder and the real-time board duel.
 import './style.css';
-import { AXIES, CARD_SETS, setById, ARCHETYPES, copyArchetypePicks } from './cards.js';
+import { AXIES, CARD_SETS, setById, ARCHETYPES, copyArchetypePicks, buildLoadout } from './cards.js';
+import { initStage, showTeam, setStageActive, portraitFor } from './teamStage.js';
 import * as game from './game.js';
 import * as ui from './ui.js';
 import * as render from './render.js';
@@ -133,6 +134,9 @@ function previewPick(pick){
 // the team builder is a normal scrolling page.
 function showDuelScreen(){
   deckScreen.classList.add('hidden');
+  document.getElementById('teamSelectScreen').classList.add('hidden');
+  document.body.classList.remove('in-select');
+  setStageActive(false);
   duelScreen.classList.remove('hidden');
   document.body.classList.add('in-duel');
   window.scrollTo(0, 0);
@@ -167,24 +171,149 @@ fullscreenBtn.addEventListener('click', () => (isFullscreen() ? exitFullscreen()
 document.addEventListener('fullscreenchange', renderFullscreenBtn);
 document.addEventListener('webkitfullscreenchange', renderFullscreenBtn);
 renderFullscreenBtn();
+// The squad builder ("Edit" / "New Team").
 function showTeamScreen(){
   duelScreen.classList.add('hidden');
+  teamSelectScreen.classList.add('hidden');
   deckScreen.classList.remove('hidden');
-  document.body.classList.remove('in-duel');
+  document.body.classList.remove('in-duel', 'in-select');
+  setStageActive(false);
+  window.scrollTo(0, 0);
+}
+
+function startDuelWith(picks, archId){
+  showDuelScreen();
+  teamSelectScreen.classList.add('hidden');
+  document.body.classList.remove('in-select');
+  setStageActive(false);
+  // The rival fields one of the archetypes too (a different one when
+  // possible), so every duel is a clash of two real synergies.
+  const pool = ARCHETYPES.filter(a => a.id !== archId);
+  const rivalArch = pool[Math.floor(Math.random() * pool.length)];
+  beginMatch(picks.map(p => ({ ...p, counts: { ...p.counts } })), copyArchetypePicks(rivalArch));
 }
 
 startDuelBtn.addEventListener('click', () => {
-  showDuelScreen();
-  // The rival fields one of the archetypes too (a different one when
-  // possible), so every duel is a clash of two real synergies.
-  const pool = ARCHETYPES.filter(a => a.id !== loadedArchetype);
-  const rivalArch = pool[Math.floor(Math.random() * pool.length)];
-  beginMatch(squad.slice(), copyArchetypePicks(rivalArch));
+  if (loadedArchetype === null) saveCustomTeam(squad);
+  startDuelWith(squad.slice(), loadedArchetype);
 });
 switchDeckBtn.addEventListener('click', () => {
   endTutorial();
+  showSelectScreen();
+});
+
+// ================= Team select (arena lobby) =================
+// The first screen: pick a team from wooden panels, see its three Axies on
+// stone pedestals in 3D, then Battle, Edit it in the builder, or build a
+// New Team. A team built or edited by hand is kept as "My Team" (saved in
+// this browser) at the top of the list.
+const teamSelectScreen = document.getElementById('teamSelectScreen');
+const guideModal = document.getElementById('guideModal');
+const CUSTOM_KEY = 'axieDuelCustomTeam';
+let customTeam = loadCustomTeam();
+let selectedTeamId = customTeam ? 'custom' : 'arch:' + ARCHETYPES[0].id;
+
+function loadCustomTeam(){
+  try {
+    const picks = JSON.parse(localStorage.getItem(CUSTOM_KEY) || 'null');
+    return Array.isArray(picks) && picks.length === game.SQUAD_SIZE && picks.some(p => p.isTank) ? picks : null;
+  } catch { return null; }
+}
+function saveCustomTeam(picks){
+  if (picks.length !== game.SQUAD_SIZE || !picks.some(p => p.isTank)) return;
+  customTeam = picks.map(p => ({ ...p, counts: { ...p.counts } }));
+  try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(customTeam)); } catch { /* storage blocked: keep for this visit */ }
+}
+
+const colorOf = classId => AXIES.find(a => a.classId === classId)?.color;
+function teamList(){
+  const teams = ARCHETYPES.map(a => ({
+    id: 'arch:' + a.id, archId: a.id, name: a.name, icon: a.icon, color: a.color, tags: a.tags, how: a.how,
+    picks: a.picks.map(p => ({ ...p, color: colorOf(p.classId) })),
+  }));
+  if (customTeam) teams.unshift({
+    id: 'custom', archId: null, name: 'My Team', icon: '✎', color: '#e8893a', custom: true,
+    tags: customTeam.map(p => setById(p.setId)?.name).filter(Boolean),
+    how: 'Your own squad, built in the team editor. Tap Edit to change it.',
+    picks: customTeam.map(p => ({ ...p, color: colorOf(p.classId) })),
+  });
+  return teams;
+}
+const selectedTeam = () => teamList().find(t => t.id === selectedTeamId) || teamList()[0];
+
+function showSelectScreen(){
+  duelScreen.classList.add('hidden');
+  deckScreen.classList.add('hidden');
+  teamSelectScreen.classList.remove('hidden');
+  document.body.classList.remove('in-duel');
+  document.body.classList.add('in-select');
+  window.scrollTo(0, 0);
+  initStage(document.getElementById('stageCanvas')).catch(err => console.error('stage failed', err));
+  setStageActive(true);
+  selectTeam(selectedTeam().id, true);
+}
+
+function selectTeam(id, force){
+  if (id === selectedTeamId && !force) return;
+  selectedTeamId = id;
+  const team = selectedTeam();
+  selectedTeamId = team.id;
+  ui.renderTeamList(teamList(), selectedTeamId, (tid) => { sfx.playSelect(); selectTeam(tid); });
+  ui.renderTeamPlaque(team);
+  ui.setStageLoading(true);
+  showTeam(team.picks).then(() => {
+    ui.setStageLoading(false);
+    // Fill the list's faces with 3D portraits, one at a time in the background.
+    ui.fillTeamFaces(portraitFor);
+  });
+}
+
+document.getElementById('tsBattleBtn').addEventListener('click', () => {
+  const team = selectedTeam();
+  loadedArchetype = team.archId;
+  squad = team.picks.map(({ color, ...p }) => ({ ...p, counts: { ...p.counts } }));
+  startDuelWith(squad, team.archId);
+});
+document.getElementById('tsEditBtn').addEventListener('click', () => {
+  const team = selectedTeam();
+  if (team.archId) useArchetype(ARCHETYPES.find(a => a.id === team.archId));
+  else { squad = team.picks.map(({ color, ...p }) => ({ ...p, counts: { ...p.counts } })); loadedArchetype = null; renderTeamScreen(); previewPick(squad.find(p => p.isTank) || squad[0]); }
   showTeamScreen();
 });
+document.getElementById('tsNewBtn').addEventListener('click', () => {
+  squad = [];
+  loadedArchetype = null;
+  renderTeamScreen();
+  showTeamScreen();
+});
+document.getElementById('builderBackBtn').addEventListener('click', () => {
+  // A finished hand-built (or edited) squad becomes "My Team".
+  if (loadedArchetype === null && squad.length === game.SQUAD_SIZE && squad.some(p => p.isTank)){
+    saveCustomTeam(squad);
+    selectedTeamId = 'custom';
+  } else if (loadedArchetype){
+    selectedTeamId = 'arch:' + loadedArchetype;
+  }
+  showSelectScreen();
+});
+document.getElementById('tsGuideBtn').addEventListener('click', () => {
+  const team = selectedTeam();
+  const members = team.picks.map(p => {
+    const set = setById(p.setId);
+    return {
+      name: AXIES.find(a => a.classId === p.classId)?.name || p.classId, classId: p.classId, color: p.color,
+      isTank: p.isTank, evolved: p.evolved, counts: p.counts,
+      setIcon: set.icon, setName: set.name, setColor: set.color,
+      cards: [...new Map(buildLoadout(p.setId, p.classId, p.counts).map(c => [c.id, c])).values()],
+    };
+  });
+  ui.renderTeamGuide(team, members);
+  guideModal.classList.remove('hidden');
+});
+document.getElementById('guideCloseBtn').addEventListener('click', () => guideModal.classList.add('hidden'));
+guideModal.addEventListener('click', (e) => { if (e.target === guideModal) guideModal.classList.add('hidden'); });
+document.getElementById('tsHelpBtn').addEventListener('click', () => helpModal.classList.remove('hidden'));
+document.getElementById('tsTutorialBtn').addEventListener('click', () => { teamSelectScreen.classList.add('hidden'); document.body.classList.remove('in-select'); setStageActive(false); startTutorial(); });
 
 // ================= Tutorial =================
 // A guided duel: the player gets Steel Rain (long range, so the first
@@ -1205,3 +1334,6 @@ function gameLoop(nowMs){
   if (state.gameOver) finishMatch();
 }
 requestAnimationFrame(gameLoop);
+
+// Start on the arena lobby.
+showSelectScreen();
