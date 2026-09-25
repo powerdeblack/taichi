@@ -54,7 +54,10 @@ Ambush and arrow combos; Stun (interrupts casts and roots a Tank), Chill (no
 dodging, half speed) and Fear (the next attack misses); and face-down Secrets
 that spring when their Axie is attacked — you see yours, the rival only sees
 "❓ Secret". Defense cards (Guard, Bulwark, Barrier, Evasion, Thorns,
-Cleanse) protect allies; a heal aimed at an enemy becomes Reverse Heal.
+Cleanse) cover your whole team; heals do too and refund 2 energy, and a heal
+aimed at an enemy becomes Reverse Heal on the whole rival team. Attack damage
+is tuned to the Tanks: every hit is at least 20% of a typical Tank's HP, and
+each attack card in a loadout adds a flat +2 to that Axie's hits.
 
 **A match always ends.** After 2:00 a Blizzard hurts everyone and halves
 healing; at 3:20 the Tank with more HP left wins.
@@ -69,8 +72,8 @@ knockouts. There's an optional interactive tutorial and a help screen.
 **Balanced with simulation.** A headless simulator plays the real rules and
 the in-game AI against itself: 400 duels for every pairing of the ten
 archetypes (18,000 duels per balance pass), plus a 2,000-team Swiss
-tournament (11,000 duels). Every archetype currently wins between 38% and 62%
-of its duels, and each has at least one counter.
+tournament (11,000 duels). Every archetype currently wins between 44% and 60%
+of its duels, and a duel lasts about a minute on average.
 
 ## Controls / first contact
 
@@ -85,8 +88,9 @@ of its duels, and each has at least one counter.
 - **Right thumb — hold a card:** shows its reach ring and a preview of the
   result (green = lands, red = misses). **Release** to play it; **drag your
   finger off the card** to cancel.
-- Defense cards go to your own Axies; heals follow the 🎯 (on an enemy they
-  become Reverse Heal).
+- Defense and heal cards cover your whole team (Secrets and Thorns go on one
+  Axie); a heal with the 🎯 on an enemy becomes Reverse Heal on their whole
+  team.
 - **On a computer:** move with **W A S D** (or the arrow keys); play cards
   with the mouse — press a card to aim, release to play, drag off it (or
   press **Esc**) to cancel; click an Axie to target it. Touch controls on

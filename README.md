@@ -8,10 +8,10 @@ livre de 3 Axies, cada um com um **loadout de 5 cartas** que você monta
 papel fixo, que determina o quão forte, tanque ou curador cada Axie fica.
 A **espécie** de um Axie (Beast/Aqua/Plant/Bird/Bug/Reptile) e sua
 **função em combate** são desacopladas: qualquer espécie pode equipar
-qualquer **conjunto de cartas** (Guerreiro/Sacerdote/Mago/Arqueiro/Ladino/
-Xamã) — é o conjunto, não a espécie, que decide as cartas de ataque/
+qualquer **conjunto de cartas** (Warrior/Priest/Mago/Ranger/Rogue/
+Shaman) — é o conjunto, não a espécie, que decide as cartas de ataque/
 defesa/cura reais daquele Axie. Cada espécie tem um conjunto "nativo"
-(Bird↔Arqueiro, Beast↔Guerreiro...) que desbloqueia uma carta-assinatura
+(Bird↔Ranger, Beast↔Warrior...) que desbloqueia uma carta-assinatura
 bônus quando combinados, recompensando a combinação natural sem travar as
 outras. Os dois esquadrões **entram andando** no salão a partir de uma
 certa distância quando o duelo começa. O duelo é **em tempo real, sem
@@ -75,7 +75,8 @@ npm run preview
   abaixo). O rival sempre entra com um arquétipo. **Vencer = derrubar o Tanque inimigo** (as outras linhas não
   precisam morrer).
 - A composição do loadout — não um papel fixo — é o que define os stats:
-  - Cada carta de **Ataque** dá **+15% de poder de dano** daquele Axie.
+  - Cada carta de **Ataque** dá **+2 de dano fixo** em todo ataque daquele
+    Axie (antes era +15%); o triângulo de classes ainda multiplica o golpe.
   - Cada carta de **Defesa** dá **+10 HP máximo** e **-6% de dano recebido**
     (até um teto de 50% de redução).
   - Cada carta de **Cura** dá **+20 MP**, e o MP escala o quanto aquele Axie
@@ -88,17 +89,17 @@ npm run preview
   **triângulo de classe** pro cálculo de dano (Beast > Plant > Aqua > Beast,
   Bird > Bug > Reptile > Bird) — nada mais. Quem decide as cartas de
   ataque/defesa/cura que aquele Axie realmente joga é o **conjunto**
-  escolhido no montador (Guerreiro/Sacerdote/Mago/Arqueiro/Ladino/Xamã, ver
+  escolhido no montador (Warrior/Priest/Mago/Ranger/Rogue/Shaman, ver
   seção abaixo) — qualquer espécie pode equipar qualquer conjunto. Cada
-  conjunto tem uma espécie **nativa** (ex.: Arqueiro↔Bird, Guerreiro↔Beast);
+  conjunto tem uma espécie **nativa** (ex.: Ranger↔Bird, Warrior↔Beast);
   combinar as duas desbloqueia uma **carta-assinatura** bônus (geralmente
-  de ataque, mas Sacerdote↔Plant ganha uma 2ª carta de cura) — o
+  de ataque, mas Priest↔Plant ganha uma 2ª carta de cura) — o
   off-species continua 100% jogável, só com o pool base, menor.
 - **Loadout pré-definido por conjunto**: cada `CARD_SET` tem um
   `defaultCounts` (`{attack, defense, heal}`, sempre somando `LOADOUT_SIZE`)
-  que já reflete a identidade daquele conjunto — Guerreiro `4/1/0` (quase
-  tudo ataque), Sacerdote `1/0/4` (curador puro), Mago `3/2/0` (ataque +
-  defesa arcana), Arqueiro/Ladino `3/1/1`, Xamã `2/2/1` (equilibrado). Ao
+  que já reflete a identidade daquele conjunto — Warrior `4/1/0` (quase
+  tudo ataque), Priest `1/0/4` (curador puro), Mago `3/2/0` (ataque +
+  defesa arcana), Ranger/Rogue `3/1/1`, Shaman `2/2/1` (equilibrado). Ao
   adicionar um Axie no time, ele já entra com o preset do seu conjunto
   nativo em vez de um split genérico; trocar de conjunto no montador
   reaplica o preset daquele novo conjunto (os steppers continuam livres
@@ -126,6 +127,14 @@ npm run preview
   inimigo do seu lado); só quando ninguém está no alcance ela mira (e
   erra) no selecionado/mais próximo. Quem está dentro do raio de
   Provocação do Tanque inimigo sempre mira no Tanque. Cartas de **Defesa/Cura** não têm limite de alcance.
+  **Cartas de Defesa e Cura valem pro time inteiro** (valor cheio em cada
+  Axie vivo; a Cura Reversa atinge o time rival inteiro). Só **Secrets** e
+  **Espinhos** continuam num alvo só. Toda carta de **Cura dá +2 de
+  energia** a quem joga. Dano-base de ataque = 20% do HP de um Tanque de
+  referência (média dos Tanques dos arquétipos, 166 → piso 33), vezes a
+  força da carta (≥ 1: Brutal Charge 1.6, Arcane Blast 1.45...); ataques
+  custam 2 de energia (os pesados e o Stun, 3). `cards.js`, seção
+  "Attack damage model". Para Secrets/Espinhos, a regra antiga vale:
   **Defesa vai sempre num aliado** do jogador: o aliado com 🎯, ou (🎯 no
   inimigo / sem 🎯) o que mais precisa — Espinhos no Tanque, as outras no
   aliado mais ferido que ainda não tem aquela proteção
@@ -158,23 +167,24 @@ npm run preview
   das normais/assinatura) e um **Secret** (entra no pool de defesa):
   | Classe | Controle | Secret |
   |---|---|---|
-  | Guerreiro | Golpe Atordoante — 😵 Stun 2.5s | Contra-Ataque — revida 22 (× Power) |
-  | Sacerdote | Luz Ofuscante — 😱 Fear | Graça Oculta — cura 26 (× MP) ao cair abaixo de ½ HP |
-  | Mago | Rajada Gélida — 🥶 Chill 8s | Armadilha Gélida — 12 de dano + Chill no atacante |
-  | Arqueiro | Flecha Congelante — 🥶 Chill 8s | Rede de Caça — Stun 3s no atacante |
-  | Ladino | Golpe Sombrio — 😱 Fear | Sombra — esquiva o golpe e dá Fear no atacante |
-  | Xamã | Uivo Ancestral — 😵 Stun 2s | Totem Amaldiçoado — Bleed + Poison no atacante |
+  | Warrior | Stunning Blow — 😵 Stun 2.5s | Counterattack — revida 22 (× Power) |
+  | Priest | Blinding Light — 😱 Fear | Hidden Grace — cura 26 (× MP) ao cair abaixo de ½ HP |
+  | Mago | Frost Gust — 🥶 Chill 8s | Frost Trap — 12 de dano + Chill no atacante |
+  | Ranger | Freezing Arrow — 🥶 Chill 8s | Hunter's Net — Stun 3s no atacante |
+  | Rogue | Shadow Strike — 😱 Fear | Sombra — esquiva o golpe e dá Fear no atacante |
+  | Shaman | Ancestral Howl — 😵 Stun 2s | Cursed Totem — Bleed + Poison no atacante |
 
   **Stun**: o Axie não joga carta, a carta que ele estava carregando é
   **interrompida**, e um Tanque atordoado não move o esquadrão. **Chill**:
   sem esquiva e o esquadrão anda a meia velocidade. **Fear** (4s): se o
   Axie atacar nesse tempo, o ataque erra por completo. Stun/Chill/Fear
-  contam em segundos reais (`tickCasts`) e a Purificação limpa os três.
+  contam em segundos reais (`tickCasts`) e a Purify limpa os três.
   **Secret**: colocado virado pra baixo num aliado (a IA põe no Tanque);
   dispara sozinho quando aquele Axie é atacado e some. Você vê qual é o
   seu Secret; do rival só aparece "❓ Secret" (nem nas mensagens nem na
   barra de cast o nome dele aparece). Reequilibrado no simulador (400
-  duelos por par): todos os arquétipos entre 38% e 62%, Fear virou janela
+  duelos por par): todos os arquétipos entre 38% e 62% (com as regras de
+  time inteiro: 44%–60%, duelo médio de 63s), Fear virou janela
   de 4s pra não anular golpe demais, e o Chill virou o counter natural da
   esquiva (Miragem).
 - **Controles no computador** (`main.js`, bloco "Keyboard"): **W A S D** ou
@@ -191,7 +201,7 @@ npm run preview
   Segurando a carta, um balão acima da mão diz exatamente o que acontece ao
   soltar (dano/cura e em quem, ou "❌ MISS… walk 0.8 closer"); arrastar o
   dedo pra fora da carta (>70px) cancela e a carta fica na mão. Depois de
-  soltar, um aviso confirma ("✔ Maré Arcana → Larva ⚔️ 26 · lands in
+  soltar, um aviso confirma ("✔ Arcane Tide → Larva ⚔️ 26 · lands in
   3.2s") e o anel de alcance + a linha até o alvo ficam no tabuleiro até o
   impacto (verde = acerta, vermelho = erra); a barra de cast sobre o Axie
   mostra "carta → alvo" e fica vermelha quando o tiro já saiu fora do
@@ -246,8 +256,8 @@ npm run preview
   funciona" (`cards.js`'s `ARCHETYPES`): 🩸 Savage Bleed, ☠️ Plague,
   ⚔️ Steel Rain, 💚 Sanctuary, 🌵 Thorn Wall (Espinhos + Provocação contra
   corpo a corpo), 💨 Mirage (evasão contra golpes grandes), 🔵 Arcane
-  Bastion (Barreira/Guarda/Purificação contra burst e DOT), 💀 Deathmark
-  Hunt (marca e executa), 🐍 Toxic Rush (três Ladinos de Poison contra
+  Bastion (Barreira/Guarda/Purify contra burst e DOT), 💀 Deathmark
+  Hunt (marca e executa), 🐍 Toxic Rush (três Rogues de Poison contra
   cura) e 🧪 Blood & Venom (Bleed + Poison juntos). "Use this team" carrega
   o time inteiro; dá pra ajustar depois. O rival sempre entra com um
   arquétipo (diferente do seu quando possível).
@@ -265,7 +275,7 @@ npm run preview
   invencível) a simulação expôs e levou a: IA que não reaplica uma defesa
   ainda ativa e põe defesas no aliado mais ferido (Espinhos no Tanque),
   Espinhos mais fortes (60% dos próximos 3 golpes), uma carta-assinatura
-  nova do Sacerdote nativo (**Purificação**: remove Bleed/Poison/Deathmark
+  nova do Priest nativo (**Purify**: remove Bleed/Poison/Deathmark
   e dá Bulwark — a IA só usa em quem tem DOT), e a Nevasca (abaixo).
 - **IA por alcance**: `ai.js` serve pros dois lados. Times com maioria de
   cartas curtas avançam até encostar; times de longe mantêm distância de
@@ -307,8 +317,8 @@ npm run preview
 - **Som dos golpes (sintetizado, sem arquivos de áudio)**: `src/sfx.js`
   gera cada efeito na hora com a Web Audio API (osciladores + ruído
   filtrado). O ataque muda de acordo com o conjunto da carta — **corte**
-  (Guerreiro/Ladino), **flecha** (Arqueiro; 3 flechas na Chuva de
-  Flechas), **magia** (Mago/Sacerdote/Xamã) — seguido de um **impacto
+  (Warrior/Rogue), **flecha** (Ranger; 3 flechas na Chuva de
+  Flechas), **magia** (Mago/Priest/Shaman) — seguido de um **impacto
   mais grave e forte quanto maior o dano**. Também tem som pra cura
   (acorde subindo), escudo/defesa (clang metálico), Vulnerável (descida
   desafinada), esquiva, veneno (bolhas), sangramento, tique de
@@ -376,16 +386,16 @@ npm run preview
 - **Animações cinematográficas por função de carta** (`src/cinematics.js`,
   disparadas em `main.js`'s `applyResultFx`): cada carta mostra em 3D o
   que ela faz. O projétil já sai com a cara do conjunto — **flecha** que
-  aponta pra onde voa num arco baixo (Arqueiro), **lâmina giratória**
-  arremessada rente ao chão (Guerreiro/Ladino), **orbe** num arco alto
-  (Mago/Sacerdote/Xamã). No impacto: **chuva de flechas** (5 no combo de
+  aponta pra onde voa num arco baixo (Ranger), **lâmina giratória**
+  arremessada rente ao chão (Warrior/Rogue), **orbe** num arco alto
+  (Mago/Priest/Shaman). No impacto: **chuva de flechas** (5 no combo de
   flechas), **corte em crescente** (em X no Ambush ou golpe pesado),
   **explosão arcana** com coluna de luz; Bleed espirra **sangue** na neve,
   Poison deixa uma **nuvem tóxica**, Deathmark pendura uma **caveira 💀**.
   Cada defesa tem sua forma: **domo** (Guard), **muralha hexagonal
   dourada** (Bulwark), **bolha de cristal** (Barreira), **imagens
   residuais** (Esquiva), **espinhos** saindo do chão (Thorns, que também
-  estouram no atacante quando refletem), **pilar de luz** (Purificação).
+  estouram no atacante quando refletem), **pilar de luz** (Purify).
   Cura é um **feixe do céu com folhas**; Regen, **folhas em espiral**; as
   versões revertidas viram **anel vermelho rachando** (Vulnerável) e
   **feixe sombrio drenando** (Cura Reversa). O Axie atingido faz um
@@ -410,22 +420,22 @@ npm run preview
   (Cura Reversa, ver mira acima); Defesa o jogador só usa em aliados (o
   motor ainda tem a forma revertida, **Vulnerável**, mas nenhuma mira
   leva uma Defesa até um inimigo):
-  - **Guarda** (Sacerdote): bloqueia 50% do próximo golpe.
-  - **Bastião** (Guerreiro): reduz os próximos 3 golpes recebidos em 25%
+  - **Guarda** (Priest): bloqueia 50% do próximo golpe.
+  - **Bastião** (Warrior): reduz os próximos 3 golpes recebidos em 25%
     cada, sem limpar status (mais golpes que o Limpeza+Bastião antigo, sem
     a limpeza).
   - **Barreira** (Mago): absorve os próximos N de dano recebido de uma vez
     só, não importa quantos golpes até acabar — diferente de reduzir um
     número fixo de hits.
-  - **Evasão** (Arqueiro/Ladino): chance de esquivar **totalmente** do
-    próximo golpe (Arqueiro: 50% de chance, 2 cargas; Ladino: 100%
+  - **Evasão** (Ranger/Rogue): chance de esquivar **totalmente** do
+    próximo golpe (Ranger: 50% de chance, 2 cargas; Rogue: 100%
     garantido, 1 carga) — dano zero, não reduzido, e nenhum outro status
     (shield/bulwark/deathmark) é consumido nessa esquiva.
-  - **Espinhos** (Xamã): reflete 40% do dano dos próximos 2 golpes de volta
+  - **Espinhos** (Shaman): reflete 40% do dano dos próximos 2 golpes de volta
     em quem bateu — pode até matar o atacante.
   - **Cura instantânea** (a maioria dos conjuntos): cura na hora, escalado
     pelo MP do conjurador.
-  - **Regeneração** (Ladino/Xamã/Sacerdote-nativo): cura um pouco a cada
+  - **Regeneração** (Rogue/Shaman/Priest-nativo): cura um pouco a cada
     tick (2 a 4 ticks dependendo da carta) em vez de um valor único maior;
     revertida vira dano ao longo do tempo em vez de instantâneo.
 - Cada Axie pode ser marcado como **Evoluído (+)** no montador de esquadrão:
@@ -445,17 +455,17 @@ livre, sem bônus.
 
 | Conjunto | Espécie nativa | Identidade |
 |---|---|---|
-| ⚔️ Guerreiro | Beast | dano bruto corpo-a-corpo, Bastião |
-| 🙏 Sacerdote | Plant | maior cura instantânea, Retain/Deathmark |
+| ⚔️ Warrior | Beast | dano bruto corpo-a-corpo, Bastião |
+| 🙏 Priest | Plant | maior cura instantânea, Retain/Deathmark |
 | 🔮 Mago | Aqua | nuke + status, Barreira (absorção) |
-| 🏹 Arqueiro | Bird | chuva de flechas (combo), Evasão probabilística |
-| 🗡️ Ladino | Bug | Veneno, Evasão garantida, Regeneração rápida |
-| 🪶 Xamã | Reptile | Espinhos (reflete dano), a Regeneração mais longa |
+| 🏹 Ranger | Bird | chuva de flechas (combo), Evasão probabilística |
+| 🗡️ Rogue | Bug | Veneno, Evasão garantida, Regeneração rápida |
+| 🪶 Shaman | Reptile | Espinhos (reflete dano), a Regeneração mais longa |
 
 Cada conjunto tem exatamente 4 cartas base (2 ataque + 1 defesa + 1 cura) e
 uma **carta-assinatura** extra que só entra no pool quando a espécie do
 Axie bate com a nativa do conjunto — normalmente uma 3ª carta de ataque
-(ex.: Arqueiro+Bird ganha uma 2ª chuva de flechas), exceto Sacerdote+Plant,
+(ex.: Ranger+Bird ganha uma 2ª chuva de flechas), exceto Priest+Plant,
 que ganha uma 2ª carta de **cura** (Regeneração) em vez de ataque. Os
 **números** (dano, HP, custo) são calibrados pra escala própria deste jogo
 (~100-150 HP), não pra escala do Origin.
@@ -613,8 +623,8 @@ tabuleiro e pela prévia do time):
   (`manifest.creator.colorVariants`): Beast laranja, Plant verde, Aqua azul,
   Bug vermelho, Bird rosa, Reptile roxo (antes todos saíam brancos com
   `colorVariant: 0`).
-- **Arma por conjunto de cartas** (`equipWeapon`): Guerreiro Sword,
-  Arqueiro Bow, Mago Staff, Ladino Dagger, Sacerdote Tome, Xamã Mala. Axie
+- **Arma por conjunto de cartas** (`equipWeapon`): Warrior Sword,
+  Ranger Bow, Mago Staff, Rogue Dagger, Priest Tome, Shaman Mala. Axie
   **Evoluído** usa a arma de nível 3.
 - **Evoluído = Místico**: partes skin 1 (S01) com material brilhante e as
   partículas místicas do toolkit (o catálogo de partículas vem compilado no

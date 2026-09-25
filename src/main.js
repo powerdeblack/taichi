@@ -465,47 +465,65 @@ function applyResultFx(result){
       if (side === 'you') sfx.playNoTarget();
       return;
     }
-    const el = ui.getLaneSideEl(result.targetSide, result.targetIndex);
+    // Team-wide cards show their effect on every Axie they reached.
+    const targets = result.targets && result.targets.length ? result.targets : [result.targetIndex];
+    const ts = result.targetSide;
     if (card.role === 'defense'){
       if (result.reversed){
-        cine.vulnerable(result.targetSide, result.targetIndex);
-        ui.hitSquash(result.targetSide, result.targetIndex, 0.6);
-        render.flashHit(el);
-        render.spawnFloatingText(el, 'VULNERABLE!', 'text-block');
+        targets.forEach(i => {
+          const el = ui.getLaneSideEl(ts, i);
+          cine.vulnerable(ts, i);
+          ui.hitSquash(ts, i, 0.6);
+          render.flashHit(el);
+          render.spawnFloatingText(el, 'VULNERABLE!', 'text-block');
+        });
         sfx.playDebuff();
       } else {
-        render.flashHeal(el);
         const labels = {
           bulwark_cleanse: 'CLEANSE + BULWARK!', bulwark: 'BULWARK!',
           barrier: 'BARRIER!', dodge: 'EVASION!', thorns: 'THORNS!',
           secret: side === 'you' ? `❓ ${card.name} set` : '❓ SECRET SET',
         };
-        render.spawnFloatingText(el, labels[card.effect] || 'GUARD!', 'text-shield');
-        defenseCinematic(card, result.targetSide, result.targetIndex);
-        ui.spawnImpact(result.targetSide, result.targetIndex, 'shield');
+        targets.forEach(i => {
+          const el = ui.getLaneSideEl(ts, i);
+          render.flashHeal(el);
+          render.spawnFloatingText(el, labels[card.effect] || 'GUARD!', 'text-shield');
+          defenseCinematic(card, ts, i);
+          ui.spawnImpact(ts, i, 'shield');
+        });
         sfx.playShield();
       }
       return;
     }
-    // heal role
+    // heal role (whole team) -- and the energy it gives back to the caster's side
+    const per = new Map((result.perTarget || []).map(p => [p.index, p]));
     if (result.reversed){
-      cine.drainBeam(result.targetSide, result.targetIndex);
-      ui.hitSquash(result.targetSide, result.targetIndex, 0.8);
+      targets.forEach(i => {
+        const el = ui.getLaneSideEl(ts, i);
+        const dmg = per.get(i)?.dmg ?? result.dmg;
+        cine.drainBeam(ts, i);
+        ui.hitSquash(ts, i, 0.8);
+        render.flashHit(el);
+        render.spawnFloatingText(el, card.effect === 'regen' ? 'ROT!' : 'REVERSE HEAL! -' + dmg, 'text-dmg');
+        ui.spawnImpact(ts, i, 'hit');
+        playKOIfDied(ts, i);
+      });
       cine.shake(0.08, 0.25);
-      render.flashHit(el);
       render.shakeBoard(boardEl);
-      render.spawnFloatingText(el, (card.effect === 'regen' ? 'ROT! -' : 'REVERSE HEAL! -')+result.dmg, 'text-dmg');
-      ui.spawnImpact(result.targetSide, result.targetIndex, 'hit');
       sfx.playAttack(card, result.dmg);
-      playKOIfDied(result.targetSide, result.targetIndex);
     } else {
-      if (card.effect === 'regen') cine.regenSpiral(result.targetSide, result.targetIndex);
-      else cine.healBeam(result.targetSide, result.targetIndex);
-      render.flashHeal(el);
-      render.spawnFloatingText(el, card.effect === 'regen' ? 'REGEN!' : (result.healed > 0 ? '+'+result.healed : 'FULL HP'), 'text-heal');
-      ui.spawnImpact(result.targetSide, result.targetIndex, 'heal');
+      targets.forEach(i => {
+        const el = ui.getLaneSideEl(ts, i);
+        const healed = per.get(i)?.healed;
+        if (card.effect === 'regen') cine.regenSpiral(ts, i);
+        else cine.healBeam(ts, i);
+        render.flashHeal(el);
+        render.spawnFloatingText(el, card.effect === 'regen' ? 'REGEN!' : (healed > 0 ? '+' + healed : 'FULL HP'), 'text-heal');
+        ui.spawnImpact(ts, i, 'heal');
+      });
       sfx.playHeal();
     }
+    if (result.energyGained > 0) render.spawnFloatingText(ui.getLaneSideEl(side, casterIndex), `+${result.energyGained} ⚡`, 'text-combo');
     return;
   }
 
@@ -673,7 +691,8 @@ function setHintForResult(side, result){
   if (result.card.role === 'defense' || result.card.role === 'heal'){
     if (result.targetIndex === -1){ ui.setHint(`${who}: no target available!`); return; }
     const onSelf = result.targetSide === side;
-    const targetWho = onSelf ? 'its own ally' : 'the enemy';
+    const team = (result.targets || []).length > 1;
+    const targetWho = onSelf ? (team ? 'its whole team' : 'its own ally') : (team ? 'the whole enemy team' : 'the enemy');
     ui.setHint(result.reversed
       ? `${who} reversed ${result.card.name} on ${targetWho}!`
       : `${who} used ${cardLabel(result.card, side)} on ${targetWho}!`);
@@ -767,6 +786,7 @@ function reachFor(card){
   const target = lanes[a.targetIndex];
   if (!target) return { ok: false, text: '❌ no target' };
   if (card.role !== 'attack'){
+    if (isTeamCard(card)) return { ok: true, text: a.targetSide === 'you' ? '👥 → your whole team' : '↩ → whole rival team' };
     return { ok: true, text: a.targetSide === 'you' ? `→ ${a.targetIndex === card.laneIndex ? 'itself' : target.name}` : `↩ → rival ${target.name}` };
   }
   const d = game.distanceBetween(state, 'you', card.laneIndex, 'rival', a.targetIndex);
@@ -774,6 +794,10 @@ function reachFor(card){
   if (a.inRange) return { ok: true, text: `${a.taunted ? '🛡️' : '✅'} hits ${target.name}` };
   return { ok: false, text: `❌ ${target.name} ${d.toFixed(1)} away · reach ${reach}` };
 }
+
+// Active Defense/Heal cards cover the whole team (game.js); Secrets and
+// Thorns stay on one Axie.
+const isTeamCard = card => card.role !== 'attack' && card.effect !== 'secret' && card.effect !== 'thorns';
 
 // First value chip of a card (its damage / heal / protection) as text.
 function mainValue(card){
@@ -858,7 +882,7 @@ function updateAim(){
     side: 'you', casterXZ: casterLane.localPos,
     radius: isAttack ? game.cardRange(card) : null,
     state: isAttack ? (a.inRange ? 'ok' : 'out') : 'support',
-    targetSide: a.targetSide, targetXZ: target ? target.localPos : null,
+    targetSide: a.targetSide, targetXZ: target && !isTeamCard(card) ? target.localPos : null,
   });
   ui.markInRange(a.targetSide, isAttack ? a.legal : []);
   // The big "if you let go now" bubble above the hand.
@@ -867,7 +891,9 @@ function updateAim(){
     ui.showReleasePreview('✋ Let go to <b>cancel</b> — the card stays in your hand', 'cancel');
   } else if (!isAttack){
     const reversed = a.targetSide === 'rival';
-    ui.showReleasePreview(`Let go → <b>${mainValue(card)}</b> on ${reversed ? "the rival's" : 'your'} <b>${tname}</b>${reversed ? ' (REVERSE HEAL)' : ''}<small>drag off the card to cancel</small>`, reversed ? 'bad' : 'ok');
+    const who = isTeamCard(card) ? (reversed ? "the rival's <b>whole team</b>" : 'your <b>whole team</b>') : `${reversed ? "the rival's" : 'your'} <b>${tname}</b>`;
+    const energy = card.role === 'heal' ? ` · <b>+${game.HEAL_ENERGY} ⚡</b>` : '';
+    ui.showReleasePreview(`Let go → <b>${mainValue(card)}</b> on ${who}${reversed ? ' (REVERSE HEAL)' : ''}${energy}<small>drag off the card to cancel</small>`, reversed ? 'bad' : 'ok');
   } else if (a.inRange){
     ui.showReleasePreview(`Let go → <b>${mainValue(card)}</b> on <b>${tname}</b> ✅ in reach<small>${card.range === 'short' ? '🗡️ short' : '🏹 long'} reach ${game.cardRange(card)} · drag off to cancel</small>`, 'ok');
   } else {

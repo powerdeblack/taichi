@@ -53,7 +53,7 @@ function createLanes(picks){
     return {
       classId, setId, isTank, evolved: !!evolved, counts, name: axie.name, color: axie.color,
       maxHp: stats.maxHp, hp: stats.maxHp, mp: stats.mp,
-      powerMult: stats.powerMult, damageReduction: stats.damageReduction,
+      powerMult: stats.powerMult, attackBonus: stats.attackBonus, damageReduction: stats.damageReduction,
       status: {}, alive: true, col, localPos: { ...FORMATION_XZ[col] },
       cardPool: buildLoadout(setId, classId, counts),
     };
@@ -351,7 +351,7 @@ function applyDamage(lane, amount, attackerClassId, casterLane){
 // Bleed: each hit adds a stack (max 3) and refreshes the duration to 3
 // ticks; every tick deals 4 per stack. One cut is a light DOT, repeated
 // cuts on the same target (the Bleed archetype) snowball.
-const BLEED_PER_STACK = 5;
+const BLEED_PER_STACK = 6;
 const BLEED_CAP = 3;
 const BLEED_TICKS = 3;
 function applyBleed(lane){
@@ -376,7 +376,7 @@ function tickBleed(lane){
 // fixed-length DOT, it front-loads damage and tapers off.
 const POISON_STACK = 3;
 const POISON_PER_STACK = 3; // damage per stack each tick
-const POISON_CAP = 9;
+const POISON_CAP = 6;
 function applyPoison(lane){
   lane.status.poison = Math.min(POISON_CAP, (lane.status.poison || 0) + POISON_STACK);
 }
@@ -412,7 +412,7 @@ function applyShield(lane){
 const BULWARK_HITS = 2;
 const VULNERABLE_HITS = 2;
 
-// Bulwark: Guardião Tropical's normal effect after its cleanse -- reduces
+// Bulwark: Purify's normal effect after its cleanse -- reduces
 // the next BULWARK_HITS hits by BULWARK_REDUCTION each (see applyDamage).
 function applyBulwark(lane, hits = BULWARK_HITS){
   lane.status.bulwark = Math.max(lane.status.bulwark || 0, hits);
@@ -434,9 +434,9 @@ function applyBarrier(lane, amount){
 
 // Dodge: a chance (0..1) to fully negate each of the next `charges` hits
 // taken -- a total miss, not a mitigated one (see applyDamage). 100%
-// chance + 1 charge is a guaranteed single dodge (Cortina de Fumaça); lower
-// chance + more charges is a probabilistic multi-hit evasion (Reflexos
-// Ágeis).
+// chance + 1 charge is a guaranteed single dodge (Smoke Screen); lower
+// chance + more charges is a probabilistic multi-hit evasion (Agile
+// Reflexes).
 function applyDodge(lane, charges, chance){
   lane.status.dodgeCharges = Math.max(lane.status.dodgeCharges || 0, charges);
   lane.status.dodgeChance = chance;
@@ -450,7 +450,7 @@ function applyThorns(lane, hits, pct){
   lane.status.thornsPct = pct;
 }
 
-// Cleanse: strips the DOTs/debuffs Guardião Tropical is meant to counter.
+// Cleanse: strips the DOTs/debuffs Purify is meant to counter.
 function applyGuardianCleanse(lane){
   delete lane.status.stun;
   delete lane.status.chill;
@@ -463,7 +463,7 @@ function applyGuardianCleanse(lane){
 
 // Regeneration: Trevo's normal effect -- heals a flat MP-scaled amount each
 // STATUS_TICK_INTERVAL tick for `ticks` ticks (see tickRegen).
-const REGEN_HEAL_PER_TICK = 11;
+const REGEN_HEAL_PER_TICK = 13;
 function applyRegen(lane, ticks){
   lane.status.regen = Math.max(lane.status.regen || 0, ticks);
 }
@@ -532,7 +532,7 @@ function secretInfo(secret){ return { name: secret.name, trap: secret.trap, text
 function springSecret(state, secret, owner, attacker){
   switch (secret.trap){
     case 'counter': {
-      const dmg = Math.round((secret.amount || 20) * (secret.ownerPower || 1));
+      const dmg = Math.round(((secret.amount || 20) + (secret.ownerBonus || 0)) * (secret.ownerPower || 1));
       attacker.hp = Math.max(0, attacker.hp - dmg);
       if (attacker.hp <= 0) attacker.alive = false;
       return { attackerDmg: dmg };
@@ -558,6 +558,17 @@ function springSecret(state, secret, owner, attacker){
     }
   }
   return null;
+}
+
+// Defense cards that stay on one Axie instead of covering the whole team.
+const SINGLE_TARGET_EFFECTS = new Set(['secret', 'thorns']);
+// Energy every Heal card gives back to its side when it lands.
+export const HEAL_ENERGY = 2;
+function grantEnergy(state, side, amount){
+  const key = side === 'you' ? 'energyYou' : 'energyRival';
+  const before = state[key];
+  state[key] = Math.min(MAX_ENERGY, state[key] + amount);
+  return Math.round((state[key] - before) * 10) / 10;
 }
 
 function baseResult(side, card, casterIndex){
@@ -587,58 +598,73 @@ export function resolveCard(state, side, card, casterIndex, targetIndex, targetS
     result.targetIndex = finalIndex;
     result.targetSide = finalSide;
     result.reversed = reversed;
+    // Team-wide: an active Defense or Heal card hits every alive Axie of the
+    // side it's cast on, each at the card's full value (a Reverse Heal hits
+    // the whole enemy team). Secrets and Thorns stay on the one Axie that
+    // carries them.
+    const teamWide = !SINGLE_TARGET_EFFECTS.has(card.effect);
+    result.targets = teamWide ? supportLanes.map((l, i) => (l.alive ? i : -1)).filter(i => i >= 0) : [finalIndex];
+    result.perTarget = [];
 
     if (card.role === 'defense'){
-      if (!reversed){
+      result.targets.forEach(i => {
+        const lane = supportLanes[i];
+        if (reversed){ applyVulnerable(lane); return; }
         switch (card.effect){
           case 'secret':
-            targetLane.secret = { id: card.id, name: card.name, trap: card.trap, amount: card.amount, duration: card.duration, ownerPower: casterLane.powerMult, ownerMp: casterLane.mp };
+            lane.secret = { id: card.id, name: card.name, trap: card.trap, amount: card.amount, duration: card.duration, ownerPower: casterLane.powerMult, ownerBonus: casterLane.attackBonus || 0, ownerMp: casterLane.mp };
             result.secretSet = true;
             break;
           case 'bulwark_cleanse':
-            applyGuardianCleanse(targetLane);
-            applyBulwark(targetLane, card.hits || BULWARK_HITS);
+            applyGuardianCleanse(lane);
+            applyBulwark(lane, card.hits || BULWARK_HITS);
             result.bulwarked = true;
             break;
           case 'bulwark':
-            applyBulwark(targetLane, card.hits || BULWARK_HITS);
+            applyBulwark(lane, card.hits || BULWARK_HITS);
             result.bulwarked = true;
             break;
           case 'barrier':
-            applyBarrier(targetLane, card.amount || 20);
+            applyBarrier(lane, card.amount || 20);
             result.barrierApplied = true;
             break;
           case 'dodge':
-            applyDodge(targetLane, card.charges || 1, card.chance != null ? card.chance : 1);
+            applyDodge(lane, card.charges || 1, card.chance != null ? card.chance : 1);
             result.dodgeApplied = true;
             break;
           case 'thorns':
-            applyThorns(targetLane, card.hits || 2, card.pct != null ? card.pct : 0.4);
+            applyThorns(lane, card.hits || 2, card.pct != null ? card.pct : 0.4);
             result.thornsApplied = true;
             break;
           default:
-            applyShield(targetLane);
+            applyShield(lane);
             result.shielded = true;
         }
-      } else {
-        applyVulnerable(targetLane);
-      }
+      });
       checkGameOver(state);
       return result;
     }
 
-    // heal role
-    if (!reversed){
-      if (card.effect === 'regen') applyRegen(targetLane, card.regenTicks || 3);
-      else result.healed = applyHeal(targetLane, card.heal * healScale(state), casterLane);
-    } else {
-      if (card.effect === 'regen') applyRegenRot(targetLane, card.regenTicks || 3);
+    // heal role: also refills energy, so healing is how you fund attacks.
+    result.targets.forEach(i => {
+      const lane = supportLanes[i];
+      if (!lane.alive) return;
+      if (!reversed){
+        if (card.effect === 'regen') applyRegen(lane, card.regenTicks || 3);
+        else {
+          const healed = applyHeal(lane, card.heal * healScale(state), casterLane);
+          result.healed += healed;
+          result.perTarget.push({ index: i, healed });
+        }
+      } else if (card.effect === 'regen') applyRegenRot(lane, card.regenTicks || 3);
       else {
-        const { dmg } = applyDamage(targetLane, card.heal, card.cls, casterLane);
-        result.dmg = dmg;
+        const { dmg } = applyDamage(lane, card.heal, card.cls, casterLane);
+        result.dmg += dmg;
+        result.perTarget.push({ index: i, dmg });
         if (dmg > 0) state.firstHitDone = true;
       }
-    }
+    });
+    result.energyGained = grantEnergy(state, side, HEAL_ENERGY);
     checkGameOver(state);
     return result;
   }
@@ -666,7 +692,7 @@ export function resolveCard(state, side, card, casterIndex, targetIndex, targetS
   }
 
   const ambush = !state.firstHitDone && card.effect === 'ambush';
-  const dmgToApply = card.dmg * (ambush ? 2 : 1);
+  const dmgToApply = (card.dmg + (casterLane.attackBonus || 0)) * (ambush ? 2 : 1);
   const { dmg, deathmarked, shielded, bulwarked, dodged, thornReflected } = applyDamage(targetLane, dmgToApply, card.cls, casterLane);
   if (!dodged){
     if (card.effect === 'stun') targetLane.status.stun = Math.max(targetLane.status.stun || 0, card.duration || STUN_TIME);
@@ -783,7 +809,7 @@ function tickStatuses(lanes, state){
 // No more turn handoff: both sides regenerate energy continuously and
 // status effects tick on a fixed interval regardless of who's "acting".
 // main.js drives all of this from one requestAnimationFrame loop.
-export const ENERGY_REGEN_PER_SEC = 0.3; // ~1.5 energy per 5s cast window
+export const ENERGY_REGEN_PER_SEC = 0.3; // ~1.5 energy per 5s cast window; Heal cards add HEAL_ENERGY on top
 export const STATUS_TICK_INTERVAL = 2; // seconds between Bleed/Poison ticks
 
 export function tickEnergyRealtime(state, dt){
@@ -861,7 +887,7 @@ export function cardValues(state, card, casterLane, reversed = false){
   const scale = healScale(state);
   const mp = casterLane.mp / BASE_MP;
   if (card.role === 'attack'){
-    const dmg = Math.round(card.dmg * casterLane.powerMult);
+    const dmg = Math.round((card.dmg + (casterLane.attackBonus || 0)) * casterLane.powerMult);
     chips.push({ icon: '⚔️', text: String(dmg), kind: 'dmg' });
     if (card.effect === 'ambush') chips.push({ icon: '⚡', text: '×2 1st hit', kind: 'fx' });
     if (card.effect === 'multi') chips.push({ icon: '🏹', text: '+' + Math.round(card.dmg * 0.5 * casterLane.powerMult), kind: 'dmg' });
@@ -874,6 +900,7 @@ export function cardValues(state, card, casterLane, reversed = false){
     if (card.effect === 'fear') chips.push({ icon: '😱', text: 'miss', kind: 'ctl' });
     return chips;
   }
+  const team = card.role !== 'attack' && !SINGLE_TARGET_EFFECTS.has(card.effect);
   if (card.role === 'heal'){
     if (card.effect === 'regen'){
       const ticks = card.regenTicks || 3;
@@ -884,12 +911,14 @@ export function cardValues(state, card, casterLane, reversed = false){
     } else {
       chips.push({ icon: '💚', text: '+' + Math.round(card.heal * mp * scale), kind: 'heal' });
     }
+    chips.push({ icon: '👥', text: 'team', kind: 'fx' });
+    chips.push({ icon: '⚡', text: '+' + HEAL_ENERGY, kind: 'fx' });
     return chips;
   }
   switch (card.effect){
     case 'secret': {
       const t = card.trap;
-      const txt = t === 'counter' ? `⚔️ ${Math.round((card.amount || 20) * casterLane.powerMult)} back`
+      const txt = t === 'counter' ? `⚔️ ${Math.round(((card.amount || 20) + (casterLane.attackBonus || 0)) * casterLane.powerMult)} back`
         : t === 'grace' ? `💚 +${Math.round((card.amount || 30) * mp * scale)} <½HP`
         : t === 'frost' ? `🥶 +${card.amount || 10}` : t === 'snare' ? `😵 ${card.duration || STUN_TIME}s`
         : t === 'shadow' ? '💨 + 😱' : '🩸 + ☠️';
@@ -915,5 +944,6 @@ export function cardValues(state, card, casterLane, reversed = false){
     default:
       chips.push({ icon: '🛡️', text: '-' + Math.round(SHIELD_BLOCK * 100) + '%', kind: 'def' });
   }
+  if (team) chips.push({ icon: '👥', text: 'team', kind: 'fx' });
   return chips;
 }
