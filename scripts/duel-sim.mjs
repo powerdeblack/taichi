@@ -60,6 +60,8 @@ export function playDuel(youPicks, rivalPicks){
         pending.splice(i, 1);
       }
     }
+    game.cullDeadHand(st, 'you');
+    game.cullDeadHand(st, 'rival');
     game.checkGameOver(st);
   }
   duelStats.seconds += t;

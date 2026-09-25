@@ -72,11 +72,19 @@ function buildDeck(picks){
   });
 }
 
+// Each side has its own deck / discard / 3-card hand with the exact same
+// rules (the rival AI plays from its hand just like the player, and a PvP
+// opponent will too). `casting` is what each side is visibly charging
+// right now -- the cast bar both players can read.
+function newPiles(picks){
+  const deck = shuffle(buildDeck(picks));
+  const hand = deck.splice(0, HAND_SIZE);
+  return { deck, discard: [], hand };
+}
+
 export function freshState(youPicks, rivalPicks){
   const youLanes = createLanes(youPicks);
   const rivalLanes = createLanes(rivalPicks);
-  const deck = shuffle(buildDeck(youPicks));
-  const hand = deck.splice(0, HAND_SIZE);
   return {
     youLanes, rivalLanes,
     energyYou: 3, energyRival: 3,
@@ -86,31 +94,46 @@ export function freshState(youPicks, rivalPicks){
     castRival: 0,
     statusTimer: 0,
     elapsed: 0,
-    deck, discard: [], hand,
+    piles: { you: newPiles(youPicks), rival: newPiles(rivalPicks) },
+    casting: { you: null, rival: null },
     gameOver: false,
     winner: null,
   };
 }
 
-export function drawCard(state){
-  if (state.deck.length === 0){
-    if (state.discard.length === 0) return null;
-    state.deck = shuffle(state.discard);
-    state.discard = [];
+export function drawCard(state, side = 'you'){
+  const p = state.piles[side];
+  if (p.deck.length === 0){
+    if (p.discard.length === 0) return null;
+    p.deck = shuffle(p.discard);
+    p.discard = [];
   }
-  const card = state.deck.pop();
-  state.hand.push(card);
+  const card = p.deck.pop();
+  p.hand.push(card);
   return card;
 }
 
-export function cullDeadHand(state){
+// A played card leaves the hand for the discard and a new one is drawn
+// (Retain cards stay in hand).
+export function discardPlayed(state, side, card){
+  if (card.effect === 'retain') return;
+  const p = state.piles[side];
+  p.hand = p.hand.filter(c => c !== card);
+  p.discard.push(card);
+  drawCard(state, side);
+}
+
+// Cards whose Axie has fallen are swapped out of the hand.
+export function cullDeadHand(state, side = 'you'){
+  const lanes = lanesOf(state, side);
+  const p = state.piles[side];
   let guard = 0;
   while (guard++ < 20){
-    const deadIdx = state.hand.findIndex(c => !state.youLanes[c.laneIndex].alive);
+    const deadIdx = p.hand.findIndex(c => !lanes[c.laneIndex].alive);
     if (deadIdx === -1) break;
-    const [card] = state.hand.splice(deadIdx, 1);
-    state.discard.push(card);
-    if (!drawCard(state)) break;
+    const [card] = p.hand.splice(deadIdx, 1);
+    p.discard.push(card);
+    if (!drawCard(state, side)) break;
   }
 }
 
@@ -279,7 +302,7 @@ export function moveSquadWithTank(state, side, dx, dz){
 
 const BULWARK_REDUCTION = 0.35;
 export const SHIELD_BLOCK = 0.6; // Guard: share of the next hit it blocks
-export const DEATHMARK_BONUS = 20; // pure damage added to each marked hit
+export const DEATHMARK_BONUS = 30; // pure damage added to each marked hit
 export const DEATHMARK_HITS = 2; // how many hits a Deathmark lasts
 const VULNERABLE_BONUS = 0.3;
 
@@ -463,7 +486,7 @@ function applyGuardianCleanse(lane){
 
 // Regeneration: Trevo's normal effect -- heals a flat MP-scaled amount each
 // STATUS_TICK_INTERVAL tick for `ticks` ticks (see tickRegen).
-const REGEN_HEAL_PER_TICK = 13;
+const REGEN_HEAL_PER_TICK = 11;
 function applyRegen(lane, ticks){
   lane.status.regen = Math.max(lane.status.regen || 0, ticks);
 }
@@ -758,23 +781,20 @@ export function playerBeginCard(state, card, targetIndex, targetSide){
   const casterIndex = card.laneIndex;
   state.energyYou -= card.cost;
   state.castYou = CAST_TIME;
-  if (card.effect !== 'retain'){
-    state.hand = state.hand.filter(c => c !== card);
-    state.discard.push(card);
-    drawCard(state);
-  }
+  discardPlayed(state, 'you', card);
   if (card.role === 'attack'){
     const taunt = tauntedBy(state, 'you', casterIndex);
     const aim = taunt !== -1 ? taunt : targetIndex;
     const missed = aim < 0 || !getLegalTargets(state, 'you', card, casterIndex).includes(aim);
-    return { side: 'you', card, casterIndex, targetIndex: aim, targetSide: 'rival', missed };
+    return (state.casting.you = { side: 'you', card, casterIndex, targetIndex: aim, targetSide: 'rival', missed });
   }
-  return { side: 'you', card, casterIndex, targetIndex, targetSide, missed: false };
+  return (state.casting.you = { side: 'you', card, casterIndex, targetIndex, targetSide, missed: false });
 }
 
 // Lands a cast plan (at CAST_IMPACT_AT). If the caster died mid-cast the
 // card fizzles; a missed attack returns a `missed` result without effect.
 export function landCast(state, plan){
+  if (state.casting && state.casting[plan.side] === plan) state.casting[plan.side] = null;
   const casterLane = lanesOf(state, plan.side)[plan.casterIndex];
   if (!casterLane || !casterLane.alive){
     return Object.assign(baseResult(plan.side, plan.card, plan.casterIndex), { fizzled: true });

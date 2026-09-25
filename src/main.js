@@ -873,7 +873,7 @@ function updateAim(){
   if (!aiming) return;
   const card = aiming;
   const casterLane = state.youLanes[card.laneIndex];
-  if (!casterLane || !casterLane.alive || !state.hand.includes(card)){ cancelAim(); return; }
+  if (!casterLane || !casterLane.alive || !state.piles.you.hand.includes(card)){ cancelAim(); return; }
   const a = aimFor(card);
   const targetLanes = a.targetSide === 'you' ? state.youLanes : state.rivalLanes;
   const target = targetLanes[a.targetIndex];
@@ -983,7 +983,7 @@ function updateCastAim(dt){
 function syncHand(){
   const reverseHeals = !!(selectedTarget && selectedTarget.side === 'rival' && state.rivalLanes[selectedTarget.laneIndex]?.alive);
   const reach = {};
-  state.hand.forEach(c => { const r = reachFor(c); if (r) reach[c.uid] = r; });
+  state.piles.you.hand.forEach(c => { const r = reachFor(c); if (r) reach[c.uid] = r; });
   ui.renderHand(state, { onPress: onCardPress, onRelease: onCardRelease, onCancel: onCardCancel, onDrag: onCardDrag, aimingUid: aiming && aiming.uid, reverseHeals, reach });
 }
 
@@ -1300,7 +1300,8 @@ function gameLoop(nowMs){
     applyBleedFx('you', statusResults.you);
     applyBleedFx('rival', statusResults.rival);
   }
-  game.cullDeadHand(state);
+  game.cullDeadHand(state, 'you');
+  game.cullDeadHand(state, 'rival');
 
   if (joyHolding || keyMoving){
     const dirX = joyHolding ? joyDirX : keyDirX, dirZ = joyHolding ? joyDirZ : keyDirZ;

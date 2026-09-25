@@ -145,6 +145,19 @@ npm run preview
   🎯 grudado num inimigo pra atacar transformava toda cura em dano sem
   aviso — parecia que a cura não funcionava). Sem 🎯, a cura vai no aliado
   mais ferido.
+- **Mão de cartas (igual pros dois lados)** — cada lado tem seu próprio
+  baralho (as 15 cartas do time, embaralhadas), descarte e mão de 3
+  (`state.piles.you` / `state.piles.rival`, `game.js`). Jogou, a carta vai
+  pro descarte e compra outra (Retain fica na mão); acabou o baralho, o
+  descarte é reembaralhado; carta de Axie morto é trocada. O **bot rival
+  joga da própria mão** com as mesmas regras (preparação pro PvP) e escolhe
+  como uma pessoa (`ai.js`, "human-like card play"): dá nota a cada carta
+  pelo que vê na tela (HP, status, energia e a **barra de cast do
+  adversário** em `state.casting`) — Stun em quem está castando, defesa
+  quando vem golpe, Chill em quem tem esquiva, golpe de misericórdia no
+  Tanque — e escolhe com ruído (softmax), às vezes erra (8%) e às vezes
+  guarda energia pra uma carta melhor quase paga. Anda conforme as cartas
+  que tem na mão (só curto alcance → avança; só longo → recua).
 - **Tela de escolha de time (lobby da arena)** — primeira tela do jogo,
   inspirada no "Meus Times" do Axie Origin mas com arte própria (tudo em
   CSS + 3D): fundo de madeira escura entalhada, placa de madeira pendurada
@@ -184,7 +197,7 @@ npm run preview
   seu Secret; do rival só aparece "❓ Secret" (nem nas mensagens nem na
   barra de cast o nome dele aparece). Reequilibrado no simulador (400
   duelos por par): todos os arquétipos entre 38% e 62% (com as regras de
-  time inteiro: 44%–60%, duelo médio de 63s), Fear virou janela
+  time inteiro e o bot jogando da mão: 45%–57%, duelo médio de 69s), Fear virou janela
   de 4s pra não anular golpe demais, e o Chill virou o counter natural da
   esquiva (Miragem).
 - **Controles no computador** (`main.js`, bloco "Keyboard"): **W A S D** ou

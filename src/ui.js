@@ -428,7 +428,7 @@ export function markInRange(side, indices){
 const handNodes = new Map(); // card.uid -> element
 export function renderHand(state, { onPress, onRelease, onCancel, onDrag, aimingUid, reverseHeals = false, reach = {} }){
   const seen = new Set();
-  state.hand.forEach((card, i) => {
+  state.piles.you.hand.forEach((card, i) => {
     seen.add(card.uid);
     const casterLane = state.youLanes[card.laneIndex];
     const laneAlive = casterLane && casterLane.alive;
@@ -532,8 +532,8 @@ export function renderPips(state){
 }
 
 export function renderPiles(state){
-  document.getElementById('deckPileCount').textContent = `Deck: ${state.deck.length}`;
-  document.getElementById('discardPileCount').textContent = `Discard: ${state.discard.length}`;
+  document.getElementById('deckPileCount').textContent = `Deck: ${state.piles.you.deck.length}`;
+  document.getElementById('discardPileCount').textContent = `Discard: ${state.piles.you.discard.length}`;
 }
 
 export function setHint(text){

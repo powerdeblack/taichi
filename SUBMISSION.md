@@ -40,7 +40,10 @@ Axie's 5 cards between Attack, Defense and Heal to shape its stats, mark one
 as the Tank, or load one of ten ready-made archetypes (Bleed, Poison, Heal,
 Thorns, Mirage, Deathmark, Arcane Bastion…).
 
-**Fight in real time.** Energy refills continuously. Tap an Axie to target it,
+**Fight in real time.** Your 15 cards are shuffled into a deck and you hold
+3, drawing a new one each time you play. The rival bot follows the exact same
+hand rules and plays like a person: it reads your cast bar, stuns casters,
+braces with defenses and saves energy for big cards. Energy refills continuously. Tap an Axie to target it,
 hold a card to see its reach ring and exactly what letting go will do, then
 release. Every card charges on its caster, flies to the target and lands a few
 seconds later, and each side can only start a new card every 5 seconds — so
@@ -72,8 +75,8 @@ knockouts. There's an optional interactive tutorial and a help screen.
 **Balanced with simulation.** A headless simulator plays the real rules and
 the in-game AI against itself: 400 duels for every pairing of the ten
 archetypes (18,000 duels per balance pass), plus a 2,000-team Swiss
-tournament (11,000 duels). Every archetype currently wins between 44% and 60%
-of its duels, and a duel lasts about a minute on average.
+tournament (11,000 duels). Every archetype currently wins between 45% and 57%
+of its duels, and a duel lasts a bit over a minute on average.
 
 ## Controls / first contact
 
