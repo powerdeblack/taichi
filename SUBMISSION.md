@@ -67,10 +67,24 @@ healing; at 3:20 the Tank with more HP left wins.
 
 **Feel.** Official 3D Axies from the Three.js Axie Mixer: class body colours,
 a weapon per card set, Mystic parts with glow for Evolved Axies, and the
-toolkit's own attack, skill, hit, stun and death animations. Each card also
-plays a short cinematic that matches what it does (arrow rain, slashes,
-arcane blasts, shields, heals), with hit-stop, camera shake and slow motion on
-knockouts. There's an optional interactive tutorial and a help screen.
+toolkit's own attack, skill, hit, stun and death animations. Every card type
+has its own spell effect: a real rain of arrows that sticks in the snow,
+venom globs that burst into lingering toxic clouds, arcane / holy / spirit /
+frost bolts with particle trails, a Frost Nova for Chill, orbiting stars for
+Stun, shadow wisps for Fear, glowing runes for shields and sparkles for
+heals. A combat camera follows the fight and frames both squads; bodies stay
+turned to the locked target while you strafe; hits land with hit-stop,
+camera shake, crit-style numbers and slow motion on knockouts. A procedural
+soundtrack (calm in the lobby, driving in battle, heating up in the Blizzard
+and close finishes) and a mixed sound design (hall reverb, stereo position,
+a heartbeat when your Tank is low) complete it. Every match ends on a result
+screen with your MVP Axie and damage / healing / knockout bars.
+
+**Plays like a person.** The rival bot follows exactly your rules -- its own
+deck and 3-card hand -- and reads the board like a player: it watches your
+cast bar to stun casters or raise shields, chills dodgers, goes for Tank
+kills, saves energy for big cards and makes the occasional human mistake.
+The same hand system is the foundation for PvP.
 
 **Balanced with simulation.** A headless simulator plays the real rules and
 the in-game AI against itself: 400 duels for every pairing of the ten
@@ -98,6 +112,8 @@ of its duels, and a duel lasts a bit over a minute on average.
   with the mouse — press a card to aim, release to play, drag off it (or
   press **Esc**) to cancel; click an Axie to target it. Touch controls on
   phones are unchanged.
+- **⏸ / Esc** pauses (resume, restart, change team, how to play); the game
+  also pauses itself if you leave the app.
 - Win by defeating the rival **Tank**.
 
 ## Axie Core fit
@@ -127,7 +143,8 @@ is a snowy Lunacia hall with the Lunacia sigil on the floor.
 ## AI tools used
 
 - **Claude Code (Anthropic)** — wrote and refactored the game code (rules
-  engine, AI, Three.js scene, UI, cinematics); designed and ran the balance
+  engine, human-like AI, Three.js scene, UI, spell effects, procedural music
+  and sound design); designed and ran the balance
   simulator and the 2,000-team tournament and applied the tuning; drove
   automated browser tests with Playwright (phone viewports, touch, screenshots)
   and asset-pack trimming; wrote the documentation.
@@ -147,7 +164,9 @@ Suggested sentence:
 
 Record the phone screen in landscape, 2–3 minutes, no cuts needed:
 
-1. **0:00–0:20 Team screen.** Tap "Use this team" on an archetype, change one
+0. **0:00–0:05 Title screen.** Let the logo and the six Axies appear, tap
+   "Tap to play" (the music starts).
+1. **0:05–0:20 Team screen.** Tap "Use this team" on an archetype, change one
    Axie's card set, toggle **Evolve** on one (the preview turns Mystic),
    show the 3D preview swinging its weapon.
 2. **0:20–0:35 Start Duel.** Squads walk into the hall.
@@ -158,7 +177,8 @@ Record the phone screen in landscape, 2–3 minutes, no cuts needed:
 4. **1:30–2:00 Control.** Land a **Stun** on a casting enemy ("INTERRUPTED")
    or a Chill; show the status timer on the unit tag.
 5. **2:00–end The finish.** Keep going until a Tank falls (slow motion,
-   letterbox and the victory pose), or let the Blizzard hit after 2:00.
+   letterbox and the victory pose), or let the Blizzard hit after 2:00,
+   then hold on the result screen (MVP and stats) for a couple of seconds.
 
 On Android: Quick Settings → Screen record; on iPhone: Control Center →
 Screen Recording.

@@ -156,6 +156,15 @@ npm run preview
   estilo crítico em golpes ≥45; borda vermelha ao levar dano e batimento
   quando seu Tanque está abaixo de 30%; cartas com borda dourada quando dá
   pra jogar agora, custo vermelho sem energia e animação ao comprar.
+- **Abertura, música e resultado** — tela de título (logo AXIE DUEL, anel
+  rúnico de Lunacia, aurora, neve, as 6 classes em 3D, barra de
+  carregamento real e "Tap to play", que libera o áudio). Trilha procedural
+  (`music.js`): lobby calmo (Am-F-C-G) e batalha (Am-G-F-E com baixo e
+  bateria) que esquenta na Nevasca e com Tanque baixo. Mixagem (`sfx.js`):
+  buses + compressor, reverb de salão, variação de tom, estéreo pela posição
+  na tela, vento de fundo, batimento cardíaco com Tanque em perigo. Tela de
+  resultado com MVP, barras de dano/cura/cartas/KOs e melhor carta.
+  Qualidade adaptativa: a resolução cai se o FPS ficar abaixo de ~45.
 - **Pausa e segurança** — Reiniciar/Trocar time ficam no menu ⏸ (ou Esc)
   durante a partida, pra um toque sem querer não jogar o duelo fora; a cena
   inteira congela com o menu aberto e o jogo pausa sozinho quando o app vai
