@@ -145,6 +145,17 @@ npm run preview
   🎯 grudado num inimigo pra atacar transformava toda cura em dano sem
   aviso — parecia que a cura não funcionava). Sem 🎯, a cura vai no aliado
   mais ferido.
+- **Efeitos e HUD (polimento)** — efeitos de magia estilo WoW para todo tipo
+  de carta (`cinematics.js`: partículas suaves com brilho aditivo, Saraivada
+  de flechas em área, bolha de veneno + nuvem tóxica, projéteis por escola
+  arcana/sagrada/espiritual/gelo, Frost Nova, estrelas de Stun, sombras de
+  Fear, sangue, auras de defesa e brilho de cura). **Câmera de combate**
+  (`board3d.js` `updateCombatCamera`): segue o centro da luta e aproxima pra
+  enquadrar os Axies vivos. Tags com cor de time (azul/vermelho), barra de
+  vida com "rastro" do dano, stats só no alvo 🎯; número de dano grande
+  estilo crítico em golpes ≥45; borda vermelha ao levar dano e batimento
+  quando seu Tanque está abaixo de 30%; cartas com borda dourada quando dá
+  pra jogar agora, custo vermelho sem energia e animação ao comprar.
 - **Mira travada (lock-on)** — com um inimigo no 🎯, o time inteiro mantém
   o corpo virado pra ele mesmo andando de lado ou pra trás pelo joystick/
   WASD (a animação de andar continua, então eles "strafam"); o rival faz o

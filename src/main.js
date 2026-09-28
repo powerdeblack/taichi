@@ -553,7 +553,8 @@ function applyResultFx(result){
     playKOIfDied(result.targetSide, result.targetIndex);
     render.flashHit(el);
     render.shakeBoard(boardEl);
-    render.spawnFloatingText(el, '-'+result.dmg, 'text-dmg');
+    render.spawnFloatingText(el, '-'+result.dmg, result.dmg >= 45 ? 'text-dmg text-big' : 'text-dmg');
+    if (result.targetSide === 'you') ui.setEdgeFx('hurt');
     ui.spawnImpact(result.targetSide, result.targetIndex, 'hit');
     if (card.effect === 'bleed') ui.spawnImpact(result.targetSide, result.targetIndex, 'bleed');
     if (card.effect === 'poison') ui.spawnImpact(result.targetSide, result.targetIndex, 'poison');
@@ -747,6 +748,7 @@ function setHintForResult(side, result){
 }
 
 function finishMatch(){
+  ui.setEdgeFx('danger', false);
   if (matchFinished) return;
   matchFinished = true;
   clearCasts();
@@ -1427,6 +1429,8 @@ function gameLoop(nowMs){
     ui.renderPips(state);
     ui.renderPiles(state);
     ui.renderMatchClock(state.elapsed, game.BLIZZARD_AT, game.MATCH_LIMIT);
+    const myTank = state.youLanes.find(l => l.isTank);
+    ui.setEdgeFx('danger', !!myTank && myTank.alive && myTank.hp / myTank.maxHp < 0.3 && !state.gameOver);
     syncHand();
     updateMoveBtn();
     updateJoystick();

@@ -3,8 +3,8 @@
 import { MAX_ENERGY, LOADOUT_SIZE, SQUAD_SIZE, cardValues } from './game.js';
 import { portraitHTML } from './axieArt.js';
 import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive, moveLaneVisual, setLaneLivePosition, setLaneRoaming, spawnImpact as spawnImpact3D, setTauntRing, showAim, hideAim,
-  startCastFX, launchCastFX, landCastFX, clearCastsFX, setBlizzard, hitSquash, cinematics, playLaneAction, getLanePortrait, setLockOn, setCastFacing } from './board3d.js';
-export { setTauntRing, showAim, hideAim, startCastFX, launchCastFX, landCastFX, clearCastsFX, setBlizzard, hitSquash, cinematics, playLaneAction, setLockOn, setCastFacing };
+  startCastFX, launchCastFX, landCastFX, clearCastsFX, setBlizzard, hitSquash, cinematics, playLaneAction, getLanePortrait, setLockOn, setCastFacing, setEdgeFx } from './board3d.js';
+export { setTauntRing, showAim, hideAim, startCastFX, launchCastFX, landCastFX, clearCastsFX, setBlizzard, hitSquash, cinematics, playLaneAction, setLockOn, setCastFacing, setEdgeFx };
 
 const rosterGrid = document.getElementById('rosterGrid');
 const squadListEl = document.getElementById('squadList');
@@ -187,13 +187,13 @@ function statusLabel(key, value){
   return label;
 }
 
-function buildUnitTag(){
+function buildUnitTag(side){
   const wrap = document.createElement('div');
-  wrap.className = 'unit-tag';
+  wrap.className = `unit-tag side-${side}`;
   wrap.innerHTML = `
     <div class="unit-chip">
       <div class="lane-name"></div>
-      <div class="hp-bar-bg"><div class="hp-bar-fill"></div></div>
+      <div class="hp-bar-bg"><div class="hp-bar-ghost"></div><div class="hp-bar-fill"></div></div>
       <div class="mp-label"></div>
       <div class="status-icons"></div>
     </div>
@@ -205,6 +205,7 @@ function buildUnitTag(){
     chip: wrap.querySelector('.unit-chip'),
     nameEl: wrap.querySelector('.lane-name'),
     hpFill: wrap.querySelector('.hp-bar-fill'),
+    hpGhost: wrap.querySelector('.hp-bar-ghost'),
     mpEl: wrap.querySelector('.mp-label'),
     statusEl: wrap.querySelector('.status-icons'),
     castBar: wrap.querySelector('.cast-bar'),
@@ -291,8 +292,8 @@ export function buildBoard(state, onUnitClick){
   currentState = state;
   boardOverlay.innerHTML = '';
   unitRefs = {
-    you: state.youLanes.map(() => buildUnitTag()),
-    rival: state.rivalLanes.map(() => buildUnitTag()),
+    you: state.youLanes.map(() => buildUnitTag('you')),
+    rival: state.rivalLanes.map(() => buildUnitTag('rival')),
   };
   // The 3D models walk in from further back at match start (see
   // board3d.js's introWalk) -- fade the name/HP tags in only once they've
@@ -376,7 +377,12 @@ function updateUnit(ref, lane, side, laneIndex){
   if (!ref) return;
   const { attack, defense, heal } = lane.counts;
   ref.nameEl.innerHTML = `${lane.name}${lane.evolved ? '<span class="role-badge evolved">+</span>' : ''}${lane.isTank ? '<span class="role-badge tank">🛡️</span>' : ''}`;
-  ref.hpFill.style.width = Math.max(0, lane.hp/lane.maxHp*100) + '%';
+  // The ghost bar trails the real one, so every chunk of damage stays
+  // visible for a beat before it drains away.
+  const pct = Math.max(0, lane.hp / lane.maxHp * 100);
+  const w = pct + '%';
+  if (ref.hpFill.style.width !== w){ ref.hpFill.style.width = w; ref.hpGhost.style.width = w; }
+  ref.chip.classList.toggle('low-hp', lane.alive && pct < 30);
   ref.mpEl.textContent = `MP ${lane.mp} · ⚔️${attack} 🛡️${defense} 💚${heal}`;
   ref.statusEl.innerHTML = Object.keys(lane.status)
     .filter(k => !STATUS_COMPANION_KEYS.has(k) && (lane.status[k]>0 || lane.status[k]===true))
@@ -444,8 +450,12 @@ export function renderHand(state, { onPress, onRelease, onCancel, onDrag, aiming
     let div = handNodes.get(card.uid);
     if (!div){
       div = document.createElement('div');
+      div._born = performance.now();
       handNodes.set(card.uid, div);
     }
+    // Freshly drawn cards slide up into the hand (the class has to survive
+    // the periodic re-render while the animation runs).
+    const drawn = performance.now() - div._born < 500;
     // A heal with the 🎯 on an enemy becomes Reverse Heal -- show it red,
     // with the damage it would deal, before the player lets go.
     const reversing = reverseHeals && card.role === 'heal';
@@ -453,7 +463,8 @@ export function renderHand(state, { onPress, onRelease, onCancel, onDrag, aiming
     const portrait = getLanePortrait('you', card.laneIndex);
     const chips = cardValues(state, card, casterLane, reversing)
       .map(c => `<span class="val val-${c.kind}">${c.icon}<b>${c.text}</b></span>`).join('');
-    div.className = 'card' + (!playable ? ' disabled' : '') + (card.uid === aimingUid ? ' aiming' : '') + (reversing ? ' reversing' : '') + (r && !r.ok ? ' will-miss' : '');
+    div.className = 'card' + (!playable ? ' disabled' : '') + (card.uid === aimingUid ? ' aiming' : '') + (reversing ? ' reversing' : '') + (r && !r.ok ? ' will-miss' : '')
+      + (playable && (!r || r.ok) ? ' ready' : '') + (!affordable ? ' no-energy' : '') + (drawn ? ' drawn' : '');
     div.style.borderColor = card.color + '55';
     div.innerHTML = `
       <div class="card-top">

@@ -10,7 +10,7 @@ export function spawnFloatingText(container, text, cssClass){
   el.className = 'floating-text ' + (cssClass||'');
   el.textContent = text;
   container.appendChild(el);
-  setTimeout(() => el.remove(), 1700);
+  setTimeout(() => el.remove(), 1950);
 }
 
 export function flashHit(laneSideEl){

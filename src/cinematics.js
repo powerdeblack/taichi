@@ -611,25 +611,25 @@ const liveAt = (side, i, y) => { const q = ctx?.lanePos(side, i); return q ? new
 // target, then dozens of arrows hail down over the area around impact,
 // punch into the snow with a puff and stay stuck there for a moment.
 const ARROW_GEO = {
-  shaft: new THREE.CylinderGeometry(0.03, 0.03, 1.0, 5),
-  tip: new THREE.ConeGeometry(0.08, 0.24, 6),
-  fletch: new THREE.PlaneGeometry(0.2, 0.26),
-  streak: new THREE.CylinderGeometry(0.012, 0.07, 2.2, 6, 1, true),
+  shaft: new THREE.CylinderGeometry(0.024, 0.024, 0.78, 5),
+  tip: new THREE.ConeGeometry(0.065, 0.19, 6),
+  fletch: new THREE.PlaneGeometry(0.16, 0.2),
+  streak: new THREE.CylinderGeometry(0.01, 0.055, 1.8, 6, 1, true),
 };
 Object.values(ARROW_GEO).forEach(g => SHARED_GEOS.add(g));
 function makeArrow(mats){
   const g = new THREE.Group();
   const shaft = new THREE.Mesh(ARROW_GEO.shaft, mats.shaft);
   const tip = new THREE.Mesh(ARROW_GEO.tip, mats.tip);
-  tip.position.y = -0.6; tip.rotation.x = Math.PI;
+  tip.position.y = -0.47; tip.rotation.x = Math.PI;
   const f1 = new THREE.Mesh(ARROW_GEO.fletch, mats.fletch);
-  f1.position.y = 0.42;
+  f1.position.y = 0.33;
   const f2 = new THREE.Mesh(ARROW_GEO.fletch, mats.fletch);
-  f2.position.y = 0.42; f2.rotation.y = Math.PI / 2;
+  f2.position.y = 0.33; f2.rotation.y = Math.PI / 2;
   g.add(shaft, tip, f1, f2);
   // A glowing streak behind the arrow while it flies (hidden once stuck).
   const streak = new THREE.Mesh(ARROW_GEO.streak, mats.streak);
-  streak.position.y = 1.5;
+  streak.position.y = 1.25;
   streak.renderOrder = 8;
   g.add(streak);
   g.userData.streak = streak;
@@ -696,7 +696,7 @@ export function volley(fromSide, fromI, toSide, toI, flight = 2, miss = false, c
       const k = (t - u.start) / 0.26;
       if (k < 0) return;
       if (!u.land){
-        u.land = center.clone().add(u.off).setY(0.4);
+        u.land = center.clone().add(u.off).setY(0.3);
         u.sky = u.land.clone().add(new THREE.Vector3(-away.x * 1.6, 6.5, -away.z * 1.6));
         a.quaternion.setFromUnitVectors(DOWN, u.land.clone().sub(u.sky).normalize());
         a.visible = true;

@@ -140,13 +140,18 @@ export function initBoard3D(canvas){
   const cineOverlay = document.createElement('div');
   cineOverlay.className = 'cine-overlay';
   canvas.parentElement?.appendChild(cineOverlay);
+  // Screen-edge feedback (low-HP heartbeat, hurt sting), see setEdgeFx.
+  edgeFx = document.createElement('div');
+  edgeFx.className = 'edge-fx';
+  canvas.parentElement?.appendChild(edgeFx);
   loadPill = document.createElement('div');
   loadPill.className = 'load-pill';
   canvas.parentElement?.appendChild(loadPill);
+  camBase = { pos: camera.position.clone(), target: new THREE.Vector3(0, 0, 0.2), fov: camera.fov };
   cine.initCinematics({
     scene, camera, overlay: cineOverlay,
     lanePos: (side, i) => slotWorld(side, i),
-    cameraBase: { pos: camera.position.clone(), target: new THREE.Vector3(0, 0, 0.2), fov: camera.fov },
+    cameraBase: camBase,
   });
   buildHall();
   buildTauntRings();
@@ -160,6 +165,41 @@ export function initBoard3D(canvas){
     requestAnimationFrame(animate);
   }
   return ensureMixer();
+}
+
+// ---------- combat camera ----------
+// The camera keeps its angle but follows the fight: it glides to the middle
+// of every Axie still standing and pulls in or out so both squads fill the
+// frame -- close and punchy when they brawl, wide when they kite. Shake,
+// zoom punches and focus (cinematics.js) ride on top of this moving base.
+let camBase = null;
+let edgeFx = null;
+// 'danger' toggles the low-HP heartbeat; 'hurt' plays a one-shot sting.
+export function setEdgeFx(kind, on = true){
+  if (!edgeFx) return;
+  if (kind === 'hurt'){ edgeFx.classList.remove('hurt'); void edgeFx.offsetWidth; edgeFx.classList.add('hurt'); return; }
+  edgeFx.classList.toggle(kind, on);
+}
+const CAM_DIR = new THREE.Vector3(0, 11.5, 12.4).normalize();
+const CAM_FAR = 16.9, CAM_NEAR = 8.2, CAM_MARGIN = 1.7;
+const camFocus = new THREE.Vector3(0, 0, 0.2);
+let camDist = CAM_FAR;
+function updateCombatCamera(dt){
+  if (!camBase || !camera) return;
+  const pts = [];
+  slots.forEach(s => { if (s.alive !== false && s.axie?.wrapper) pts.push(s.axie.wrapper.position); });
+  if (!pts.length) return;
+  const c = pts.reduce((a, p) => a.add(p), new THREE.Vector3()).divideScalar(pts.length);
+  let r = 0;
+  pts.forEach(p => { r = Math.max(r, Math.hypot(p.x - c.x, (p.z - c.z) * 0.8)); });
+  const vHalf = THREE.MathUtils.degToRad(camBase.fov) / 2;
+  const hHalf = Math.atan(Math.tan(vHalf) * (camera.aspect || 1.6));
+  const want = THREE.MathUtils.clamp((r + CAM_MARGIN) / Math.tan(Math.min(vHalf, hHalf)), CAM_NEAR, CAM_FAR);
+  const k = Math.min(1, dt * 1.8);
+  camFocus.lerp(new THREE.Vector3(c.x * 0.85, 0, c.z * 0.85 + 0.25), k);
+  camDist += (want - camDist) * k;
+  camBase.target.copy(camFocus);
+  camBase.pos.copy(camFocus).addScaledVector(CAM_DIR, camDist);
 }
 
 function animate(){
@@ -218,6 +258,7 @@ function animate(){
   tickCasts(dt);
   tickScenery(dt);
   tickSquash(dt);
+  updateCombatCamera(realDt);
   if (scene) cine.tickCinematics(dt, realDt);
   if (renderer && scene && camera) renderer.render(scene, camera);
 }
