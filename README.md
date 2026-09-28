@@ -145,6 +145,13 @@ npm run preview
   🎯 grudado num inimigo pra atacar transformava toda cura em dano sem
   aviso — parecia que a cura não funcionava). Sem 🎯, a cura vai no aliado
   mais ferido.
+- **Mira travada (lock-on)** — com um inimigo no 🎯, o time inteiro mantém
+  o corpo virado pra ele mesmo andando de lado ou pra trás pelo joystick/
+  WASD (a animação de andar continua, então eles "strafam"); o rival faz o
+  mesmo com o último Axie que atacou. Quem está conjurando vira pro alvo da
+  carta desde que você segura a carta até o impacto. Sem alvo travado, o
+  corpo segue a direção do movimento (`board3d.js` `setLockOn` /
+  `setCastFacing`, alimentados por `main.js` `syncFacing`).
 - **Mão de cartas (igual pros dois lados)** — cada lado tem seu próprio
   baralho (as 15 cartas do time, embaralhadas), descarte e mão de 3
   (`state.piles.you` / `state.piles.rival`, `game.js`). Jogou, a carta vai

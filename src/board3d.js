@@ -22,6 +22,8 @@ let elapsedTime = 0;
 // whose position it doesn't own.
 const slots = new Map();
 const slotKey = (side, laneIndex) => side + ':' + laneIndex;
+// Dev-only handle for browser tests (facing, positions); stripped from builds.
+if (import.meta.env.DEV && typeof window !== 'undefined') window.__axieSlots = slots;
 const MOVE_LERP_SPEED = 6; // higher = snappier slide into the new slot
 const INTRO_LERP_SPEED = 1.8; // slower -- the opening "walk into the hall" entrance (~2.5-3s)
 const PATROL_AMPLITUDE = 0.07; // how far idle units wander from their spot
@@ -51,6 +53,37 @@ function faceDirection(s, dx, dz, dt){
   if (dx * dx + dz * dz < 0.0004) return; // too small to be real movement -- ignore patrol-wobble-scale noise
   const targetAngle = Math.atan2(dx, dz);
   s.axie.wrapper.rotation.y = lerpAngle(s.axie.wrapper.rotation.y, targetAngle, Math.min(1, dt * ROTATE_LERP_SPEED));
+}
+
+// ---------- lock-on facing ----------
+// While a side has a target locked (the player's 🎯, the rival's current
+// prey) its Axies keep their body turned toward it even while the squad
+// walks sideways or backwards -- the gait keeps playing, so they strafe --
+// and a caster always faces whoever its card is aimed at from the moment
+// it starts charging until just after impact. Movement direction only
+// steers the body when nothing is locked.
+const lockOn = { you: null, rival: null };  // side -> { side, index } | null
+const castFacing = new Map();               // slotKey -> { side, index }
+
+export function setLockOn(side, target){ lockOn[side] = target || null; }
+export function setCastFacing(side, laneIndex, target){
+  if (target) castFacing.set(slotKey(side, laneIndex), target);
+  else castFacing.delete(slotKey(side, laneIndex));
+}
+function lockedPoint(s){
+  const t = castFacing.get(slotKey(s.side, s.laneIndex)) || lockOn[s.side];
+  if (!t || (t.side === s.side && t.index === s.laneIndex)) return null;
+  const ts = slots.get(slotKey(t.side, t.index));
+  if (!ts || !ts.axie || ts.alive === false) return null;
+  return ts.axie.wrapper.position;
+}
+// Turns toward the locked target if there is one; returns false otherwise.
+function faceLocked(s, dt){
+  const p = lockedPoint(s);
+  if (!p) return false;
+  const w = s.axie.wrapper.position;
+  faceDirection(s, p.x - w.x, p.z - w.z, dt);
+  return true;
 }
 
 function ensureMixer(){
@@ -146,7 +179,7 @@ function animate(){
       // from how far it moved since the last tick.
       const dx = s.axie.wrapper.position.x - s.lastPos.x;
       const dz = s.axie.wrapper.position.z - s.lastPos.z;
-      faceDirection(s, dx, dz, dt);
+      if (!faceLocked(s, dt)) faceDirection(s, dx, dz, dt);
       stepGait(s, dt > 0 ? Math.hypot(dx, dz) / dt : 0, dt);
       s.lastPos.copy(s.axie.wrapper.position);
       return;
@@ -154,7 +187,7 @@ function animate(){
     if (s.targetPos){
       const dx = s.targetPos.x - s.axie.wrapper.position.x;
       const dz = s.targetPos.z - s.axie.wrapper.position.z;
-      faceDirection(s, dx, dz, dt);
+      if (s.introWalk || !faceLocked(s, dt)) faceDirection(s, dx, dz, dt);
       const speed = s.introWalk ? INTRO_LERP_SPEED : MOVE_LERP_SPEED;
       s.axie.wrapper.position.lerp(s.targetPos, Math.min(1, dt * speed));
       if (s.axie.wrapper.position.distanceTo(s.targetPos) < 0.01){
@@ -176,7 +209,7 @@ function animate(){
       s.axie.wrapper.position.z = s.basePos.z + Math.cos(t * 0.5) * PATROL_AMPLITUDE * 0.8;
       // Nothing to chase while idle -- gently settle back to facing the
       // enemy instead of freezing wherever the last real move left it.
-      s.axie.wrapper.rotation.y = lerpAngle(s.axie.wrapper.rotation.y, s.baseRotation, Math.min(1, dt * ROTATE_LERP_SPEED * 0.4));
+      if (!faceLocked(s, dt)) s.axie.wrapper.rotation.y = lerpAngle(s.axie.wrapper.rotation.y, s.baseRotation, Math.min(1, dt * ROTATE_LERP_SPEED * 0.4));
       s.lastPos.copy(s.axie.wrapper.position);
     }
   });
@@ -1171,6 +1204,8 @@ export function setLaneRoaming(side, laneIndex, roaming){
 
 export function clearBoard3D(){
   clearCastsFX();
+  lockOn.you = lockOn.rival = null;
+  castFacing.clear();
   portraits.clear();
   slots.forEach(s => { scene.remove(s.axie.wrapper); s.axie.dispose(); });
   slots.clear();

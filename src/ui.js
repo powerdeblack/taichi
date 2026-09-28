@@ -3,8 +3,8 @@
 import { MAX_ENERGY, LOADOUT_SIZE, SQUAD_SIZE, cardValues } from './game.js';
 import { portraitHTML } from './axieArt.js';
 import { initBoard3D, syncBoardAxies, projectLane, setLaneAlive, moveLaneVisual, setLaneLivePosition, setLaneRoaming, spawnImpact as spawnImpact3D, setTauntRing, showAim, hideAim,
-  startCastFX, launchCastFX, landCastFX, clearCastsFX, setBlizzard, hitSquash, cinematics, playLaneAction, getLanePortrait } from './board3d.js';
-export { setTauntRing, showAim, hideAim, startCastFX, launchCastFX, landCastFX, clearCastsFX, setBlizzard, hitSquash, cinematics, playLaneAction };
+  startCastFX, launchCastFX, landCastFX, clearCastsFX, setBlizzard, hitSquash, cinematics, playLaneAction, getLanePortrait, setLockOn, setCastFacing } from './board3d.js';
+export { setTauntRing, showAim, hideAim, startCastFX, launchCastFX, landCastFX, clearCastsFX, setBlizzard, hitSquash, cinematics, playLaneAction, setLockOn, setCastFacing };
 
 const rosterGrid = document.getElementById('rosterGrid');
 const squadListEl = document.getElementById('squadList');

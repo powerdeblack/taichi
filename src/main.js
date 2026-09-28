@@ -1010,8 +1010,34 @@ function startCast(plan){
   // charges instead.
   if (!travels) ui.playLaneAction(plan.side, plan.casterIndex, 'skill');
   pendingCasts.push({ id, plan, age: 0, travels, launched: false });
+  if (plan.side === 'rival' && plan.targetSide === 'you' && plan.targetIndex >= 0) rivalFocus = { side: 'you', index: plan.targetIndex };
   if (plan.side === 'you') ui.setHint(`⏳ Casting ${plan.card.name}…`);
   else if (!aiming) ui.setHint(`⚠️ The rival is casting ${cardLabel(plan.card, 'rival')}!`);
+}
+
+// ---------- lock-on facing (board3d.js setLockOn / setCastFacing) ----------
+// With an enemy under the 🎯 your whole squad keeps its bodies turned to it,
+// even while the joystick walks them sideways or back (they strafe); the
+// rival does the same with the last Axie it attacked. A caster also faces
+// its card's target while you hold the card and while it charges and flies.
+let rivalFocus = null; // { side: 'you', index } -- the rival's current prey
+
+function syncFacing(){
+  const laneOf = t => t && (t.side === 'you' ? state.youLanes : state.rivalLanes)[t.index];
+  const youLock = selectedTarget && selectedTarget.side === 'rival' ? { side: 'rival', index: selectedTarget.laneIndex } : null;
+  ui.setLockOn('you', laneOf(youLock)?.alive ? youLock : null);
+  if (!laneOf(rivalFocus)?.alive) rivalFocus = null;
+  ui.setLockOn('rival', rivalFocus);
+
+  const face = { you: [null, null, null], rival: [null, null, null] };
+  if (aiming && !isTeamCard(aiming)){
+    const a = aimFor(aiming);
+    if (a.targetIndex >= 0) face.you[aiming.laneIndex] = { side: a.targetSide, index: a.targetIndex };
+  }
+  pendingCasts.forEach(c => {
+    if (c.plan.targetIndex >= 0) face[c.plan.side][c.plan.casterIndex] = { side: c.plan.targetSide, index: c.plan.targetIndex };
+  });
+  for (const side of ['you', 'rival']) face[side].forEach((t, i) => ui.setCastFacing(side, i, t));
 }
 
 function tickPendingCasts(dt){
@@ -1055,6 +1081,7 @@ function targetName(plan){
 }
 
 function clearCasts(){
+  rivalFocus = null;
   castAim = null;
   pendingCasts = [];
   ui.clearCastsFX();
@@ -1342,6 +1369,7 @@ function gameLoop(nowMs){
   ui.updateBoard(state);
   updateAim();
   updateCastAim(dt);
+  syncFacing();
   ['you', 'rival'].forEach(side => {
     const tank = (side === 'you' ? state.youLanes : state.rivalLanes).find(l => l.isTank);
     ui.setTauntRing(side, tank.localPos, tank.alive);
