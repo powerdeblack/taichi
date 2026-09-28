@@ -261,7 +261,7 @@ function selectTeam(id, force){
   ui.renderTeamList(teamList(), selectedTeamId, (tid) => { sfx.playSelect(); selectTeam(tid); });
   ui.renderTeamPlaque(team);
   ui.setStageLoading(true);
-  showTeam(team.picks).then(() => {
+  showTeam(team.picks, team.archId || 'custom', team.color).then(() => {
     ui.setStageLoading(false);
     // Fill the list's faces with 3D portraits, one at a time in the background.
     ui.fillTeamFaces(portraitFor);
