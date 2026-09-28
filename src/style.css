@@ -951,11 +951,11 @@ body.in-select h1, body.in-select .subtitle, body.in-select .top-btns{ display:n
   background:linear-gradient(180deg, #f3ebdd 0%, #dccfb9 100%);
   box-shadow:inset 0 -3px 0 #c3b294, inset 0 2px 0 #fffaf0, 0 6px 14px rgba(0,0,0,.45);
 }
-.ts-plaque-name{ font-family:'Baloo 2',sans-serif; font-weight:800; font-size:1.25rem; line-height:1.15; color:#8a7458; }
+.ts-plaque-name{ font-family:'Baloo 2',sans-serif; font-weight:800; font-size:1.25rem; line-height:1.15; color:#4a3822; text-shadow:0 1px 0 #ffffffa0; }
 .ts-plaque-tags span, .ts-row-tags span{
   display:inline-block; margin:2px 3px 0 0; padding:0 7px; border-radius:8px; font-size:.64rem; font-weight:700;
 }
-.ts-plaque-tags span{ background:#c9b99b66; color:#6d5b44; }
+.ts-plaque-tags span{ background:#b8a68566; color:#4a3822; }
 .ts-actions{ display:flex; justify-content:center; gap:10px; flex-wrap:wrap; }
 
 /* Team panels. */
@@ -1083,3 +1083,62 @@ body.in-select h1, body.in-select .subtitle, body.in-select .top-btns{ display:n
   to{ transform:none; opacity:1; }
 }
 @media (prefers-reduced-motion: reduce){ .hand .card.drawn{ animation:none; } }
+
+/* ---------- Pause menu / end-of-match actions ---------- */
+/* During a match the Rematch / Change team buttons live in the ⏸ menu;
+   after the final blow they come back, centred under the result banner. */
+body.in-duel:not(.match-over) .btn-row{ display:none; }
+body.in-duel.match-over .btn-row{
+  display:flex; position:absolute; left:50%; right:auto; top:calc(44% + 58px);
+  transform:translateX(-50%); z-index:9; margin:0; gap:10px;
+  animation:fade-up .4s ease .8s both;
+}
+body.in-duel.match-over .reset-btn, body.in-duel.match-over .switch-deck-btn{
+  padding:9px 18px; font-size:.85rem; border-radius:24px; box-shadow:0 6px 16px -6px #000c;
+}
+@keyframes fade-up{ from{ opacity:0; transform:translate(-50%, 10px); } to{ opacity:1; transform:translate(-50%, 0); } }
+.pause-box{ max-width:300px; text-align:center; display:flex; flex-direction:column; gap:10px; }
+.pause-box h2{ font-family:'Baloo 2',sans-serif; margin:0 0 4px; font-size:1.4rem; color:var(--gold); letter-spacing:.5px; }
+.pause-item{
+  font-family:'Baloo 2',sans-serif; font-weight:700; font-size:.95rem; color:var(--text-light);
+  background:#4a3824; border:1px solid #ffffff22; border-radius:14px; padding:10px 14px; cursor:pointer;
+  transition:transform .08s ease, background .15s ease;
+}
+.pause-item:hover{ background:#5a4430; }
+.pause-item:active{ transform:scale(.97); }
+.pause-item.primary{ background:linear-gradient(180deg,#5fbf5a,#3f8f3a); color:#fff; border-color:#8fe08a80; }
+
+/* ---------- Hand: cost gem on the card's corner ---------- */
+/* The energy cost sits as a gem on the top-right corner (like classic card
+   games), so the card name gets the full width instead of colliding with it. */
+.hand .card{ position:relative; }
+.hand .card-cost{
+  position:absolute; top:-7px; right:-7px; z-index:2;
+  width:24px; height:24px; font-size:.8rem; color:#fff;
+  background:radial-gradient(circle at 35% 30%, #ffe58a, #d9a21f 55%, #8a5a10);
+  border:2px solid #2a1a08; box-shadow:0 2px 6px #000a;
+  text-shadow:0 1px 1px #0008;
+}
+.hand .card-top{ gap:4px; padding-right:12px; }
+.hand .card.no-energy .card-cost{ background:radial-gradient(circle at 35% 30%, #ff9a8a, #b8352a 55%, #5a1510); color:#fff; border-color:#2a0806; }
+.hand .card.ready .card-cost{ box-shadow:0 0 10px #ffd76a, 0 2px 6px #000a; }
+.hand{ padding-top:6px; }
+@media (orientation:landscape) and (max-height:520px){
+  .hand .card-face{ display:none; }
+}
+@media (orientation:portrait) and (max-width:520px){
+  body.in-duel .hand .card-cost{ width:21px; height:21px; font-size:.7rem; top:-6px; right:-6px; }
+}
+
+/* ---------- Desktop / big screens: the arena uses the whole window ---------- */
+@media (orientation:landscape) and (min-height:521px){
+  body.in-duel .stage{ max-width:none; }
+  body.in-duel .controls{ width:min(100%, 1000px); align-self:center; }
+}
+/* Portrait: the "let go" preview floats above the whole control panel
+   instead of covering the energy bar and hint. */
+@media (orientation:portrait){
+  body.in-duel .release-preview{ bottom:calc(100% + 64px); }
+}
+
+#pauseBtn{ color:var(--text-light); }

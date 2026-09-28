@@ -247,8 +247,13 @@ export function renderCastLock(remaining, total){
 // Overlay position tracks each lane's live `localPos` (mutable via the
 // discrete move swap or, for the Tank, continuous free-roam), not its
 // array index -- repositionUnits reads it off the live game state.
+// Tags never pile on top of each other: when two overlap, the one higher on
+// screen (further from the camera) is lifted just above the other, easing
+// into place so tags glide apart instead of jumping.
 function repositionUnits(){
   if (!currentState) return;
+  const W = boardOverlay.clientWidth || 1, H = boardOverlay.clientHeight || 1;
+  const items = [];
   ['you','rival'].forEach(side => {
     const lanes = side === 'you' ? currentState.youLanes : currentState.rivalLanes;
     unitRefs[side].forEach((ref, i) => {
@@ -256,9 +261,26 @@ function repositionUnits(){
       if (!ref || !lane) return;
       const p = projectLane(side, lane.localPos);
       if (!p) return;
-      ref.wrap.style.left = (p.x*100) + '%';
-      ref.wrap.style.top = (p.y*100) + '%';
+      items.push({ ref, x: p.x * W, y0: p.y * H, y: p.y * H, w: ref.wrap.offsetWidth || 78, h: ref.wrap.offsetHeight || 30 });
     });
+  });
+  items.sort((a, b) => b.y0 - a.y0);
+  for (let i = 1; i < items.length; i++){
+    const b = items[i];
+    for (let pass = 0; pass < 2; pass++){
+      for (let j = 0; j < i; j++){
+        const a = items[j];
+        if (Math.abs(a.x - b.x) >= (a.w + b.w) / 2 - 4) continue;
+        const limit = a.y - a.h - 2;
+        if (b.y > limit && b.y - b.h < a.y) b.y = limit;
+      }
+    }
+  }
+  items.forEach(it => {
+    const ref = it.ref;
+    ref.dy = (ref.dy || 0) + ((it.y - it.y0) - (ref.dy || 0)) * 0.35;
+    ref.wrap.style.left = (it.x / W * 100) + '%';
+    ref.wrap.style.top = ((it.y0 + ref.dy) / H * 100) + '%';
   });
 }
 

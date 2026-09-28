@@ -1145,7 +1145,10 @@ let timeScale = 1;
 // slow-mo doesn't turn into a long freeze.
 const slows = [];
 
-export function getTimeScale(){ return timeScale; }
+export function getTimeScale(){ return paused ? 0 : timeScale; }
+// Pause freezes the whole scene -- rules, casts in flight and effects.
+let paused = false;
+export function setPaused(on){ paused = on; }
 
 export function shake(intensity = 0.15, duration = 0.35){
   cam.shake = Math.max(cam.shake, intensity);

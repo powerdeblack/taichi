@@ -156,6 +156,12 @@ npm run preview
   estilo crítico em golpes ≥45; borda vermelha ao levar dano e batimento
   quando seu Tanque está abaixo de 30%; cartas com borda dourada quando dá
   pra jogar agora, custo vermelho sem energia e animação ao comprar.
+- **Pausa e segurança** — Reiniciar/Trocar time ficam no menu ⏸ (ou Esc)
+  durante a partida, pra um toque sem querer não jogar o duelo fora; a cena
+  inteira congela com o menu aberto e o jogo pausa sozinho quando o app vai
+  pro fundo. No fim da partida, Rematch/Change team aparecem sob o placar.
+  Tags que se sobrepõem se afastam suavemente; custo da carta é uma gema no
+  canto; no desktop o duelo usa a janela inteira.
 - **Mira travada (lock-on)** — com um inimigo no 🎯, o time inteiro mantém
   o corpo virado pra ele mesmo andando de lado ou pra trás pelo joystick/
   WASD (a animação de andar continua, então eles "strafam"); o rival faz o

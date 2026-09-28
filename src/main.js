@@ -202,6 +202,30 @@ switchDeckBtn.addEventListener('click', () => {
   showSelectScreen();
 });
 
+// ================= Pause menu =================
+// Restart / change team live behind ⏸ (or Esc) during a match, so a stray
+// tap can't throw a duel away; the whole scene freezes while it's open, and
+// the game pauses itself when the app goes to the background. Once the
+// match is over, the Rematch / Change team buttons show under the banner.
+const pauseModal = document.getElementById('pauseModal');
+let paused = false;
+function setPausedUI(on){
+  if (on && (!state || matchFinished)) return;
+  paused = on;
+  cine.setPaused(on);
+  pauseModal.classList.toggle('hidden', !on);
+  if (on){ if (aiming) cancelAim(); keysDown.clear(); updateKeyMove(); joyHolding = false; }
+}
+document.getElementById('pauseBtn').addEventListener('click', () => setPausedUI(true));
+document.getElementById('pauseResume').addEventListener('click', () => setPausedUI(false));
+document.getElementById('pauseRestart').addEventListener('click', () => { setPausedUI(false); endTutorial(); beginMatch(lastYouSquad, lastRivalSquad); });
+document.getElementById('pauseTeams').addEventListener('click', () => { setPausedUI(false); endTutorial(); showSelectScreen(); });
+document.getElementById('pauseHelp').addEventListener('click', () => helpModal.classList.remove('hidden'));
+pauseModal.addEventListener('click', (e) => { if (e.target === pauseModal) setPausedUI(false); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state && !matchFinished && !duelScreen.classList.contains('hidden')) setPausedUI(true);
+});
+
 // ================= Team select (arena lobby) =================
 // The first screen: pick a team from wooden panels, see its three Axies on
 // stone pedestals in 3D, then Battle, Edit it in the builder, or build a
@@ -261,7 +285,7 @@ function selectTeam(id, force){
   ui.renderTeamList(teamList(), selectedTeamId, (tid) => { sfx.playSelect(); selectTeam(tid); });
   ui.renderTeamPlaque(team);
   ui.setStageLoading(true);
-  showTeam(team.picks, team.archId || 'custom', team.color).then(() => {
+  showTeam(team.picks).then(() => {
     ui.setStageLoading(false);
     // Fill the list's faces with 3D portraits, one at a time in the background.
     ui.fillTeamFaces(portraitFor);
@@ -396,6 +420,7 @@ function beginMatch(youSquad, rivalSquad){
   moveMode = false;
   moveSource = null;
   matchFinished = false;
+  document.body.classList.remove('match-over');
   aiMoveTimer = 1 + Math.random() * 1.5;
   aiWandering = false;
   aiThinkTimer = 2.5; // let both squads finish walking in first
@@ -751,6 +776,7 @@ function finishMatch(){
   ui.setEdgeFx('danger', false);
   if (matchFinished) return;
   matchFinished = true;
+  document.body.classList.add('match-over');
   clearCasts();
   endTutorial();
   cine.letterbox(true);
@@ -1295,7 +1321,10 @@ window.addEventListener('keydown', (e) => {
     updateKeyMove();
     return;
   }
-  if (e.code === 'Escape' && aiming) cancelAim();
+  if (e.code === 'Escape'){
+    if (aiming) cancelAim();
+    else if (!duelScreen.classList.contains('hidden') && state && !matchFinished) setPausedUI(!paused);
+  }
 });
 window.addEventListener('keyup', (e) => {
   if (MOVE_KEYS[e.code]){ keysDown.delete(e.code); if (state) updateKeyMove(); }

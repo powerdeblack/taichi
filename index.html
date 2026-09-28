@@ -125,6 +125,7 @@
           <span id="discardPileCount">Discard: 0</span>
         </div>
         <button class="mute-btn" id="muteBtn" type="button" aria-label="Mute sound">🔊</button>
+        <button class="mute-btn" id="pauseBtn" type="button" aria-label="Pause"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><rect x="3" y="2" width="3.6" height="12" rx="1" fill="currentColor"/><rect x="9.4" y="2" width="3.6" height="12" rx="1" fill="currentColor"/></svg></button>
         <button class="mute-btn hidden" id="fullscreenBtn" type="button" aria-label="Full screen">⛶</button>
       </div>
       <div class="hint" id="hint">Choose a card to play.</div>
@@ -150,6 +151,16 @@
     <div class="btn-row">
       <button class="reset-btn" id="resetBtn">Rematch (same team)</button>
       <button class="switch-deck-btn" id="switchDeckBtn">Change team</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="pauseModal">
+    <div class="modal-box pause-box" role="dialog" aria-labelledby="pauseTitle">
+      <h2 id="pauseTitle">Paused</h2>
+      <button type="button" class="pause-item primary" id="pauseResume">▶ Resume</button>
+      <button type="button" class="pause-item" id="pauseRestart">↻ Restart match</button>
+      <button type="button" class="pause-item" id="pauseTeams">⇆ Change team</button>
+      <button type="button" class="pause-item" id="pauseHelp">❓ How to play</button>
     </div>
   </div>
 

@@ -26,14 +26,24 @@ function ensureMixer(){
   return mixerPromise;
 }
 
+// The preview is created while the editor is still hidden (0x0), so it
+// must follow the canvas's real size whenever it changes -- not only on
+// window resizes -- or it renders at a fallback size and gets stretched.
 function resize(){
   if (!renderer || !canvasEl) return;
-  const w = canvasEl.clientWidth || 220;
-  const h = canvasEl.clientHeight || 220;
+  const w = canvasEl.clientWidth, h = canvasEl.clientHeight;
+  if (!w || !h) return;
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
+  // Keep the whole Axie (about 1.6 units tall, 1.8 wide with its weapon)
+  // in frame whatever the canvas shape.
+  const dist = camera.position.distanceTo(LOOK);
+  const vNeed = 2 * Math.atan(0.95 / dist);
+  const hNeed = 2 * Math.atan(Math.tan(Math.atan(1.1 / dist)) / camera.aspect);
+  camera.fov = THREE.MathUtils.radToDeg(Math.max(vNeed, hNeed));
   camera.updateProjectionMatrix();
 }
+const LOOK = new THREE.Vector3(0, 0.72, 0);
 
 export function initPreview(canvas){
   canvasEl = canvas;
@@ -43,7 +53,7 @@ export function initPreview(canvas){
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(32, 1, 0.1, 10);
   camera.position.set(0, 1.05, 2.6);
-  camera.lookAt(0, 0.75, 0);
+  camera.lookAt(LOOK);
   scene.add(new THREE.HemisphereLight(0xfff3d6, 0x3a2c1a, 1.4));
   const dir = new THREE.DirectionalLight(0xffffff, 1.6);
   dir.position.set(2, 3, 2);
@@ -51,6 +61,7 @@ export function initPreview(canvas){
   clock = new THREE.Clock();
   resize();
   window.addEventListener('resize', resize);
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
   if (!loopStarted){
     loopStarted = true;
     requestAnimationFrame(animate);
