@@ -266,6 +266,7 @@ function teamList(){
 const selectedTeam = () => teamList().find(t => t.id === selectedTeamId) || teamList()[0];
 
 function showSelectScreen(){
+  sfx.stopAmbience();
   duelScreen.classList.add('hidden');
   deckScreen.classList.add('hidden');
   teamSelectScreen.classList.remove('hidden');
@@ -385,6 +386,11 @@ helpBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
 // case the tab was backgrounded and the context got suspended.
 document.addEventListener('pointerdown', sfx.unlockAudio, { passive: true });
 document.addEventListener('keydown', sfx.unlockAudio);
+// Menu buttons click softly (the hand and board have their own sounds).
+document.addEventListener('click', (e) => { if (e.target.closest('button') && !e.target.closest('.hand')) sfx.playClick(); });
+let heartbeatT = 0;
+// Dev-only handle for browser tests (read/poke the live match state).
+if (import.meta.env.DEV) window.__duel = () => state;
 const muteBtn = document.getElementById('muteBtn');
 function renderMuteBtn(){
   muteBtn.textContent = sfx.isMuted() ? '🔇' : '🔊';
@@ -393,11 +399,27 @@ function renderMuteBtn(){
 muteBtn.addEventListener('click', () => { sfx.toggleMute(); renderMuteBtn(); });
 renderMuteBtn();
 
+// ================= Match stats (for the result screen) =================
+// Damage and healing each side dealt, cards played, knockouts, and who did
+// the most: the best Axie (MVP) and the best card of each side.
+let stats = null;
+const blankStats = () => ({ dmg: 0, heal: 0, cards: 0, kos: 0, byLane: [0, 0, 0], byCard: new Map() });
+function resetStats(){ stats = { you: blankStats(), rival: blankStats() }; }
+function credit(side, laneIndex, card, amount, kind = 'dmg'){
+  if (!stats || !(amount > 0)) return;
+  const st = stats[side];
+  st[kind] += amount;
+  if (laneIndex >= 0) st.byLane[laneIndex] += amount;
+  if (card){ const k = card.name; st.byCard.set(k, (st.byCard.get(k) || 0) + amount); }
+}
+const otherSide = side => side === 'you' ? 'rival' : 'you';
+
 function playKOIfDied(side, laneIndex){
   const lanes = side === 'you' ? state.youLanes : state.rivalLanes;
   const lane = lanes[laneIndex];
   if (lane && !lane.alive && !koPlayed.has(lane)){
     koPlayed.add(lane);
+    if (stats) stats[otherSide(side)].kos++;
     sfx.playKO();
     // A knockout gets the full treatment: slow motion, a white flash, a
     // big shockwave and the camera leaning in on the fallen Axie.
@@ -413,6 +435,10 @@ helpModal.addEventListener('click', (e) => { if (e.target === helpModal) helpMod
 
 // ================= Match lifecycle =================
 function beginMatch(youSquad, rivalSquad){
+  resetStats();
+  ui.hideResults();
+  sfx.startAmbience();
+  sfx.setStorm(false);
   lastYouSquad = youSquad;
   lastRivalSquad = rivalSquad;
   state = game.freshState(youSquad, rivalSquad);
@@ -461,7 +487,17 @@ function updateMoveBtn(){
     : '🔀 Move';
 }
 
+// Every result's sounds come from where it happens on screen (stereo).
 function applyResultFx(result){
+  if (!result) return;
+  const side = result.targetIndex >= 0 && result.targetSide ? result.targetSide : result.side;
+  const idx = result.targetIndex >= 0 ? result.targetIndex : result.casterIndex;
+  const el = ui.getLaneSideEl(side, idx);
+  const r = el?.getBoundingClientRect();
+  sfx.at(r ? (r.left + r.width / 2) / window.innerWidth : 0.5, () => applyResultFxInner(result));
+}
+
+function applyResultFxInner(result){
   if (!result) return;
   const { side, card, casterIndex } = result;
 
@@ -530,6 +566,7 @@ function applyResultFx(result){
         ui.hitSquash(ts, i, 0.8);
         render.flashHit(el);
         render.spawnFloatingText(el, card.effect === 'regen' ? 'ROT!' : 'REVERSE HEAL! -' + dmg, 'text-dmg');
+        credit(side, casterIndex, card, dmg);
         ui.spawnImpact(ts, i, 'hit');
         playKOIfDied(ts, i);
       });
@@ -540,6 +577,7 @@ function applyResultFx(result){
       targets.forEach(i => {
         const el = ui.getLaneSideEl(ts, i);
         const healed = per.get(i)?.healed;
+        credit(side, casterIndex, card, healed, 'heal');
         if (card.effect === 'regen') cine.regenSpiral(ts, i);
         else cine.healBeam(ts, i);
         cine.healSparkle(ts, i);
@@ -579,6 +617,7 @@ function applyResultFx(result){
     render.flashHit(el);
     render.shakeBoard(boardEl);
     render.spawnFloatingText(el, '-'+result.dmg, result.dmg >= 45 ? 'text-dmg text-big' : 'text-dmg');
+    credit(side, casterIndex, card, result.dmg);
     if (result.targetSide === 'you') ui.setEdgeFx('hurt');
     ui.spawnImpact(result.targetSide, result.targetIndex, 'hit');
     if (card.effect === 'bleed') ui.spawnImpact(result.targetSide, result.targetIndex, 'bleed');
@@ -601,6 +640,7 @@ function applyResultFx(result){
     const casterEl = ui.getLaneSideEl(result.side, result.casterIndex);
     render.flashHit(casterEl);
     render.spawnFloatingText(casterEl, '-'+result.thornReflected+' 🌵', 'text-dmg');
+    credit(result.targetSide, result.targetIndex, { name: 'Thorns' }, result.thornReflected);
     ui.spawnImpact(result.side, result.casterIndex, 'hit');
     cine.thornSpikes(result.side, result.casterIndex);
     ui.playLaneAction(result.side, result.casterIndex, 'hit');
@@ -738,11 +778,13 @@ function applyBleedFx(side, statusResults){
       render.spawnFloatingText(el, '+'+dmg+' 🌿', 'text-heal');
       ui.spawnImpact(side, laneIndex, 'heal');
       cine.healSparkle(side, laneIndex);
+      credit(side, -1, { name: 'Regeneration' }, dmg, 'heal');
       return;
     }
     render.flashHit(el);
     const icon = { poison: '☠️', regenRot: '🥀', blizzard: '❄️' }[kind] || '🩸';
     render.spawnFloatingText(el, '-'+dmg+' '+icon, kind === 'blizzard' ? 'text-shield' : 'text-bleed');
+    if (kind !== 'blizzard') credit(otherSide(side), -1, { name: kind === 'poison' ? 'Poison ticks' : kind === 'regenRot' ? 'Rot ticks' : 'Bleed ticks' }, dmg);
     ui.spawnImpact(side, laneIndex, { poison: 'poison', blizzard: 'frost' }[kind] || 'bleed');
     if (kind === 'poison') cine.poisonTick(side, laneIndex);
     else if (kind === 'bleed') cine.bleedTick(side, laneIndex);
@@ -795,6 +837,29 @@ function finishMatch(){
   else ui.showBanner('You lost the duel.', 'Your Tank was defeated.');
   // Let the final KO boom land before the fanfare.
   setTimeout(state.winner === 'you' ? sfx.playVictory : sfx.playDefeat, 450);
+  // Then the result screen replaces the banner.
+  const finished = state;
+  setTimeout(() => { if (state === finished) showResults(); }, 2300);
+}
+
+function showResults(){
+  if (!stats) return;
+  const you = stats.you;
+  const mvpIndex = you.byLane.reduce((b, v, i) => (v > you.byLane[b] ? i : b), 0);
+  const best = [...you.byCard.entries()].sort((a, b) => b[1] - a[1])[0] || null;
+  const outcome = state.winner === 'you' ? 'win' : state.winner === 'rival' ? 'loss' : 'draw';
+  const reason = state.timeUp ? (outcome === 'draw' ? 'Time up — equal Tank HP' : outcome === 'win' ? 'Time up — your Tank had more HP' : 'Time up — the rival Tank had more HP')
+    : outcome === 'win' ? 'The rival Tank was defeated' : outcome === 'loss' ? 'Your Tank was defeated' : 'Both Tanks fell together';
+  ui.hideBanner();
+  ui.showResults({
+    outcome, reason, elapsed: state.elapsed,
+    you: stats.you, rival: stats.rival,
+    mvp: { index: mvpIndex, name: state.youLanes[mvpIndex]?.name, amount: you.byLane[mvpIndex] },
+    bestCard: best,
+  }, {
+    onRematch: () => { endTutorial(); beginMatch(lastYouSquad, lastRivalSquad); },
+    onTeams: () => { endTutorial(); showSelectScreen(); },
+  });
 }
 
 // Tap-target-first flow: tapping any alive Axie (yours or the rival's)
@@ -950,6 +1015,9 @@ function updateAim(){
   const targetLanes = a.targetSide === 'you' ? state.youLanes : state.rivalLanes;
   const target = targetLanes[a.targetIndex];
   const isAttack = card.role === 'attack';
+  // The preview also carries the card's full text -- the hand truncates it
+  // on small screens, and holding the card is when you want to read it.
+  const preview = (html, tone) => ui.showReleasePreview(html, tone, tone === 'cancel' ? null : `<b>${card.name}</b> — ${card.desc}`);
   ui.showAim({
     side: 'you', casterXZ: casterLane.localPos,
     radius: isAttack ? game.cardRange(card) : null,
@@ -960,18 +1028,18 @@ function updateAim(){
   // The big "if you let go now" bubble above the hand.
   const tname = target ? target.name : 'nobody';
   if (aimCancelling){
-    ui.showReleasePreview('✋ Let go to <b>cancel</b> — the card stays in your hand', 'cancel');
+    preview('✋ Let go to <b>cancel</b> — the card stays in your hand', 'cancel');
   } else if (!isAttack){
     const reversed = a.targetSide === 'rival';
     const who = isTeamCard(card) ? (reversed ? "the rival's <b>whole team</b>" : 'your <b>whole team</b>') : `${reversed ? "the rival's" : 'your'} <b>${tname}</b>`;
     const energy = card.role === 'heal' ? ` · <b>+${game.HEAL_ENERGY} ⚡</b>` : '';
-    ui.showReleasePreview(`Let go → <b>${mainValue(card)}</b> on ${who}${reversed ? ' (REVERSE HEAL)' : ''}${energy}<small>drag off the card to cancel</small>`, reversed ? 'bad' : 'ok');
+    preview(`Let go → <b>${mainValue(card)}</b> on ${who}${reversed ? ' (REVERSE HEAL)' : ''}${energy}<small>drag off the card to cancel</small>`, reversed ? 'bad' : 'ok');
   } else if (a.inRange){
-    ui.showReleasePreview(`Let go → <b>${mainValue(card)}</b> on <b>${tname}</b> ✅ in reach<small>${card.range === 'short' ? '🗡️ short' : '🏹 long'} reach ${game.cardRange(card)} · drag off to cancel</small>`, 'ok');
+    preview(`Let go → <b>${mainValue(card)}</b> on <b>${tname}</b> ✅ in reach<small>${card.range === 'short' ? '🗡️ short' : '🏹 long'} reach ${game.cardRange(card)} · drag off to cancel</small>`, 'ok');
   } else {
     const d = target ? game.distanceBetween(state, 'you', card.laneIndex, 'rival', a.targetIndex) : 0;
     const gap = Math.max(0, d - game.cardRange(card));
-    ui.showReleasePreview(`Let go → <b>❌ MISS</b>: ${tname} is ${d.toFixed(1)} away, ${card.range === 'short' ? '🗡️ short' : '🏹 long'} reach is ${game.cardRange(card)}<small>walk ${gap.toFixed(1)} closer first · drag off to cancel</small>`, 'bad');
+    preview(`Let go → <b>❌ MISS</b>: ${tname} is ${d.toFixed(1)} away, ${card.range === 'short' ? '🗡️ short' : '🏹 long'} reach is ${game.cardRange(card)}<small>walk ${gap.toFixed(1)} closer first · drag off to cancel</small>`, 'bad');
   }
   if (!isAttack){
     const onSelf = a.targetSide === 'you';
@@ -1073,6 +1141,7 @@ function castColor(card){
 }
 
 function startCast(plan){
+  if (stats) stats[plan.side].cards++;
   const id = ++castSeq;
   const selfCast = plan.targetSide === plan.side && plan.targetIndex === plan.casterIndex;
   const travels = !selfCast && plan.targetIndex >= 0;
@@ -1397,6 +1466,7 @@ function gameLoop(nowMs){
     blizzardAnnounced = true;
     ui.setBlizzard(true);
     sfx.playBlizzard();
+    sfx.setStorm(true);
     ui.setHint('❄️ BLIZZARD! The storm hurts every Axie each tick and heals are halved — finish it!');
   }
   const statusResults = game.tickStatusTimer(state, dt);
@@ -1459,7 +1529,10 @@ function gameLoop(nowMs){
     ui.renderPiles(state);
     ui.renderMatchClock(state.elapsed, game.BLIZZARD_AT, game.MATCH_LIMIT);
     const myTank = state.youLanes.find(l => l.isTank);
-    ui.setEdgeFx('danger', !!myTank && myTank.alive && myTank.hp / myTank.maxHp < 0.3 && !state.gameOver);
+    const danger = !!myTank && myTank.alive && myTank.hp / myTank.maxHp < 0.3 && !state.gameOver;
+    ui.setEdgeFx('danger', danger);
+    heartbeatT -= UI_REFRESH_INTERVAL;
+    if (danger && heartbeatT <= 0){ heartbeatT = 1.1; sfx.playHeartbeat(); }
     syncHand();
     updateMoveBtn();
     updateJoystick();

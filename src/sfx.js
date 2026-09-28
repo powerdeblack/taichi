@@ -4,15 +4,33 @@
 // lazily by unlockAudio() on the first tap/click/key.
 
 const MUTE_KEY = 'axieDuelMuted';
-const MASTER_VOLUME = 0.55;
+const MASTER_VOLUME = 0.6;
 
+// Mix: every sound goes into a bus (combat, ui, ambience) -> the master
+// gain -> a compressor that glues busy moments together and stops pile-ups
+// from clipping. Combat also feeds a small procedural hall reverb, so hits
+// sound like they happen in a room, not inside the speaker.
 let ctx = null;
-let master = null;
+let master = null, comp = null, reverb = null, reverbSend = null;
+let bus = {};
 let noiseBuf = null;
 let muted = readMuted();
+let pan = 0;          // stereo position for the next sounds (-1 left .. 1 right)
+let target = 'combat'; // bus for the next sounds
 
 function readMuted(){
   try { return localStorage.getItem(MUTE_KEY) === '1'; } catch { return false; }
+}
+
+// A short, dark, decaying noise tail -- a snowy stone hall.
+function hallImpulse(seconds = 1.6){
+  const len = Math.floor(ctx.sampleRate * seconds);
+  const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let c = 0; c < 2; c++){
+    const d = buf.getChannelData(c);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2);
+  }
+  return buf;
 }
 
 export function unlockAudio(){
@@ -20,9 +38,25 @@ export function unlockAudio(){
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     ctx = new AC();
+    comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 4;
+    comp.attack.value = 0.004; comp.release.value = 0.18;
     master = ctx.createGain();
     master.gain.value = muted ? 0 : MASTER_VOLUME;
-    master.connect(ctx.destination);
+    master.connect(comp).connect(ctx.destination);
+    reverb = ctx.createConvolver();
+    reverb.buffer = hallImpulse();
+    const wet = ctx.createGain(); wet.gain.value = 0.22;
+    const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 3200;
+    reverb.connect(tone).connect(wet).connect(master);
+    reverbSend = ctx.createGain(); reverbSend.gain.value = 1;
+    reverbSend.connect(reverb);
+    for (const [name, vol] of [['combat', 1], ['ui', 0.7], ['ambience', 0.5]]){
+      bus[name] = ctx.createGain();
+      bus[name].gain.value = vol;
+      bus[name].connect(master);
+    }
+    bus.combat.connect(reverbSend);
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const data = noiseBuf.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
@@ -43,6 +77,27 @@ function ready(){
   return ctx && ctx.state === 'running' && !muted;
 }
 
+// Plays `fn`'s sounds panned to a screen position (0 = left edge, 1 = right)
+// -- a hit on the right of the arena comes from the right speaker.
+export function at(screenX, fn){
+  const prev = pan;
+  pan = Math.max(-0.8, Math.min(0.8, (screenX - 0.5) * 1.6));
+  try { fn(); } finally { pan = prev; }
+}
+function onBus(name, fn){ const prev = target; target = name; try { fn(); } finally { target = prev; } }
+
+// Every sound ends here: its own panner, then the current bus.
+function out(node){
+  if (pan && ctx.createStereoPanner){
+    const p = ctx.createStereoPanner();
+    p.pan.value = pan;
+    node.connect(p).connect(bus[target]);
+  } else node.connect(bus[target]);
+}
+
+// Small random pitch/level drift so repeated hits never sound machine-made.
+const vary = (x, amt) => x * (1 + (Math.random() * 2 - 1) * amt);
+
 // ---- building blocks ----
 
 function env(gainNode, t, peak, attack, decay){
@@ -56,11 +111,12 @@ function tone({ type = 'sine', freq, freqEnd, t = 0, peak = 0.3, attack = 0.005,
   const osc = ctx.createOscillator();
   const g = ctx.createGain();
   osc.type = type;
-  osc.detune.value = detune;
+  osc.detune.value = detune + (target === 'combat' ? (Math.random() * 2 - 1) * 35 : 0);
   osc.frequency.setValueAtTime(freq, start);
   if (freqEnd) osc.frequency.exponentialRampToValueAtTime(freqEnd, start + attack + decay);
-  env(g, start, peak, attack, decay);
-  osc.connect(g).connect(master);
+  env(g, start, vary(peak, 0.08), attack, decay);
+  osc.connect(g);
+  out(g);
   osc.start(start);
   osc.stop(start + attack + decay + 0.05);
 }
@@ -69,16 +125,51 @@ function noise({ t = 0, peak = 0.3, attack = 0.003, decay = 0.15, filter = 'lowp
   const start = ctx.currentTime + t;
   const src = ctx.createBufferSource();
   src.buffer = noiseBuf;
+  src.playbackRate.value = vary(1, 0.06);
   const f = ctx.createBiquadFilter();
   f.type = filter;
   f.Q.value = q;
   f.frequency.setValueAtTime(freq, start);
   if (freqEnd) f.frequency.exponentialRampToValueAtTime(freqEnd, start + attack + decay);
   const g = ctx.createGain();
-  env(g, start, peak, attack, decay);
-  src.connect(f).connect(g).connect(master);
+  env(g, start, vary(peak, 0.08), attack, decay);
+  src.connect(f).connect(g);
+  out(g);
   src.start(start, Math.random() * 0.5);
   src.stop(start + attack + decay + 0.05);
+}
+
+// ---- ambience ----
+// A low wind bed under the whole duel; it swells when the Blizzard hits
+// and ducks under big moments (knockouts, the result sting).
+let amb = null;
+export function startAmbience(){
+  if (!ctx || amb) return;
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuf; src.loop = true;
+  const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 420; f.Q.value = 0.8;
+  const lfo = ctx.createOscillator(); lfo.frequency.value = 0.09;
+  const lfoGain = ctx.createGain(); lfoGain.gain.value = 180;
+  lfo.connect(lfoGain).connect(f.frequency);
+  const g = ctx.createGain(); g.gain.value = 0.0001;
+  g.gain.setTargetAtTime(0.07, ctx.currentTime, 1.2);
+  src.connect(f).connect(g).connect(bus.ambience);
+  src.start(); lfo.start();
+  amb = { src, lfo, g };
+}
+export function stopAmbience(){
+  if (!amb) return;
+  const a = amb; amb = null;
+  a.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.4);
+  setTimeout(() => { try { a.src.stop(); a.lfo.stop(); } catch { /* already stopped */ } }, 1500);
+}
+export function setStorm(on){ if (amb) amb.g.gain.setTargetAtTime(on ? 0.2 : 0.07, ctx.currentTime, 1.5); }
+function duck(seconds = 1.2){
+  if (!bus.ambience) return;
+  const g = bus.ambience.gain, now = ctx.currentTime;
+  g.cancelScheduledValues(now);
+  g.setTargetAtTime(0.12, now, 0.05);
+  g.setTargetAtTime(0.5, now + seconds, 0.6);
 }
 
 // ---- attack flavors (by card set) ----
@@ -199,6 +290,7 @@ export function playBlizzard(){
 
 export function playKO(){
   if (!ready()) return;
+  duck(1.6);
   tone({ type: 'sine', freq: 110, freqEnd: 30, peak: 0.6, decay: 0.7 });
   noise({ peak: 0.35, decay: 0.5, filter: 'lowpass', freq: 800, freqEnd: 80 });
   tone({ type: 'square', freq: 220, freqEnd: 55, t: 0.05, peak: 0.06, decay: 0.5 });
@@ -206,17 +298,38 @@ export function playKO(){
 
 export function playNoTarget(){
   if (!ready()) return;
-  tone({ type: 'square', freq: 180, peak: 0.06, decay: 0.08 });
-  tone({ type: 'square', freq: 140, t: 0.09, peak: 0.06, decay: 0.1 });
+  onBus('ui', () => {
+    tone({ type: 'square', freq: 180, peak: 0.06, decay: 0.08 });
+    tone({ type: 'square', freq: 140, t: 0.09, peak: 0.06, decay: 0.1 });
+  });
 }
 
 export function playSelect(){
   if (!ready()) return;
-  tone({ type: 'sine', freq: 1200, peak: 0.06, attack: 0.003, decay: 0.05 });
+  onBus('ui', () => tone({ type: 'sine', freq: 1200, peak: 0.06, attack: 0.003, decay: 0.05 }));
+}
+
+// A soft wooden click for menu buttons.
+export function playClick(){
+  if (!ready()) return;
+  onBus('ui', () => {
+    tone({ type: 'triangle', freq: 660, freqEnd: 420, peak: 0.07, attack: 0.002, decay: 0.05 });
+    noise({ peak: 0.05, decay: 0.03, filter: 'bandpass', freq: 2400, q: 3 });
+  });
+}
+
+// One heartbeat ("lub-dub"), played while your Tank is in danger.
+export function playHeartbeat(){
+  if (!ready()) return;
+  onBus('ui', () => {
+    tone({ type: 'sine', freq: 62, freqEnd: 44, peak: 0.28, attack: 0.01, decay: 0.12 });
+    tone({ type: 'sine', freq: 56, freqEnd: 40, t: 0.2, peak: 0.2, attack: 0.01, decay: 0.14 });
+  });
 }
 
 export function playVictory(){
   if (!ready()) return;
+  duck(3);
   [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => {
     tone({ type: 'triangle', freq: f, t: i * 0.12, peak: 0.18, attack: 0.01, decay: 0.45 });
     tone({ type: 'sine', freq: f * 2, t: i * 0.12, peak: 0.05, attack: 0.01, decay: 0.3 });
@@ -225,6 +338,7 @@ export function playVictory(){
 
 export function playDefeat(){
   if (!ready()) return;
+  duck(3);
   [392, 349.23, 311.13, 261.63].forEach((f, i) =>
     tone({ type: 'triangle', freq: f, t: i * 0.22, peak: 0.16, attack: 0.02, decay: 0.55 }));
 }

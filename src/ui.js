@@ -537,8 +537,8 @@ const CANCEL_DRAG_PX = 70;
 // The big "what happens if I let go" bubble above the hand while a card is
 // held, and a short confirmation right after it is played.
 const releasePreviewEl = document.getElementById('releasePreview');
-export function showReleasePreview(html, tone){
-  releasePreviewEl.innerHTML = html;
+export function showReleasePreview(html, tone, detail = null){
+  releasePreviewEl.innerHTML = html + (detail ? `<div class="rp-detail">${detail}</div>` : '');
   releasePreviewEl.className = 'release-preview show ' + (tone || '');
 }
 export function hideReleasePreview(){ releasePreviewEl.className = 'release-preview'; }
@@ -575,6 +575,57 @@ export function setHint(text){
 
 export function hideBanner(){
   bannerEl.classList.remove('show');
+}
+
+// ---------- Result screen ----------
+const resultsEl = document.getElementById('results');
+const fmtTime = sec => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+export function hideResults(){ resultsEl.classList.add('hidden'); resultsEl.innerHTML = ''; }
+export function showResults(r, { onRematch, onTeams }){
+  const title = { win: 'Victory', loss: 'Defeat', draw: 'Draw' }[r.outcome];
+  const portrait = getLanePortrait('you', r.mvp.index);
+  const row = (label, a, b) => {
+    const total = a + b || 1;
+    return `<div class="res-row">
+      <span class="res-v you" data-count="${Math.round(a)}">0</span>
+      <div class="res-mid"><span class="res-label">${label}</span>
+        <div class="res-bar"><i class="you" style="width:${(a / total) * 100}%"></i><i class="rival" style="width:${(b / total) * 100}%"></i></div></div>
+      <span class="res-v rival" data-count="${Math.round(b)}">0</span>
+    </div>`;
+  };
+  resultsEl.innerHTML = `
+    <div class="res-card res-${r.outcome}">
+      <div class="res-title">${title}</div>
+      <div class="res-sub">${r.reason} · ${fmtTime(r.elapsed)}</div>
+      ${r.mvp.amount > 0 ? `<div class="res-mvp">
+        ${portrait ? `<img src="${portrait}" alt="">` : '<div class="res-mvp-ph">⭐</div>'}
+        <div><div class="res-kicker">MVP</div><div class="res-name">${r.mvp.name}</div>
+        <div class="res-sub2"><b data-count="${Math.round(r.mvp.amount)}">0</b> damage & healing</div></div>
+      </div>` : ''}
+      <div class="res-head"><span>You</span><span>Rival</span></div>
+      ${row('Damage', r.you.dmg, r.rival.dmg)}
+      ${row('Healing', r.you.heal, r.rival.heal)}
+      ${row('Cards played', r.you.cards, r.rival.cards)}
+      ${row('Knockouts', r.you.kos, r.rival.kos)}
+      ${r.bestCard ? `<div class="res-best">Best card <b>${r.bestCard[0]}</b> · ${Math.round(r.bestCard[1])}</div>` : ''}
+      <div class="res-actions">
+        <button type="button" class="res-btn primary" id="resRematch">↻ Rematch</button>
+        <button type="button" class="res-btn" id="resTeams">⇆ Change team</button>
+      </div>
+    </div>`;
+  resultsEl.classList.remove('hidden');
+  resultsEl.querySelector('#resRematch').onclick = onRematch;
+  resultsEl.querySelector('#resTeams').onclick = onTeams;
+  // Numbers count up quickly -- the payoff lands instead of just appearing.
+  const nodes = [...resultsEl.querySelectorAll('[data-count]')];
+  const t0 = performance.now();
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / 700);
+    const e = 1 - Math.pow(1 - k, 3);
+    nodes.forEach(n => { n.textContent = Math.round(+n.dataset.count * e); });
+    if (k < 1 && !resultsEl.classList.contains('hidden')) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 export function showBanner(text, sub){
