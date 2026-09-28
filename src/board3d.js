@@ -167,6 +167,30 @@ export function initBoard3D(canvas){
   return ensureMixer();
 }
 
+// ---------- adaptive quality ----------
+// Judges and players open this on anything from a flagship to a budget
+// phone. Every 2 s the average frame rate is checked: under ~45 fps the
+// render resolution steps down (never below 1x), and after a long stretch
+// well above 58 fps it steps back up -- smooth play beats sharp pixels.
+const MAX_PR = Math.min(window.devicePixelRatio || 1, 2);
+let pixelRatio = MAX_PR, fpsFrames = 0, fpsTime = 0, fpsGood = 0;
+function adaptQuality(realDt){
+  if (!renderer || !realDt || document.hidden) return;
+  fpsFrames++; fpsTime += realDt;
+  if (fpsTime < 2) return;
+  const fps = fpsFrames / fpsTime;
+  fpsFrames = 0; fpsTime = 0;
+  let next = pixelRatio;
+  if (fps < 45 && pixelRatio > 1){ next = Math.max(1, pixelRatio - 0.25); fpsGood = 0; }
+  else if (fps > 58){ if (++fpsGood >= 5 && pixelRatio < MAX_PR){ next = Math.min(MAX_PR, pixelRatio + 0.25); fpsGood = 0; } }
+  else fpsGood = 0;
+  if (next !== pixelRatio){
+    pixelRatio = next;
+    renderer.setPixelRatio(pixelRatio);
+    resizeBoard3D();
+  }
+}
+
 // ---------- combat camera ----------
 // The camera keeps its angle but follows the fight: it glides to the middle
 // of every Axie still standing and pulls in or out so both squads fill the
@@ -259,6 +283,7 @@ function animate(){
   tickScenery(dt);
   tickSquash(dt);
   updateCombatCamera(realDt);
+  adaptQuality(realDt);
   if (scene) cine.tickCinematics(dt, realDt);
   if (renderer && scene && camera) renderer.render(scene, camera);
 }

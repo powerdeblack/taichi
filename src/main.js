@@ -6,6 +6,8 @@ import * as game from './game.js';
 import * as ui from './ui.js';
 import * as render from './render.js';
 import { aiBeginCard, aiMoveIntent } from './ai.js';
+import * as music from './music.js';
+import { portraitHTML } from './axieArt.js';
 import { initPreview, showAxie } from './axie3d.js';
 import * as sfx from './sfx.js';
 import { createTutorial, tutorialDone, tutorialDismissed, dismissTutorialInvite } from './tutorial.js';
@@ -267,6 +269,7 @@ const selectedTeam = () => teamList().find(t => t.id === selectedTeamId) || team
 
 function showSelectScreen(){
   sfx.stopAmbience();
+  music.play('lobby');
   duelScreen.classList.add('hidden');
   deckScreen.classList.add('hidden');
   teamSelectScreen.classList.remove('hidden');
@@ -288,6 +291,7 @@ function selectTeam(id, force){
   ui.setStageLoading(true);
   showTeam(team.picks).then(() => {
     ui.setStageLoading(false);
+    markSplashReady();
     // Fill the list's faces with 3D portraits, one at a time in the background.
     ui.fillTeamFaces(portraitFor);
   });
@@ -439,6 +443,8 @@ function beginMatch(youSquad, rivalSquad){
   ui.hideResults();
   sfx.startAmbience();
   sfx.setStorm(false);
+  music.play('battle');
+  music.setIntensity(0);
   lastYouSquad = youSquad;
   lastRivalSquad = rivalSquad;
   state = game.freshState(youSquad, rivalSquad);
@@ -818,6 +824,7 @@ function finishMatch(){
   ui.setEdgeFx('danger', false);
   if (matchFinished) return;
   matchFinished = true;
+  music.stop(1.2);
   document.body.classList.add('match-over');
   clearCasts();
   endTutorial();
@@ -851,6 +858,7 @@ function showResults(){
   const reason = state.timeUp ? (outcome === 'draw' ? 'Time up — equal Tank HP' : outcome === 'win' ? 'Time up — your Tank had more HP' : 'Time up — the rival Tank had more HP')
     : outcome === 'win' ? 'The rival Tank was defeated' : outcome === 'loss' ? 'Your Tank was defeated' : 'Both Tanks fell together';
   ui.hideBanner();
+  music.play('lobby');
   ui.showResults({
     outcome, reason, elapsed: state.elapsed,
     you: stats.you, rival: stats.rival,
@@ -1530,6 +1538,10 @@ function gameLoop(nowMs){
     ui.renderMatchClock(state.elapsed, game.BLIZZARD_AT, game.MATCH_LIMIT);
     const myTank = state.youLanes.find(l => l.isTank);
     const danger = !!myTank && myTank.alive && myTank.hp / myTank.maxHp < 0.3 && !state.gameOver;
+    // The battle music heats up with the Blizzard and when either Tank is low.
+    const rivalTank = state.rivalLanes.find(l => l.isTank);
+    const low = Math.min(myTank ? myTank.hp / myTank.maxHp : 1, rivalTank ? rivalTank.hp / rivalTank.maxHp : 1);
+    music.setIntensity(Math.max(state.elapsed >= game.BLIZZARD_AT ? 0.8 : 0.3, low < 0.35 ? 1 : low < 0.6 ? 0.6 : 0));
     ui.setEdgeFx('danger', danger);
     heartbeatT -= UI_REFRESH_INTERVAL;
     if (danger && heartbeatT <= 0){ heartbeatT = 1.1; sfx.playHeartbeat(); }
@@ -1542,5 +1554,52 @@ function gameLoop(nowMs){
 }
 requestAnimationFrame(gameLoop);
 
-// Start on the arena lobby.
+// Start on the arena lobby, behind the title screen.
 showSelectScreen();
+
+// ================= Title screen =================
+// Fills while the lobby's 3D Axies load (eased toward 90%, then done when
+// the first squad is on its pedestals, or after 8 s at the latest), then
+// waits for a tap -- which also unlocks audio so the music can start.
+const splash = document.getElementById('splash');
+const splashFill = document.getElementById('splashFill');
+const splashPlay = document.getElementById('splashPlay');
+let splashProgress = 0, splashReady = false;
+function markSplashReady(){
+  if (splashReady) return;
+  splashReady = true;
+  splashFill.style.width = '100%';
+  splashPlay.disabled = false;
+  splashPlay.textContent = '▶ Tap to play';
+  splashPlay.classList.add('ready');
+  upgradeSplashAxies();
+}
+// The six classes line up under the logo (class art first, swapped for
+// real 3D portraits once the lobby has rendered them).
+const SPLASH_AXIES = [['Beast', 'warrior'], ['Aqua', 'mage'], ['Plant', 'priest'], ['Bird', 'ranger'], ['Bug', 'rogue'], ['Reptile', 'shaman']];
+const splashAxiesEl = document.getElementById('splashAxies');
+splashAxiesEl.innerHTML = SPLASH_AXIES.map(([cls], i) =>
+  `<div class="splash-axie" style="--i:${i}">${portraitHTML(cls, AXIES.find(a => a.classId === cls)?.color, 'splash-art')}</div>`).join('');
+function upgradeSplashAxies(){
+  SPLASH_AXIES.forEach(([classId, setId], i) => portraitFor({ classId, setId, evolved: false }).then(url => {
+    const slot = splashAxiesEl.children[i];
+    if (url && slot && document.body.contains(splash)) slot.innerHTML = `<img src="${url}" alt="${classId}">`;
+  }));
+}
+(function splashTick(){
+  if (splashReady) return;
+  splashProgress += (0.9 - splashProgress) * 0.02;
+  splashFill.style.width = (splashProgress * 100).toFixed(1) + '%';
+  requestAnimationFrame(splashTick);
+})();
+setTimeout(markSplashReady, 8000);
+function closeSplash(){
+  if (!splashReady || splash.classList.contains('gone')) return;
+  sfx.unlockAudio();
+  sfx.playClick();
+  music.play('lobby');
+  splash.classList.add('gone');
+  setTimeout(() => splash.remove(), 700);
+}
+splashPlay.addEventListener('click', closeSplash);
+window.addEventListener('keydown', (e) => { if ((e.code === 'Enter' || e.code === 'Space') && document.body.contains(splash)) closeSplash(); });

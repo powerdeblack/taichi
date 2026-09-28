@@ -19,6 +19,20 @@
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
+<!-- Title screen: shows while the 3D Axies load, then "Tap to play" (the
+     tap also unlocks audio, so the music can start). -->
+<div class="splash" id="splash">
+  <div class="splash-aurora" aria-hidden="true"></div>
+  <div class="splash-snow" aria-hidden="true"></div>
+  <div class="splash-inner">
+    <div class="splash-logo" aria-label="Axie Duel"><div class="splash-emblem" aria-hidden="true"><div class="splash-ring"></div><div class="splash-ring r2"></div></div><span class="sl-axie">AXIE</span><span class="sl-duel">DUEL</span></div>
+    <div class="splash-tag">Real-time 3v3 card battles in the snowy halls of Lunacia</div>
+    <div class="splash-axies" id="splashAxies" aria-hidden="true"></div>
+    <div class="splash-bar" aria-hidden="true"><i id="splashFill"></i></div>
+    <button class="splash-play" id="splashPlay" type="button" disabled>Loading…</button>
+    <div class="splash-foot">Made for the Axie Vibeathon · Axie art & 3D models by Sky Mavis</div>
+  </div>
+</div>
 <div class="stage">
   <h1>Axie Duel</h1>
   <p class="subtitle">Build your squad of 3 — kill the enemy Tank to win</p>

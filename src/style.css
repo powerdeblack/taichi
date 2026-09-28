@@ -1216,3 +1216,113 @@ body.in-duel.match-over .btn-row{ display:none; }
 @media (orientation:landscape) and (max-height:520px){
   .rp-detail{ font-size:.6rem; max-width:320px; }
 }
+
+/* ================= Title screen ================= */
+.splash{
+  position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at 50% 35%, #2c4a6e 0%, #16263b 45%, #0c0805 100%);
+  transition:opacity .6s ease, transform .6s ease; overflow:hidden;
+}
+.splash.gone{ opacity:0; transform:scale(1.06); pointer-events:none; }
+.splash-snow{
+  position:absolute; inset:-50% 0 0; pointer-events:none; opacity:.55;
+  background-image:
+    radial-gradient(2px 2px at 20% 30%, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 70% 10%, #fff 50%, transparent 51%),
+    radial-gradient(2.5px 2.5px at 40% 70%, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 85% 55%, #fff 50%, transparent 51%),
+    radial-gradient(2px 2px at 10% 85%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 55% 45%, #fff 50%, transparent 51%);
+  background-size:260px 260px; animation:snowfall 14s linear infinite;
+}
+@keyframes snowfall{ from{ transform:translateY(0); } to{ transform:translateY(260px); } }
+.splash-inner{ position:relative; text-align:center; padding:24px; width:min(560px, 100%); }
+.splash-logo{
+  display:flex; flex-direction:column; align-items:center; line-height:.86;
+  font-family:'Baloo 2',sans-serif; font-weight:800; letter-spacing:4px;
+  animation:logo-in .9s cubic-bezier(.2,1.3,.4,1) both, logo-float 5s ease-in-out 1s infinite;
+}
+.sl-axie{
+  font-size:clamp(2.6rem, 11vw, 5.2rem);
+  background:linear-gradient(180deg,#ffffff 0%,#bfe6ff 55%,#6fb4ff 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  filter:drop-shadow(0 3px 0 #1a3a5a) drop-shadow(0 0 18px #6fb4ff70);
+}
+.sl-duel{
+  font-size:clamp(3.2rem, 14vw, 6.6rem);
+  background:linear-gradient(180deg,#fff3c4 0%,#ffd76a 45%,#e8893a 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  filter:drop-shadow(0 4px 0 #6a3a08) drop-shadow(0 0 22px #ffb83070);
+}
+@keyframes logo-in{ from{ opacity:0; transform:scale(.6) translateY(20px); } to{ opacity:1; transform:none; } }
+@keyframes logo-float{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-6px); } }
+.splash-tag{ margin:10px 0 22px; color:#cfe0f2; font-weight:700; font-size:.92rem; animation:fade-in .8s ease .5s both; }
+@keyframes fade-in{ from{ opacity:0; } to{ opacity:1; } }
+.splash-bar{ width:min(280px, 80%); height:5px; margin:0 auto 18px; border-radius:4px; background:#ffffff1c; overflow:hidden; }
+.splash-bar i{ display:block; height:100%; width:0; background:linear-gradient(90deg,#ffd76a,#fff3c4); box-shadow:0 0 10px #ffd76a; transition:width .3s ease; }
+.splash-play{
+  font-family:'Baloo 2',sans-serif; font-weight:800; font-size:1.2rem; color:#fff;
+  padding:12px 34px; border-radius:30px; border:1px solid #8fe08a80; cursor:pointer;
+  background:linear-gradient(180deg,#5fbf5a,#3f8f3a); box-shadow:0 8px 20px -8px #000, inset 0 1px 0 #ffffff50;
+  opacity:.45; transition:opacity .3s ease, transform .1s ease;
+}
+.splash-play.ready{ opacity:1; animation:play-pulse 1.6s ease-in-out infinite; }
+.splash-play:active{ transform:scale(.96); }
+@keyframes play-pulse{ 0%,100%{ box-shadow:0 8px 20px -8px #000, 0 0 0 0 #5fbf5a80; } 50%{ box-shadow:0 8px 20px -8px #000, 0 0 0 12px #5fbf5a00; } }
+.splash-foot{ margin-top:22px; color:#8fa6bf; font-size:.66rem; font-weight:600; }
+@media (orientation:landscape) and (max-height:520px){
+  .splash-tag{ margin:6px 0 12px; font-size:.8rem; }
+  .splash-bar{ margin-bottom:10px; }
+  .splash-foot{ margin-top:10px; }
+  .sl-axie{ font-size:3rem; } .sl-duel{ font-size:3.8rem; }
+}
+@media (prefers-reduced-motion: reduce){ .splash-snow, .splash-logo, .splash-play.ready{ animation:none; } }
+/* Title screen: aurora, a slowly turning Lunacia rune ring behind the logo,
+   and the six classes lined up. */
+.splash-aurora{
+  position:absolute; inset:-20%; pointer-events:none; filter:blur(40px); opacity:.55;
+  background:
+    radial-gradient(40% 30% at 30% 25%, #3fe0c080, transparent 70%),
+    radial-gradient(35% 25% at 70% 20%, #7a6bff70, transparent 70%),
+    radial-gradient(45% 30% at 50% 80%, #ffb83040, transparent 70%);
+  animation:aurora 16s ease-in-out infinite alternate;
+}
+@keyframes aurora{ from{ transform:translate(-3%, -2%) rotate(-3deg); } to{ transform:translate(3%, 2%) rotate(3deg); } }
+.splash-emblem{ position:absolute; left:50%; top:clamp(70px, 22vh, 150px); width:0; height:0; pointer-events:none; }
+.splash-ring{
+  position:absolute; left:50%; top:50%; width:min(78vw, 420px); aspect-ratio:1; transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:repeating-conic-gradient(from 0deg, #ffd76a55 0 2deg, transparent 2deg 11.25deg);
+  -webkit-mask:radial-gradient(circle, transparent 60%, #000 61%, #000 64%, transparent 65%, transparent 70%, #000 71%, #000 72%, transparent 73%);
+          mask:radial-gradient(circle, transparent 60%, #000 61%, #000 64%, transparent 65%, transparent 70%, #000 71%, #000 72%, transparent 73%);
+  animation:ring-spin 60s linear infinite; opacity:.9;
+}
+.splash-ring.r2{
+  width:min(60vw, 320px); opacity:.6;
+  background:repeating-conic-gradient(from 0deg, #8fd0ff66 0 6deg, transparent 6deg 30deg);
+  animation-direction:reverse; animation-duration:40s;
+}
+@keyframes ring-spin{ to{ transform:translate(-50%,-50%) rotate(360deg); } }
+.splash-axies{ display:flex; justify-content:center; gap:clamp(4px, 2vw, 14px); margin:0 0 18px; }
+.splash-axie{
+  width:clamp(40px, 11vw, 64px); aspect-ratio:1; border-radius:50%;
+  background:radial-gradient(circle at 50% 40%, #ffffff26, #ffffff06); border:1px solid #ffffff22;
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+  animation:axie-pop .5s cubic-bezier(.2,1.4,.4,1) both, axie-bob 3s ease-in-out infinite;
+  animation-delay:calc(.7s + var(--i) * .08s), calc(1.4s + var(--i) * .25s);
+}
+.splash-axie img, .splash-axie svg{ width:100%; height:100%; object-fit:cover; }
+@keyframes axie-pop{ from{ opacity:0; transform:scale(.3) translateY(14px); } to{ opacity:1; transform:none; } }
+@keyframes axie-bob{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-4px); } }
+@media (orientation:landscape) and (max-height:520px){
+  .splash-axies{ margin-bottom:10px; } .splash-axie{ width:40px; }
+  .splash-emblem{ top:80px; } .splash-ring{ width:300px; } .splash-ring.r2{ width:230px; }
+}
+@media (prefers-reduced-motion: reduce){ .splash-aurora, .splash-ring, .splash-axie{ animation:none; } }
+.splash-logo{ position:relative; }
+.splash-logo .splash-emblem{ position:absolute; left:50%; top:50%; width:0; height:0; z-index:-1; }
+.splash-logo .sl-axie, .splash-logo .sl-duel{ position:relative; }
+.splash-inner{ isolation:isolate; }
+.splash-axie .portrait, .splash-axie .portrait-svg{ width:100%; height:100%; display:block; }
+.splash-axie .portrait-svg svg{ width:100%; height:100%; }
+@media (orientation:landscape) and (max-height:520px){ .splash-logo .splash-emblem{ top:50%; } }

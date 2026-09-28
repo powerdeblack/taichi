@@ -51,12 +51,13 @@ export function unlockAudio(){
     reverb.connect(tone).connect(wet).connect(master);
     reverbSend = ctx.createGain(); reverbSend.gain.value = 1;
     reverbSend.connect(reverb);
-    for (const [name, vol] of [['combat', 1], ['ui', 0.7], ['ambience', 0.5]]){
+    for (const [name, vol] of [['combat', 1], ['ui', 0.7], ['ambience', 0.5], ['music', 0.3]]){
       bus[name] = ctx.createGain();
       bus[name].gain.value = vol;
       bus[name].connect(master);
     }
     bus.combat.connect(reverbSend);
+    bus.music.connect(reverbSend);
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const data = noiseBuf.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
@@ -65,6 +66,9 @@ export function unlockAudio(){
 }
 
 export function isMuted(){ return muted; }
+
+// For music.js: the shared context, its music bus and the noise buffer.
+export function audioGraph(){ return ctx && ctx.state !== 'closed' ? { ctx, out: bus.music, noiseBuf } : null; }
 
 export function toggleMute(){
   muted = !muted;
@@ -166,10 +170,13 @@ export function stopAmbience(){
 export function setStorm(on){ if (amb) amb.g.gain.setTargetAtTime(on ? 0.2 : 0.07, ctx.currentTime, 1.5); }
 function duck(seconds = 1.2){
   if (!bus.ambience) return;
-  const g = bus.ambience.gain, now = ctx.currentTime;
-  g.cancelScheduledValues(now);
-  g.setTargetAtTime(0.12, now, 0.05);
-  g.setTargetAtTime(0.5, now + seconds, 0.6);
+  const now = ctx.currentTime;
+  for (const [name, low, full] of [['ambience', 0.12, 0.5], ['music', 0.1, 0.3]]){
+    const g = bus[name].gain;
+    g.cancelScheduledValues(now);
+    g.setTargetAtTime(low, now, 0.05);
+    g.setTargetAtTime(full, now + seconds, 0.6);
+  }
 }
 
 // ---- attack flavors (by card set) ----
