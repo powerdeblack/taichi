@@ -39,10 +39,17 @@ function follow(fx){
   a.p.x += dx; a.p.z += dz;
 }
 
+// Shared resources (the soft particle texture, the arrow geometries) are
+// reused by every effect and must survive a single effect's cleanup.
 function dispose(o){
-  o.traverse?.(n => { n.geometry?.dispose(); n.material?.dispose?.(); n.material?.map?.dispose(); });
+  o.traverse?.(n => {
+    if (n.geometry && !SHARED_GEOS.has(n.geometry)) n.geometry.dispose();
+    const m = n.material;
+    if (m){ if (m.map && m.map !== softTex) m.map.dispose(); m.dispose?.(); }
+  });
   ctx.scene.remove(o);
 }
+const SHARED_GEOS = new Set();
 
 // dt is the (slow-motion scaled) game time; realDt drives the camera so a
 // shake still settles on schedule during a slow-mo moment.
@@ -277,25 +284,55 @@ export function bloodSplash(side, i){
 
 // A lingering toxic cloud: puffy green/purple spheres swelling and
 // drifting upward.
+// A thick toxic cloud (soft smoke billboards swirling slowly), a venom pool
+// on the snow, glowing bubbles rising and popping -- it hangs over the
+// Axie for a few seconds.
 export function poisonCloud(side, i){
-  const p = at(side, i, 0.5);
+  const p = at(side, i, 0.55);
   if (!p) return;
-  const puffs = [];
-  for (let k = 0; k < 8; k++){
-    const s = new THREE.Mesh(new THREE.SphereGeometry(0.28 + Math.random() * 0.18, 14, 10), mat(k % 3 ? 0x5fbf3a : 0x8e5cc9, 0.5));
-    s.position.copy(p).add(new THREE.Vector3((Math.random() - 0.5) * 0.9, Math.random() * 0.6, (Math.random() - 0.5) * 0.7));
-    s.userData.rise = 0.15 + Math.random() * 0.25;
-    s.scale.setScalar(0.2);
-    puffs.push(s);
+  const DUR = 3;
+  const clouds = [];
+  for (let k = 0; k < 16; k++){
+    const col = [0x4fae2e, 0x6fd048, 0x2f6e1f, 0x7a4fb0][k % 4];
+    const s = smoke(col, 0.9, k % 4 === 3 ? 0.35 : 0.55);
+    s.userData = { a: Math.random() * Math.PI * 2, r: 0.2 + Math.random() * 0.6, y: Math.random() * 0.9 - 0.2, sp: (Math.random() - 0.5) * 0.8, size: 0.8 + Math.random() * 0.7, spin: (Math.random() - 0.5) * 0.8, base: s.userData.base };
+    clouds.push(s);
   }
+  const bubbles = [];
+  for (let k = 0; k < 10; k++){
+    const b = glow(0xb8ff7a, 0.12, 1);
+    b.userData = { t0: Math.random() * (DUR - 0.8), x: (Math.random() - 0.5) * 1.1, z: (Math.random() - 0.5) * 0.9, base: 1 };
+    b.visible = false;
+    bubbles.push(b);
+  }
+  const pool = new THREE.Mesh(new THREE.CircleGeometry(0.95, 36), mat(0x3f9a24, 0.55));
+  pool.rotation.x = -Math.PI / 2; pool.position.set(p.x, 0.015, p.z); pool.scale.setScalar(0.01);
+  const sheen = glow(0x7dff4a, 2.6, 0.35);
+  sheen.position.copy(p);
   spawn((t, dt) => {
-    puffs.forEach(s => {
-      s.position.y += s.userData.rise * dt;
-      s.scale.setScalar(0.2 + ease(t / 0.6) * 1.1);
-      s.material.opacity = t < 1.4 ? 0.5 : Math.max(0, 0.5 - (t - 1.4) * 0.8);
+    const grow = ease(t / 0.5);
+    const fade = t > DUR - 0.8 ? Math.max(0, (DUR - t) / 0.8) : 1;
+    clouds.forEach(s => {
+      const u = s.userData;
+      u.a += dt * u.sp;
+      s.position.set(p.x + Math.cos(u.a) * u.r, p.y + u.y + t * 0.08, p.z + Math.sin(u.a) * u.r * 0.8);
+      s.scale.setScalar(u.size * (0.3 + grow * 0.9));
+      s.material.rotation += dt * u.spin;
+      s.material.opacity = u.base * fade;
     });
-    return t < 2.05;
-  }, puffs, { side, i, p });
+    bubbles.forEach(b => {
+      const q = (t - b.userData.t0) / 0.8;
+      b.visible = q > 0 && q < 1;
+      if (!b.visible) return;
+      b.position.set(p.x + b.userData.x, 0.1 + q * 1.3, p.z + b.userData.z);
+      b.scale.setScalar(q > 0.85 ? 0.3 : 0.12);
+      b.material.opacity = q > 0.85 ? (1 - q) * 6 : 1;
+    });
+    pool.scale.setScalar(Math.max(0.01, grow));
+    pool.material.opacity = 0.55 * fade;
+    sheen.material.opacity = 0.35 * fade * (0.8 + 0.2 * Math.sin(t * 6));
+    return t < DUR;
+  }, [...clouds, ...bubbles, pool, sheen], { side, i, p });
 }
 
 // A skull hovering over the marked target, with a spinning purple ring.
@@ -530,6 +567,573 @@ export function drainBeam(side, i){
     motes.forEach(m => { m.position.y += dt * 2.5; m.material.opacity = Math.max(0, 0.9 * (1 - k)); });
     return k < 1;
   }, [beam, ...motes], { side, i, p });
+}
+
+// ---------- soft particles (WoW-style spell look) ----------
+// One shared radial-gradient texture drives every soft particle: additive
+// "glow" sprites for light (sparks, spell cores) and normal-blended "smoke"
+// sprites for clouds, so effects read as volumes instead of solid balls.
+let softTex = null;
+function softTexture(){
+  if (softTex) return softTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.35, 'rgba(255,255,255,0.7)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  softTex = new THREE.CanvasTexture(c);
+  return softTex;
+}
+function glow(color, size, opacity = 1){
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: softTexture(), color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending }));
+  s.scale.setScalar(size);
+  s.userData.base = opacity;
+  return s;
+}
+function smoke(color, size, opacity = 0.6){
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: softTexture(), color, transparent: true, opacity, depthWrite: false }));
+  s.scale.setScalar(size);
+  s.material.rotation = Math.random() * Math.PI * 2;
+  s.userData.base = opacity;
+  return s;
+}
+
+const lerpAt = (a, b, t) => new THREE.Vector3().lerpVectors(a, b, t);
+const liveAt = (side, i, y) => { const q = ctx?.lanePos(side, i); return q ? new THREE.Vector3(q.x, y, q.z) : null; };
+
+// ---------- Volley: a real rain of arrows ----------
+// Launched from the caster the moment the card fires: a sheaf of arrows
+// shoots up out of view, a golden target circle marks the ground under the
+// target, then dozens of arrows hail down over the area around impact,
+// punch into the snow with a puff and stay stuck there for a moment.
+const ARROW_GEO = {
+  shaft: new THREE.CylinderGeometry(0.03, 0.03, 1.0, 5),
+  tip: new THREE.ConeGeometry(0.08, 0.24, 6),
+  fletch: new THREE.PlaneGeometry(0.2, 0.26),
+  streak: new THREE.CylinderGeometry(0.012, 0.07, 2.2, 6, 1, true),
+};
+Object.values(ARROW_GEO).forEach(g => SHARED_GEOS.add(g));
+function makeArrow(mats){
+  const g = new THREE.Group();
+  const shaft = new THREE.Mesh(ARROW_GEO.shaft, mats.shaft);
+  const tip = new THREE.Mesh(ARROW_GEO.tip, mats.tip);
+  tip.position.y = -0.6; tip.rotation.x = Math.PI;
+  const f1 = new THREE.Mesh(ARROW_GEO.fletch, mats.fletch);
+  f1.position.y = 0.42;
+  const f2 = new THREE.Mesh(ARROW_GEO.fletch, mats.fletch);
+  f2.position.y = 0.42; f2.rotation.y = Math.PI / 2;
+  g.add(shaft, tip, f1, f2);
+  // A glowing streak behind the arrow while it flies (hidden once stuck).
+  const streak = new THREE.Mesh(ARROW_GEO.streak, mats.streak);
+  streak.position.y = 1.5;
+  streak.renderOrder = 8;
+  g.add(streak);
+  g.userData.streak = streak;
+  g.userData.shared = true;
+  return g;
+}
+const DOWN = new THREE.Vector3(0, -1, 0);
+
+
+export function volley(fromSide, fromI, toSide, toI, flight = 2, miss = false, color = 0xd9b44a){
+  const from = liveAt(fromSide, fromI, 1.1);
+  const first = liveAt(toSide, toI, 0);
+  if (!from || !first) return;
+  const mats = { shaft: mat(0x8a5a2e), tip: mat(0xf4f8ff), fletch: mat(color), streak: mat(0xfff1b8, 0.75, { blending: THREE.AdditiveBlending }) };
+  const away = first.clone().sub(from).setY(0).normalize();
+  const missOff = miss ? new THREE.Vector3(-away.z, 0, away.x).multiplyScalar(Math.random() < 0.5 ? -1.7 : 1.7) : new THREE.Vector3();
+  const objects = [];
+
+  // Up-shot: a fan of arrows leaving the bow.
+  const up = [];
+  for (let k = 0; k < 9; k++){
+    const a = makeArrow(mats);
+    a.position.copy(from);
+    a.userData.v = new THREE.Vector3(away.x * 1.5 + (Math.random() - 0.5) * 1.4, 11 + Math.random() * 3, away.z * 1.5 + (Math.random() - 0.5) * 1.4);
+    a.userData.delay = k * 0.035;
+    a.visible = false;
+    up.push(a);
+  }
+  // Ground telegraph under the target.
+  const ring = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.32, 48), mat(0xffd76a, 0, { blending: THREE.AdditiveBlending }));
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(1.15, 40), mat(0xffb84a, 0, { blending: THREE.AdditiveBlending }));
+  [ring, disc].forEach(m => { m.rotation.x = -Math.PI / 2; });
+  // The hail.
+  const rain = [];
+  const RAIN = 28;
+  for (let k = 0; k < RAIN; k++){
+    const a = makeArrow(mats);
+    const r = Math.sqrt(Math.random()) * 1.15, ang = Math.random() * Math.PI * 2;
+    Object.assign(a.userData, { off: new THREE.Vector3(Math.cos(ang) * r, 0, Math.sin(ang) * r), start: flight - 0.6 + Math.random() * 0.75, landed: false, land: null, sky: null });
+    a.visible = false;
+    rain.push(a);
+  }
+  const puffs = [];
+  objects.push(...up, ring, disc, ...rain);
+
+  spawn((t, dt) => {
+    up.forEach(a => {
+      const k = t - a.userData.delay;
+      if (k < 0) return;
+      a.visible = k < 0.6;
+      a.userData.v.y -= 6 * dt;
+      a.position.addScaledVector(a.userData.v, dt);
+      a.quaternion.setFromUnitVectors(DOWN, a.userData.v.clone().normalize());
+    });
+    const center = (liveAt(toSide, toI, 0.02) || first).add(missOff);
+    const tele = Math.min(1, Math.max(0, (t - (flight - 1.1)) / 0.4));
+    const teleFade = t > flight + 0.6 ? Math.max(0, 1 - (t - flight - 0.6) / 0.4) : 1;
+    ring.position.copy(center); disc.position.copy(center).setY(0.015);
+    ring.material.opacity = 1 * tele * teleFade;
+    disc.material.opacity = 0.3 * tele * teleFade * (0.8 + 0.2 * Math.sin(t * 14));
+    ring.scale.setScalar(1.25 - 0.25 * ease(tele));
+    rain.forEach(a => {
+      const u = a.userData;
+      const k = (t - u.start) / 0.26;
+      if (k < 0) return;
+      if (!u.land){
+        u.land = center.clone().add(u.off).setY(0.4);
+        u.sky = u.land.clone().add(new THREE.Vector3(-away.x * 1.6, 6.5, -away.z * 1.6));
+        a.quaternion.setFromUnitVectors(DOWN, u.land.clone().sub(u.sky).normalize());
+        a.visible = true;
+      }
+      if (k < 1){ a.position.lerpVectors(u.sky, u.land, k); return; }
+      if (!u.landed){
+        u.landed = true;
+        a.position.copy(u.land);
+        a.userData.streak.visible = false;
+        for (let n = 0; n < 2; n++){
+          const s = smoke(0xffffff, 0.25, 0.8);
+          s.position.copy(u.land).setY(0.12);
+          s.userData.v = new THREE.Vector3((Math.random() - 0.5) * 0.9, 0.6 + Math.random() * 0.5, (Math.random() - 0.5) * 0.9);
+          s.userData.t0 = t;
+          ctx.scene.add(s);
+          puffs.push(s);
+          objects.push(s);
+        }
+      }
+    });
+    puffs.forEach(s => {
+      const k = (t - s.userData.t0) / 0.5;
+      s.position.addScaledVector(s.userData.v, dt);
+      s.scale.setScalar(0.25 + k * 0.45);
+      s.material.opacity = Math.max(0, 0.8 * (1 - k));
+    });
+    const fade = Math.max(0, 1 - (t - flight - 1.6) / 0.5);
+    mats.shaft.opacity = mats.tip.opacity = mats.fletch.opacity = Math.min(1, fade);
+    mats.streak.opacity = 0.75 * Math.min(1, fade);
+    return fade > 0;
+  }, objects);
+}
+
+// ---------- Poison: a venom glob thrown from the hand ----------
+// A bubbling green glob leaves the caster's front, arcs over to the target
+// trailing toxic smoke and dripping venom, then bursts into a splash. The
+// lingering cloud itself is poisonCloud(), played on impact.
+export function poisonBolt(fromSide, fromI, toSide, toI, flight = 2, miss = false){
+  const start = liveAt(fromSide, fromI, 1.0);
+  const first = liveAt(toSide, toI, 0.9);
+  if (!start || !first) return;
+  const fwd = first.clone().sub(start).setY(0).normalize();
+  start.addScaledVector(fwd, 0.45);
+  const missOff = miss ? new THREE.Vector3(-fwd.z, 0, fwd.x).multiplyScalar(Math.random() < 0.5 ? -1.4 : 1.4) : new THREE.Vector3();
+  const core = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), mat(0x7dff4a, 0.95));
+  const aura = glow(0x6dff3a, 1.1, 0.9);
+  const inner = glow(0xeaffb0, 0.45, 1);
+  const trail = [];
+  const drops = [];
+  const objects = [core, aura, inner];
+  let lastPuff = 0;
+  spawn((t, dt) => {
+    const k = Math.min(1, t / flight);
+    const to = (liveAt(toSide, toI, 0.9) || first).add(missOff);
+    const pos = lerpAt(start, to, k);
+    pos.y += Math.sin(Math.PI * k) * 1.4;
+    if (k < 1){
+      core.position.copy(pos); aura.position.copy(pos); inner.position.copy(pos);
+      const wob = 1 + 0.18 * Math.sin(t * 26);
+      core.scale.set(wob, 2 - wob, wob);
+      aura.scale.setScalar(1.1 * (0.9 + 0.2 * Math.sin(t * 13)));
+      if (t - lastPuff > 0.035){
+        lastPuff = t;
+        const s = smoke(Math.random() < 0.3 ? 0x2f7a22 : 0x6fd048, 0.3, 0.55);
+        s.position.copy(pos).add(new THREE.Vector3((Math.random() - 0.5) * 0.12, (Math.random() - 0.5) * 0.12, (Math.random() - 0.5) * 0.12));
+        s.userData.t0 = t;
+        ctx.scene.add(s); trail.push(s); objects.push(s);
+        if (Math.random() < 0.45){
+          const d = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), mat(0x8cff5a, 0.95));
+          d.position.copy(pos); d.userData = { v: new THREE.Vector3(0, -0.4, 0), t0: t };
+          ctx.scene.add(d); drops.push(d); objects.push(d);
+        }
+      }
+    } else if (core.visible){
+      core.visible = false; inner.visible = false;
+      aura.scale.setScalar(2.4);
+      // Splash: a burst of venom droplets.
+      for (let n = 0; n < 16; n++){
+        const d = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), mat(n % 3 ? 0x7dff4a : 0x2f7a22, 0.95));
+        const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 1.6;
+        d.position.copy(pos);
+        d.userData = { v: new THREE.Vector3(Math.cos(a) * sp, 1.5 + Math.random() * 2, Math.sin(a) * sp), t0: t };
+        ctx.scene.add(d); drops.push(d); objects.push(d);
+      }
+    }
+    if (!core.visible) aura.material.opacity = Math.max(0, 0.9 - (t - flight) * 3);
+    trail.forEach(s => {
+      const q = (t - s.userData.t0) / 0.7;
+      s.scale.setScalar(0.3 + q * 0.7);
+      s.position.y += dt * 0.25;
+      s.material.opacity = Math.max(0, s.userData.base * (1 - q));
+    });
+    drops.forEach(d => {
+      d.userData.v.y -= 7 * dt;
+      d.position.addScaledVector(d.userData.v, dt);
+      if (d.position.y < 0.03){ d.position.y = 0.03; d.userData.v.set(0, 0, 0); }
+      d.material.opacity = Math.max(0, 0.95 - (t - d.userData.t0) * 1.2);
+    });
+    return t < flight + 0.9;
+  }, objects);
+}
+
+// Poison ticking on an Axie: a few bubbles rise and pop in a small green haze.
+export function poisonTick(side, i){
+  const p = at(side, i, 0.4);
+  if (!p) return;
+  const parts = [];
+  for (let k = 0; k < 7; k++){
+    const b = k < 3 ? smoke(0x5fbf3a, 0.5, 0.35) : glow(0x9dff6a, 0.14, 0.9);
+    b.position.copy(p).add(new THREE.Vector3((Math.random() - 0.5) * 0.6, Math.random() * 0.5, (Math.random() - 0.5) * 0.5));
+    b.userData.rise = 0.4 + Math.random() * 0.7;
+    parts.push(b);
+  }
+  spawn((t, dt) => {
+    parts.forEach(b => { b.position.y += b.userData.rise * dt; b.material.opacity = Math.max(0, b.userData.base * (1 - t / 0.9)); });
+    return t < 0.9;
+  }, parts, { side, i, p });
+}
+
+// ---------- spell bolts (magic sets) ----------
+// A glowing bolt with a hot core and a comet tail of soft particles, thrown
+// from the caster to the target. `kind` picks the school's look: arcane
+// (blue-violet), holy (gold, with rays), spirit (teal wisps) and frost
+// (icy shards and snowflakes).
+const SCHOOL = {
+  arcane: { core: 0xe6f0ff, glow: 0x6f8dff, trail: 0x9a6bff, arc: 0.9, size: 1 },
+  holy:   { core: 0xfffbe6, glow: 0xffd84a, trail: 0xffe9a0, arc: 0.5, size: 1.05 },
+  spirit: { core: 0xe6fff8, glow: 0x3fe0c0, trail: 0x7affd9, arc: 1.2, size: 0.95 },
+  frost:  { core: 0xffffff, glow: 0x7fd4ff, trail: 0xcff0ff, arc: 0.6, size: 1 },
+};
+export function spellBolt(fromSide, fromI, toSide, toI, flight = 2, miss = false, kind = 'arcane'){
+  const sc = SCHOOL[kind] || SCHOOL.arcane;
+  const start = liveAt(fromSide, fromI, 1.25);
+  const first = liveAt(toSide, toI, 0.9);
+  if (!start || !first) return;
+  const fwd = first.clone().sub(start).setY(0).normalize();
+  start.addScaledVector(fwd, 0.35);
+  const missOff = miss ? new THREE.Vector3(-fwd.z, 0, fwd.x).multiplyScalar(Math.random() < 0.5 ? -1.4 : 1.4) : new THREE.Vector3();
+  const core = glow(sc.core, 0.42 * sc.size, 1);
+  const halo = glow(sc.glow, 1.2 * sc.size, 0.95);
+  const shards = [];
+  if (kind === 'frost'){
+    for (let n = 0; n < 5; n++){
+      const s = new THREE.Mesh(new THREE.OctahedronGeometry(0.09, 0), mat(0xdff6ff, 0.95));
+      s.scale.set(0.6, 1.8, 0.6);
+      s.userData.a = (n / 5) * Math.PI * 2;
+      shards.push(s);
+    }
+  }
+  const tail = [];
+  const objects = [core, halo, ...shards];
+  let last = 0;
+  spawn((t, dt) => {
+    const k = Math.min(1, t / flight);
+    const to = (liveAt(toSide, toI, 0.9) || first).add(missOff);
+    const pos = lerpAt(start, to, ease(k * 0.85 + k * 0.15));
+    pos.y += Math.sin(Math.PI * k) * sc.arc;
+    if (k < 1){
+      core.position.copy(pos); halo.position.copy(pos);
+      halo.scale.setScalar(1.2 * sc.size * (0.85 + 0.25 * Math.sin(t * 20)));
+      shards.forEach(s => {
+        s.userData.a += dt * 9;
+        s.position.copy(pos).add(new THREE.Vector3(Math.cos(s.userData.a) * 0.22, Math.sin(s.userData.a * 1.3) * 0.12, Math.sin(s.userData.a) * 0.22));
+        s.rotation.y += dt * 12;
+      });
+      if (t - last > 0.022){
+        last = t;
+        const p = glow(Math.random() < 0.5 ? sc.trail : sc.glow, (0.2 + Math.random() * 0.25) * sc.size, 0.9);
+        p.position.copy(pos).add(new THREE.Vector3((Math.random() - 0.5) * 0.15, (Math.random() - 0.5) * 0.15, (Math.random() - 0.5) * 0.15));
+        p.userData.t0 = t;
+        p.userData.v = new THREE.Vector3((Math.random() - 0.5) * 0.5, kind === 'spirit' ? 0.5 : kind === 'frost' ? -0.3 : 0.1, (Math.random() - 0.5) * 0.5);
+        ctx.scene.add(p); tail.push(p); objects.push(p);
+      }
+    } else {
+      core.visible = halo.visible = false;
+      shards.forEach(s => { s.visible = false; });
+    }
+    tail.forEach(p => {
+      const q = (t - p.userData.t0) / 0.45;
+      p.position.addScaledVector(p.userData.v, dt);
+      p.material.opacity = Math.max(0, p.userData.base * (1 - q));
+      p.scale.multiplyScalar(1 - dt * 1.5);
+    });
+    return t < flight + 0.5;
+  }, objects);
+}
+
+// Sparks: a burst of hot additive particles flying out of an impact.
+export function sparks(side, i, color = 0xffe7a0, n = 14, y = 0.9){
+  const p = at(side, i, y);
+  if (!p) return;
+  const bits = [];
+  for (let k = 0; k < n; k++){
+    const s = glow(k % 3 ? color : 0xffffff, 0.12 + Math.random() * 0.12, 1);
+    s.position.copy(p);
+    const a = Math.random() * Math.PI * 2, e = (Math.random() - 0.3) * 1.4;
+    const sp = 2.5 + Math.random() * 3;
+    s.userData.v = new THREE.Vector3(Math.cos(a) * sp, e * sp * 0.6 + 1, Math.sin(a) * sp);
+    bits.push(s);
+  }
+  const flare = glow(color, 1.8, 0.9);
+  flare.position.copy(p);
+  spawn((t, dt) => {
+    bits.forEach(s => {
+      s.userData.v.y -= 9 * dt;
+      s.userData.v.multiplyScalar(1 - dt * 2.5);
+      s.position.addScaledVector(s.userData.v, dt);
+      s.material.opacity = Math.max(0, 1 - t / 0.55);
+    });
+    flare.scale.setScalar(1.8 + t * 3);
+    flare.material.opacity = Math.max(0, 0.9 * (1 - t / 0.25));
+    return t < 0.55;
+  }, [...bits, flare], { side, i, p });
+}
+
+// Holy smite: a shaft of golden light slams down with rays and motes.
+export function holyBurst(side, i){
+  const p = at(side, i, 0);
+  if (!p) return;
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.55, 8, 24, 1, true), mat(0xfff0a8, 0, { blending: THREE.AdditiveBlending }));
+  shaft.position.set(p.x, 4, p.z);
+  const flare = glow(0xffe07a, 2.6, 1);
+  flare.position.set(p.x, 0.9, p.z);
+  const rays = [];
+  for (let k = 0; k < 8; k++){
+    const r = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 1.6), mat(0xfff3c4, 0.9, { blending: THREE.AdditiveBlending }));
+    r.position.set(p.x, 0.9, p.z);
+    r.lookAt(ctx.camera.position);
+    r.rotateZ((k / 8) * Math.PI * 2);
+    r.translateY(0.9);
+    rays.push(r);
+  }
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.7, 48), mat(0xffd23f, 0.9, { blending: THREE.AdditiveBlending }));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(p.x, 0.03, p.z);
+  spawn(t => {
+    const k = t / 0.8;
+    shaft.material.opacity = k < 0.15 ? k / 0.15 * 0.7 : Math.max(0, 0.7 * (1 - (k - 0.15) / 0.85));
+    shaft.scale.set(1 - k * 0.6, 1, 1 - k * 0.6);
+    flare.scale.setScalar(2.6 * (1 + ease(k)));
+    flare.material.opacity = Math.max(0, 1 - k);
+    rays.forEach(r => { r.material.opacity = Math.max(0, 0.9 * (1 - k)); r.scale.y = 0.6 + ease(k) * 0.8; });
+    ring.scale.setScalar(1 + ease(k) * 2.2);
+    ring.material.opacity = Math.max(0, 0.9 * (1 - k));
+    return k < 1;
+  }, [shaft, flare, ...rays, ring], { side, i, p });
+}
+
+// Frost nova: ice crystals burst out of the snow in a ring, a cold mist
+// rolls out and a frosty sheen stays under the Axie while it's Chilled.
+export function frostNova(side, i){
+  const p = at(side, i, 0);
+  if (!p) return;
+  const crystals = [];
+  for (let k = 0; k < 12; k++){
+    const a = (k / 12) * Math.PI * 2 + Math.random() * 0.3;
+    const r = 0.55 + Math.random() * 0.35;
+    const c = new THREE.Mesh(new THREE.ConeGeometry(0.1 + Math.random() * 0.06, 0.6 + Math.random() * 0.5, 5), mat(k % 2 ? 0xbfeaff : 0xe8f8ff, 0.9));
+    c.position.set(p.x + Math.cos(a) * r, 0, p.z + Math.sin(a) * r * 0.85);
+    c.rotation.z = -Math.cos(a) * 0.5; c.rotation.x = Math.sin(a) * 0.5;
+    c.scale.set(1, 0.01, 1);
+    crystals.push(c);
+  }
+  const mist = [];
+  for (let k = 0; k < 8; k++){
+    const m = smoke(0xdff4ff, 0.8, 0.5);
+    const a = Math.random() * Math.PI * 2;
+    m.position.set(p.x, 0.25, p.z);
+    m.userData.v = new THREE.Vector3(Math.cos(a) * 1.3, 0.1, Math.sin(a) * 1.3);
+    mist.push(m);
+  }
+  const sheen = new THREE.Mesh(new THREE.CircleGeometry(1.1, 40), mat(0x9fdcff, 0.5, { blending: THREE.AdditiveBlending }));
+  sheen.rotation.x = -Math.PI / 2; sheen.position.set(p.x, 0.02, p.z);
+  const flare = glow(0xaee6ff, 2.4, 0.9);
+  flare.position.set(p.x, 0.7, p.z);
+  spawn((t, dt) => {
+    const grow = t < 0.18 ? ease(t / 0.18) : t > 1.4 ? Math.max(0.01, 1 - (t - 1.4) / 0.5) : 1;
+    crystals.forEach(c => { c.scale.y = grow; c.position.y = 0.25 * grow; });
+    mist.forEach(m => {
+      m.userData.v.multiplyScalar(1 - dt * 2);
+      m.position.addScaledVector(m.userData.v, dt);
+      m.scale.setScalar(0.8 + t * 1.2);
+      m.material.opacity = Math.max(0, 0.5 * (1 - t / 1.4));
+    });
+    sheen.material.opacity = Math.max(0, 0.5 * (1 - t / 1.9));
+    flare.material.opacity = Math.max(0, 0.9 * (1 - t / 0.3));
+    return t < 1.9;
+  }, [...crystals, ...mist, sheen, flare], { side, i, p });
+}
+
+// Stun: golden stars orbiting over the head plus an electric ground ring.
+export function stunStars(side, i, seconds = 2.5){
+  const p = at(side, i, 1.75);
+  if (!p) return;
+  const stars = [0, 1, 2, 3].map(k => {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTexture('⭐'), transparent: true, depthWrite: false }));
+    s.scale.setScalar(0.28); s.userData.a = (k / 4) * Math.PI * 2;
+    return s;
+  });
+  const glows = stars.map(() => glow(0xffe36a, 0.45, 0.8));
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.72, 40), mat(0xffe36a, 0.9, { blending: THREE.AdditiveBlending }));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(p.x, 0.03, p.z);
+  spawn((t, dt) => {
+    const fade = t > seconds - 0.3 ? Math.max(0, (seconds - t) / 0.3) : Math.min(1, t / 0.15);
+    stars.forEach((s, k) => {
+      s.userData.a += dt * 5;
+      s.position.set(p.x + Math.cos(s.userData.a) * 0.42, p.y + Math.sin(s.userData.a * 2) * 0.06, p.z + Math.sin(s.userData.a) * 0.3);
+      s.material.opacity = fade;
+      glows[k].position.copy(s.position);
+      glows[k].material.opacity = 0.8 * fade;
+    });
+    ring.scale.setScalar(1 + ease(Math.min(1, t / 0.4)) * 0.8);
+    ring.material.opacity = Math.max(0, 0.9 * (1 - t / 0.6));
+    return t < seconds;
+  }, [...stars, ...glows, ring], { side, i, p });
+}
+
+// Fear: dark shadow smoke coils up around the target with a ghost flicker.
+export function fearWisps(side, i){
+  const p = at(side, i, 0.2);
+  if (!p) return;
+  const wisps = [];
+  for (let k = 0; k < 12; k++){
+    const w = smoke(k % 3 ? 0x2a1840 : 0x6a3fa0, 0.6, 0.7);
+    w.userData = { a: (k / 12) * Math.PI * 2, r: 0.5 + Math.random() * 0.2, y: Math.random() * 0.4, sp: 3 + Math.random() * 2, base: 0.7 };
+    wisps.push(w);
+  }
+  const ghost = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTexture('👻'), transparent: true, depthWrite: false }));
+  ghost.position.set(p.x, 2.1, p.z); ghost.scale.setScalar(0.01);
+  spawn((t, dt) => {
+    wisps.forEach(w => {
+      const u = w.userData;
+      u.a += dt * u.sp; u.y += dt * 1.1;
+      w.position.set(p.x + Math.cos(u.a) * u.r, p.y + u.y, p.z + Math.sin(u.a) * u.r * 0.8);
+      w.scale.setScalar(0.6 + t * 0.4);
+      w.material.opacity = Math.max(0, 0.7 * (1 - t / 1.4));
+    });
+    ghost.scale.setScalar(Math.min(0.6, ease(t / 0.3) * 0.6));
+    ghost.material.opacity = t > 1.1 ? Math.max(0, 1 - (t - 1.1) / 0.3) : (0.7 + 0.3 * Math.sin(t * 30));
+    return t < 1.4;
+  }, [...wisps, ghost], { side, i, p });
+}
+
+// Blood: droplets sprayed out of the wound that splat on the snow.
+export function bloodSpray(side, i){
+  const p = at(side, i, 0.8);
+  if (!p) return;
+  const drops = [];
+  for (let k = 0; k < 14; k++){
+    const d = new THREE.Mesh(new THREE.SphereGeometry(0.04 + Math.random() * 0.03, 6, 6), mat(k % 2 ? 0xa11616 : 0xd02a20, 0.95));
+    d.position.copy(p);
+    const a = Math.random() * Math.PI * 2, sp = 1.2 + Math.random() * 1.8;
+    d.userData.v = new THREE.Vector3(Math.cos(a) * sp, 1.2 + Math.random() * 1.8, Math.sin(a) * sp);
+    drops.push(d);
+  }
+  spawn((t, dt) => {
+    drops.forEach(d => {
+      if (d.position.y > 0.03){
+        d.userData.v.y -= 9 * dt;
+        d.position.addScaledVector(d.userData.v, dt);
+      } else { d.position.y = 0.02; d.scale.set(1.8, 0.2, 1.8); }
+      d.material.opacity = t > 1.2 ? Math.max(0, 0.95 - (t - 1.2) * 2) : 0.95;
+    });
+    return t < 1.7;
+  }, drops, { side, i, p });
+}
+
+// Bleed ticking: a few drops fall from the wound.
+export function bleedTick(side, i){
+  const p = at(side, i, 0.9);
+  if (!p) return;
+  const drops = [];
+  for (let k = 0; k < 5; k++){
+    const d = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), mat(0xc0201a, 0.95));
+    d.position.copy(p).add(new THREE.Vector3((Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3));
+    d.scale.set(0.8, 1.4, 0.8);
+    d.userData.v = new THREE.Vector3(0, -0.5 - Math.random(), 0);
+    drops.push(d);
+  }
+  spawn((t, dt) => {
+    drops.forEach(d => {
+      if (d.position.y > 0.03){ d.userData.v.y -= 8 * dt; d.position.addScaledVector(d.userData.v, dt); }
+      else { d.position.y = 0.02; d.scale.set(2, 0.2, 2); }
+      d.material.opacity = Math.max(0, 0.95 - Math.max(0, t - 0.6) * 2);
+    });
+    return t < 1.1;
+  }, drops, { side, i, p });
+}
+
+// Defense aura: a glowing rune circle on the ground and motes rising around
+// the Axie -- the "buff applied" beat every defense shares.
+export function buffAura(side, i, color = 0x8fd0ff){
+  const p = at(side, i, 0);
+  if (!p) return;
+  const rune = new THREE.Mesh(new THREE.RingGeometry(0.7, 0.85, 6), mat(color, 0.9, { blending: THREE.AdditiveBlending }));
+  const rune2 = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.6, 32), mat(color, 0.8, { blending: THREE.AdditiveBlending }));
+  [rune, rune2].forEach(r => { r.rotation.x = -Math.PI / 2; r.position.set(p.x, 0.03, p.z); });
+  const motes = [];
+  for (let k = 0; k < 12; k++){
+    const m = glow(k % 3 ? color : 0xffffff, 0.14, 0.95);
+    const a = (k / 12) * Math.PI * 2;
+    m.userData = { a, y: Math.random() * 0.3, sp: 0.9 + Math.random() * 0.8, base: 0.95 };
+    motes.push(m);
+  }
+  spawn((t, dt) => {
+    const k = t / 1.3;
+    rune.rotation.z += dt * 1.5; rune2.rotation.z -= dt * 2;
+    rune.scale.setScalar(0.6 + ease(Math.min(1, k * 3)) * 0.5);
+    rune.material.opacity = rune2.material.opacity = Math.max(0, 0.9 * (1 - k));
+    motes.forEach(m => {
+      const u = m.userData;
+      u.y += dt * u.sp; u.a += dt * 1.2;
+      m.position.set(p.x + Math.cos(u.a) * 0.7, u.y, p.z + Math.sin(u.a) * 0.6);
+      m.material.opacity = Math.max(0, 0.95 * (1 - k));
+    });
+    return k < 1;
+  }, [rune, rune2, ...motes], { side, i, p });
+}
+
+// Heal sparkle: green-gold glitter rising through the Axie.
+export function healSparkle(side, i, color = 0x9dffb0){
+  const p = at(side, i, 0);
+  if (!p) return;
+  const bits = [];
+  for (let k = 0; k < 16; k++){
+    const b = glow(k % 4 ? color : 0xfff6b0, 0.1 + Math.random() * 0.1, 1);
+    b.position.set(p.x + (Math.random() - 0.5) * 1.0, Math.random() * 0.6, p.z + (Math.random() - 0.5) * 0.8);
+    b.userData.rise = 0.8 + Math.random() * 1.2;
+    b.userData.base = 1;
+    bits.push(b);
+  }
+  const flare = glow(color, 2.2, 0.6);
+  flare.position.set(p.x, 0.8, p.z);
+  spawn((t, dt) => {
+    bits.forEach(b => { b.position.y += b.userData.rise * dt; b.material.opacity = Math.max(0, 1 - t / 1.3) * (0.6 + 0.4 * Math.sin(t * 25 + b.userData.rise * 10)); });
+    flare.material.opacity = Math.max(0, 0.6 * (1 - t / 0.5));
+    return t < 1.3;
+  }, [...bits, flare], { side, i, p });
 }
 
 // ---------- camera, time and screen ----------

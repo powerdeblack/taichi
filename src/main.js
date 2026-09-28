@@ -517,6 +517,7 @@ function applyResultFx(result){
         const healed = per.get(i)?.healed;
         if (card.effect === 'regen') cine.regenSpiral(ts, i);
         else cine.healBeam(ts, i);
+        cine.healSparkle(ts, i);
         render.flashHeal(el);
         render.spawnFloatingText(el, card.effect === 'regen' ? 'REGEN!' : (healed > 0 ? '+' + healed : 'FULL HP'), 'text-heal');
         ui.spawnImpact(ts, i, 'heal');
@@ -591,23 +592,59 @@ function applyResultFx(result){
 // Heavy hits add a shockwave, camera shake, a zoom punch and a hit-stop.
 const cine = ui.cinematics;
 
+// Projectile look per card: Ranger volleys rain arrows (multi) or loose a
+// single arrow, poison is a venom glob thrown from the hand, melee sets
+// throw a blade, and each magic school flies its own spell bolt.
+const SPELL_SCHOOL = { mage: 'arcane', priest: 'holy', shaman: 'spirit' };
 function projectileStyle(card){
   if (card.role !== 'attack') return 'orb';
+  if (card.effect === 'multi') return 'volley';
+  if (card.effect === 'poison') return 'poison';
   if (card.setId === 'ranger') return 'arrow';
   if (card.setId === 'warrior' || card.setId === 'rogue') return 'blade';
-  return 'orb';
+  if (card.effect === 'chill') return 'frost';
+  return SPELL_SCHOOL[card.setId] || 'arcane';
+}
+
+// The projectiles cinematics.js draws itself, started as the card leaves
+// the caster (the generic cast orb is hidden for these, see board3d.js).
+function launchCinematic(plan, style, flight){
+  const a = [plan.side, plan.casterIndex, plan.targetSide, plan.targetIndex, flight, plan.missed];
+  if (style === 'volley') cine.volley(...a, castColor(plan.card));
+  else if (style === 'poison') cine.poisonBolt(...a);
+  else if (style === 'arcane' || style === 'holy' || style === 'spirit' || style === 'frost') cine.spellBolt(...a, style);
 }
 
 function attackCinematic(result){
   const { card, targetSide: ts, targetIndex: ti } = result;
   const color = castColor(card);
-  cine.strikeTrail(result.side, result.casterIndex, ts, ti, color);
-  if (card.setId === 'ranger') cine.arrowRain(ts, ti, card.effect === 'multi' ? 5 : 2, color);
-  else if (card.setId === 'warrior' || card.setId === 'rogue') cine.slash(ts, ti, color, !!result.ambush || result.dmg >= 18);
-  else cine.arcaneBlast(ts, ti, color);
-  if (card.effect === 'bleed') cine.bloodSplash(ts, ti);
+  const style = projectileStyle(card);
+  if (style === 'volley'){
+    cine.sparks(ts, ti, 0xffe7a0, 10);
+  } else if (card.setId === 'ranger'){
+    cine.arrowRain(ts, ti, 2, color);
+    cine.sparks(ts, ti, 0xffe7a0, 10);
+  } else if (card.setId === 'warrior' || card.setId === 'rogue'){
+    cine.strikeTrail(result.side, result.casterIndex, ts, ti, color);
+    cine.slash(ts, ti, color, !!result.ambush || result.dmg >= 18);
+    cine.sparks(ts, ti, 0xfff0c0, 16);
+  } else if (style === 'holy'){
+    cine.holyBurst(ts, ti);
+  } else if (style === 'spirit'){
+    cine.arcaneBlast(ts, ti, 0x3fe0c0);
+    cine.sparks(ts, ti, 0x7affd9, 14);
+  } else if (style === 'frost'){
+    cine.sparks(ts, ti, 0xcff0ff, 14);
+  } else if (style !== 'poison'){
+    cine.arcaneBlast(ts, ti, 0x6f8dff);
+    cine.sparks(ts, ti, 0x9a6bff, 14);
+  }
+  if (card.effect === 'bleed'){ cine.bloodSplash(ts, ti); cine.bloodSpray(ts, ti); }
   if (card.effect === 'poison') cine.poisonCloud(ts, ti);
   if (card.effect === 'deathmark') cine.deathmark(ts, ti);
+  if (card.effect === 'chill') cine.frostNova(ts, ti);
+  if (card.effect === 'stun') cine.stunStars(ts, ti, card.duration || game.STUN_TIME);
+  if (card.effect === 'fear') cine.fearWisps(ts, ti);
   if (result.deathmarked) cine.flash('#9f7aea', 0.35);
   ui.hitSquash(ts, ti, Math.min(1.6, 0.6 + result.dmg / 20));
   if (result.dmg >= 18 || result.ambush || result.comboBonus || result.deathmarked){
@@ -620,7 +657,11 @@ function attackCinematic(result){
   }
 }
 
+// Each defense's own shape, over a shared "buff applied" rune and motes
+// in the defense's colour.
+const DEFENSE_GLOW = { bulwark: 0xffc233, bulwark_cleanse: 0xfff0a8, barrier: 0x5fd0ff, dodge: 0xdff4ff, thorns: 0x8fce4a, secret: 0xb89cff };
 function defenseCinematic(card, side, index){
+  cine.buffAura(side, index, DEFENSE_GLOW[card.effect] || 0x8fd0ff);
   switch (card.effect){
     case 'bulwark': cine.bulwarkWall(side, index); break;
     case 'bulwark_cleanse': cine.cleansePillar(side, index); cine.bulwarkWall(side, index); break;
@@ -670,12 +711,15 @@ function applyBleedFx(side, statusResults){
       render.flashHeal(el);
       render.spawnFloatingText(el, '+'+dmg+' 🌿', 'text-heal');
       ui.spawnImpact(side, laneIndex, 'heal');
+      cine.healSparkle(side, laneIndex);
       return;
     }
     render.flashHit(el);
     const icon = { poison: '☠️', regenRot: '🥀', blizzard: '❄️' }[kind] || '🩸';
     render.spawnFloatingText(el, '-'+dmg+' '+icon, kind === 'blizzard' ? 'text-shield' : 'text-bleed');
     ui.spawnImpact(side, laneIndex, { poison: 'poison', blizzard: 'frost' }[kind] || 'bleed');
+    if (kind === 'poison') cine.poisonTick(side, laneIndex);
+    else if (kind === 'bleed') cine.bleedTick(side, laneIndex);
     playKOIfDied(side, laneIndex);
   });
 }
@@ -1045,7 +1089,9 @@ function tickPendingCasts(dt){
     c.age += dt;
     if (c.travels && !c.launched && c.age >= game.CAST_LAUNCH_AT){
       c.launched = true;
-      ui.launchCastFX(c.id, c.plan.targetSide, c.plan.targetIndex, game.CAST_IMPACT_AT - game.CAST_LAUNCH_AT, c.plan.missed, projectileStyle(c.plan.card));
+      const style = projectileStyle(c.plan.card), flight = game.CAST_IMPACT_AT - game.CAST_LAUNCH_AT;
+      ui.launchCastFX(c.id, c.plan.targetSide, c.plan.targetIndex, flight, c.plan.missed, style);
+      launchCinematic(c.plan, style, flight);
       // The caster swings its weapon as the shot leaves (toolkit clips).
       ui.playLaneAction(c.plan.side, c.plan.casterIndex, c.plan.card.role === 'attack' ? 'attack' : 'skill');
       sfx.playLaunch(c.plan.card);

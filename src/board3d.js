@@ -387,6 +387,7 @@ export function startCastFX(id, side, laneIndex, color, chargeTime){
 // a real arrow on a flat, fast arc that points where it flies; 'blade'
 // (Warrior/Rogue) is a spinning crescent thrown low; 'orb' (magic sets)
 // keeps the glowing orb on a high lob.
+const CINE_STYLES = new Set(['volley', 'poison', 'arcane', 'holy', 'spirit', 'frost']);
 export function launchCastFX(id, toSide, toIndex, duration, miss, style = 'orb'){
   const cast = casts.get(id);
   if (!cast) return;
@@ -395,7 +396,13 @@ export function launchCastFX(id, toSide, toIndex, duration, miss, style = 'orb')
     toSide, toIndex, dur: duration, t: 0, from: cast.orb.position.clone(), miss, style,
     offset: miss ? side : new THREE.Vector3(), arc: style === 'arrow' ? 0.7 : style === 'blade' ? 0.45 : 1.3,
   };
-  if (style !== 'orb'){
+  if (CINE_STYLES.has(style)){
+    // cinematics.js flies its own projectile (volley, venom glob, spell
+    // bolt) -- the generic orb just vanishes from the caster's hands.
+    cast.orb.visible = false;
+    cast.halo.visible = false;
+    cast.motes.forEach(m => { m.visible = false; });
+  } else if (style !== 'orb'){
     const color = cast.halo.material.color.clone();
     cast.shape = style === 'arrow' ? buildArrow(color) : buildBlade(color);
     cast.shape.position.copy(cast.orb.position);
