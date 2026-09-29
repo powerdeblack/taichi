@@ -17,7 +17,7 @@ export function seedRandom(seed){
 
 const DT = 0.1;
 export const MAX_TIME = 300;
-const AI_SPEED = 1.3; // same as the in-game rival
+const AI_SPEED = 2.0; // same as the in-game rival
 
 const CAST = { you: 'castYou', rival: 'castRival' };
 export const duelStats = { duels: 0, seconds: 0, timeouts: 0 };

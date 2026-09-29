@@ -156,6 +156,12 @@ npm run preview
   estilo crítico em golpes ≥45; borda vermelha ao levar dano e batimento
   quando seu Tanque está abaixo de 30%; cartas com borda dourada quando dá
   pra jogar agora, custo vermelho sem energia e animação ao comprar.
+- **Arena grande** — os times começam a 9 unidades (3× a distância antiga,
+  `game.js` `ROW_Z`), numa arena de 18 × 13,6 (`ARENA`); o salão 3D
+  (colunas, árvores, sigilo, neve, névoa) escala junto (`HALL_SCALE`) e a
+  câmera de combate abre até 30 de distância. Movimento mais rápido (você
+  2.6/s, bot 2.0/s). Rebalanceado no simulador: 44%–58%, duelo médio 58s
+  (Barreira 50, Veneno até 5 acúmulos, Regeneração 13).
 - **Abertura, música e resultado** — tela de título (logo AXIE DUEL, anel
   rúnico de Lunacia, aurora, neve, as 6 classes em 3D, barra de
   carregamento real e "Tap to play", que libera o áudio). Trilha procedural

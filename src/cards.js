@@ -109,8 +109,8 @@ export const CARD_SETS = [
       desc:'Long range. Chill 8s: the target can\'t dodge and a chilled Tank moves at half speed.' },
     secretCard: { id:'armadilha_gelida', name:'Frost Trap', range:'own', role:'defense', cost:1, effect:'secret', trap:'frost', amount:12, duration:8,
       desc:'Secret: laid face-down on an ally. When it\'s attacked, the attacker takes 12 and is Chilled for 8s.' },
-    defenseCard: { id:'barreira_arcana', name:'Arcane Barrier', range:'own', role:'defense', cost:2, effect:'barrier', amount:44,
-      desc:'Barrier: absorbs the next 44 damage taken, no matter how many hits it takes to burn through.' },
+    defenseCard: { id:'barreira_arcana', name:'Arcane Barrier', range:'own', role:'defense', cost:2, effect:'barrier', amount:50,
+      desc:'Barrier: absorbs the next 50 damage taken, no matter how many hits it takes to burn through.' },
     healCard: { id:'dreno_vital', name:'Life Drain', range:'own', role:'heal', cost:1, heal:21,
       desc:'Channels life force -- heals an ally for 21 HP (scaled by MP), or drains an enemy for the same amount as damage instead (Reverse Heal).' },
   },
@@ -280,7 +280,7 @@ export const ARCHETYPES = [
   {
     id: 'poison', name: 'Plague', icon: '☠️', color: '#8e5cc9',
     tags: ['Poison', 'Long range', 'Kite'],
-    how: 'Rogue and Mage stack Poison from long range: each hit adds 3 stacks (up to 9), a tick deals 3 per stack and then fades by one -- a full stack (6) does about 63 damage over time. Stay back and keep re-applying it while the Shaman Tank regenerates and punishes anyone who rushes it with Thorns.',
+    how: 'Rogue and Mage stack Poison from long range: each hit adds 3 stacks (up to 5), a tick deals 3 per stack and then fades by one -- a full stack (5) does about 45 damage over time. Stay back and keep re-applying it while the Shaman Tank regenerates and punishes anyone who rushes it with Thorns.',
     picks: [
       { classId: 'Reptile', setId: 'shaman', isTank: true, evolved: false, counts: { attack: 1, defense: 2, heal: 2 } },
       { classId: 'Bug', setId: 'rogue', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
@@ -303,7 +303,7 @@ export const ARCHETYPES = [
     how: 'Outlast them: the Priest drops big heals and Regeneration on whoever is hurt, the Shaman Tank regenerates for 4 ticks and punishes attackers with Thorns, and the Ranger chips damage from range. Keep your Tank topped up and the enemy wears itself out.',
     picks: [
       { classId: 'Reptile', setId: 'shaman', isTank: true, evolved: false, counts: { attack: 0, defense: 3, heal: 2 } },
-      { classId: 'Plant', setId: 'priest', isTank: false, evolved: false, counts: { attack: 1, defense: 0, heal: 4 } },
+      { classId: 'Plant', setId: 'priest', isTank: false, evolved: false, counts: { attack: 2, defense: 0, heal: 3 } },
       { classId: 'Bird', setId: 'ranger', isTank: false, evolved: false, counts: { attack: 3, defense: 1, heal: 1 } },
     ],
   },
@@ -330,9 +330,9 @@ export const ARCHETYPES = [
   {
     id: 'bastion', name: 'Arcane Bastion', icon: '🔵', color: '#3f7fd1',
     tags: ['Barrier', 'Shield', 'Sustain'],
-    how: 'Layers of protection: the Mage Tank throws up Barriers on the whole team (each absorbs the next 44 damage), the Priest adds Guard (blocks 60% of the next hit), heals and a bit of damage. Burst gets soaked before it reaches HP, while the Mage behind trades Arcane Blasts. Weak spot: Bleed and Poison ticks go straight through barriers.',
+    how: 'Layers of protection: the Mage Tank throws up Barriers on the whole team (each absorbs the next 50 damage), the Priest adds Guard (blocks 60% of the next hit) and heals, and both Mages trade Arcane Blasts. Burst gets soaked before it reaches HP. Weak spot: Bleed and Poison ticks go straight through barriers.',
     picks: [
-      { classId: 'Aqua', setId: 'mage', isTank: true, evolved: false, counts: { attack: 1, defense: 3, heal: 1 } },
+      { classId: 'Aqua', setId: 'mage', isTank: true, evolved: false, counts: { attack: 2, defense: 3, heal: 0 } },
       { classId: 'Plant', setId: 'priest', isTank: false, evolved: false, counts: { attack: 2, defense: 2, heal: 1 } },
       { classId: 'Aqua', setId: 'mage', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
     ],
@@ -350,7 +350,7 @@ export const ARCHETYPES = [
   {
     id: 'toxic', name: 'Toxic Rush', icon: '🐍', color: '#5fa84a',
     tags: ['Poison', 'Rush', 'Anti-heal'],
-    how: 'Three Rogues flood the enemy with Poison: every blade adds 3 stacks (up to 6, about 63 damage over time) faster than healers can undo it. Rush in, spread poison on the Tank, and let it tick while Smoke keeps your own Tank from being hit.',
+    how: 'Three Rogues flood the enemy with Poison: every blade adds 3 stacks (up to 5, about 45 damage over time) faster than healers can undo it. Rush in, spread poison on the Tank, and let it tick while Smoke keeps your own Tank from being hit.',
     picks: [
       { classId: 'Bug', setId: 'rogue', isTank: true, evolved: false, counts: { attack: 2, defense: 2, heal: 1 } },
       { classId: 'Bug', setId: 'rogue', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
@@ -362,7 +362,7 @@ export const ARCHETYPES = [
     tags: ['Bleed', 'Poison', 'Hybrid DOT'],
     how: 'Two damage-over-time effects at once: the Mage applies both Bleed (short) and Poison (long), the Rogue stacks more Poison, and they tick independently every 2s. The Warrior Tank holds the line with Bulwark (next 3 hits taken -35%).',
     picks: [
-      { classId: 'Beast', setId: 'warrior', isTank: true, evolved: false, counts: { attack: 2, defense: 3, heal: 0 } },
+      { classId: 'Beast', setId: 'warrior', isTank: true, evolved: false, counts: { attack: 1, defense: 3, heal: 1 } },
       { classId: 'Aqua', setId: 'mage', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
       { classId: 'Bug', setId: 'rogue', isTank: false, evolved: false, counts: { attack: 4, defense: 1, heal: 0 } },
     ],

@@ -47,8 +47,9 @@ braces with defenses and saves energy for big cards. Energy refills continuously
 hold a card to see its reach ring and exactly what letting go will do, then
 release. Every card charges on its caster, flies to the target and lands a few
 seconds later, and each side can only start a new card every 5 seconds — so
-the fight is about positioning and reading the rival's cast bar. Short-range
-cards need contact distance; long-range cards reach most of the arena. Your
+the fight is about positioning and reading the rival's cast bar. Squads start far apart on a wide snowfield, so every duel opens with an
+approach; short-range cards need contact distance, long-range cards reach
+about a third of the arena. Your
 squad moves as one block led by the Tank, whose Taunt forces nearby attackers
 to hit it.
 
@@ -89,8 +90,8 @@ The same hand system is the foundation for PvP.
 **Balanced with simulation.** A headless simulator plays the real rules and
 the in-game AI against itself: 400 duels for every pairing of the ten
 archetypes (18,000 duels per balance pass), plus a 2,000-team Swiss
-tournament (11,000 duels). Every archetype currently wins between 45% and 57%
-of its duels, and a duel lasts a bit over a minute on average.
+tournament (11,000 duels). Every archetype currently wins between 44% and 58%
+of its duels, and a duel lasts about a minute on average.
 
 ## Controls / first contact
 

@@ -148,7 +148,9 @@ export function aliveIndices(lanes){
 // below (range, taunt, arena bounds) measures. Comparing the two sides'
 // local positions directly would be mirrored: walking toward the enemy
 // would look like walking away.
-export const ROW_Z = { you: 1.5, rival: -1.5 };
+// Squads start 9 apart (3x the old 3): nobody is in reach at the whistle,
+// so every duel opens with positioning and a real approach.
+export const ROW_Z = { you: 4.5, rival: -4.5 };
 export function worldPos(side, lane){
   const faceSign = side === 'you' ? -1 : 1;
   return { x: lane.localPos.x, z: ROW_Z[side] + faceSign * lane.localPos.z };
@@ -162,7 +164,7 @@ const other = side => side === 'you' ? 'rival' : 'you';
 const lanesOf = (state, side) => side === 'you' ? state.youLanes : state.rivalLanes;
 
 // Attack reach in world units. Short range is roughly "touching distance"
-// (the two front lines start ~1.7 apart); long range covers most of the
+// (two Axies standing side by side); long range covers most of the
 // arena but not all of it, so positioning still matters for every card.
 export const RANGE = { short: 2.3, long: 6.0 };
 export function cardRange(card){
@@ -280,10 +282,10 @@ export function tickMoveCooldown(state, dt){
 // arena (the whole snowfield in view, both halves). Squads don't block
 // each other: they can walk past and around enemy Axies freely, so
 // nobody gets stuck behind an opponent.
-// Squad-center bounds in world units: wide left/right, and limits at both
-// ends of the field so no squad walks under the HUD bars (top: energy and
-// clock; bottom: joystick and cards).
-export const ARENA = { xMin: -4.4, xMax: 4.4, zMin: -2.1, zMax: 2.6 };
+// Squad-center bounds in world units: a wide snowfield with room behind each
+// starting line to retreat, flank and kite (the combat camera frames the
+// fight wherever it goes).
+export const ARENA = { xMin: -9, xMax: 9, zMin: -6.8, zMax: 6.8 };
 export function moveSquadWithTank(state, side, dx, dz){
   const lanes = lanesOf(state, side);
   const tank = lanes.find(l => l.isTank && l.alive);
@@ -399,7 +401,7 @@ function tickBleed(lane){
 // fixed-length DOT, it front-loads damage and tapers off.
 const POISON_STACK = 3;
 const POISON_PER_STACK = 3; // damage per stack each tick
-const POISON_CAP = 6;
+const POISON_CAP = 5;
 function applyPoison(lane){
   lane.status.poison = Math.min(POISON_CAP, (lane.status.poison || 0) + POISON_STACK);
 }
@@ -486,7 +488,7 @@ function applyGuardianCleanse(lane){
 
 // Regeneration: Trevo's normal effect -- heals a flat MP-scaled amount each
 // STATUS_TICK_INTERVAL tick for `ticks` ticks (see tickRegen).
-const REGEN_HEAL_PER_TICK = 11;
+const REGEN_HEAL_PER_TICK = 13;
 function applyRegen(lane, ticks){
   lane.status.regen = Math.max(lane.status.regen || 0, ticks);
 }

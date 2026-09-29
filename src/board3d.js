@@ -27,7 +27,7 @@ if (import.meta.env.DEV && typeof window !== 'undefined') window.__axieSlots = s
 const MOVE_LERP_SPEED = 6; // higher = snappier slide into the new slot
 const INTRO_LERP_SPEED = 1.8; // slower -- the opening "walk into the hall" entrance (~2.5-3s)
 const PATROL_AMPLITUDE = 0.07; // how far idle units wander from their spot
-const INTRO_SPAWN_OFFSET = 2.0; // extra distance back from the formation at match start
+const INTRO_SPAWN_OFFSET = 3.0; // extra distance back from the formation at match start
 const ROTATE_LERP_SPEED = 8; // higher = snaps to face its movement direction faster
 const impacts = []; // short-lived hit/heal burst effects -- see spawnImpact
 
@@ -122,8 +122,8 @@ export function initBoard3D(canvas){
   // Pulled back and slightly wider than the original tiles-only framing so
   // the much bigger hall (see buildHall) actually reads as a big room
   // instead of just a slightly larger floor color.
-  camera = new THREE.PerspectiveCamera(26, 1, 0.1, 60);
-  camera.position.set(0, 11.5, 12.6);
+  camera = new THREE.PerspectiveCamera(26, 1, 0.1, 110);
+  camera.position.set(0, 20.4, 22.1);
   camera.lookAt(0, 0, 0.2);
   // matrixWorldInverse (needed by Vector3.project, used for overlay
   // positioning) is normally only refreshed during a render() pass -- force
@@ -205,7 +205,7 @@ export function setEdgeFx(kind, on = true){
   edgeFx.classList.toggle(kind, on);
 }
 const CAM_DIR = new THREE.Vector3(0, 11.5, 12.4).normalize();
-const CAM_FAR = 16.9, CAM_NEAR = 8.2, CAM_MARGIN = 1.7;
+const CAM_FAR = 30, CAM_NEAR = 8.2, CAM_MARGIN = 1.7;
 const camFocus = new THREE.Vector3(0, 0, 0.2);
 let camDist = CAM_FAR;
 function updateCombatCamera(dt){
@@ -747,13 +747,16 @@ export function hideAim(){
 // drifting down the whole time. Everything that could block the view
 // (pillars, trees, drifts) stays on the far arc or well out on the flanks
 // -- nothing stands between the camera and the fight.
-const SNOW_RADIUS = 30;
-const COLUMN_RADIUS = 8.5;
+// The whole hall scales with the (bigger) arena so pillars, trees and
+// drifts stay outside the field of play.
+const HALL_SCALE = 1.75;
+const SNOW_RADIUS = 50;
+const COLUMN_RADIUS = 8.5 * HALL_SCALE;
 const COLUMN_COUNT = 16;
 const COLUMN_MAX_SIN = -0.35; // far arc only
-const SIGIL_RADIUS = 2.8;
-const SNOWFLAKE_COUNT = 700;
-const SNOW_BOX = { x: 13, yTop: 9, zMin: -13, zMax: 9 };
+const SIGIL_RADIUS = 2.8 * HALL_SCALE;
+const SNOWFLAKE_COUNT = 1400;
+const SNOW_BOX = { x: 13 * HALL_SCALE, yTop: 9, zMin: -13 * HALL_SCALE, zMax: 9 * HALL_SCALE };
 
 let sigilGlow = null;
 let sigilRing = null;
@@ -765,13 +768,13 @@ let blizzard = false;
 // Sudden death look: snow falls hard and sideways, the haze closes in.
 export function setBlizzard(on){
   blizzard = on;
-  if (scene && scene.fog){ scene.fog.near = on ? 8 : 15; scene.fog.far = on ? 24 : 34; }
+  if (scene && scene.fog){ scene.fog.near = on ? 14 : 26; scene.fog.far = on ? 42 : 60; }
   if (snowPoints){ snowPoints.material.size = on ? 0.3 : 0.24; }
 }
 
 function buildHall(){
   scene.background = buildSkyTexture();
-  scene.fog = new THREE.Fog(0xb9d3ea, 15, 34);
+  scene.fog = new THREE.Fog(0xb9d3ea, 26, 60);
 
   const floorGeo = new THREE.CircleGeometry(SNOW_RADIUS, 64);
   const floorMat = new THREE.MeshStandardMaterial({
@@ -872,10 +875,10 @@ function buildPines(){
   for (let i = 0; i < 14; i++){
     const a = Math.PI * (1.08 + (i / 13) * 0.84); // back arc
     const r = 11 + (i % 3) * 1.4;
-    spots.push([Math.cos(a) * r, Math.sin(a) * r]);
+    spots.push([Math.cos(a) * r * HALL_SCALE, Math.sin(a) * r * HALL_SCALE]);
   }
   for (const side of [-1, 1]){
-    for (let i = 0; i < 4; i++) spots.push([side * (10.5 + (i % 2) * 1.6), -4 + i * 1.7]);
+    for (let i = 0; i < 4; i++) spots.push([side * (10.5 + (i % 2) * 1.6) * HALL_SCALE, (-4 + i * 1.7) * HALL_SCALE]);
   }
   spots.forEach(([x, z], i) => {
     const s = 0.8 + ((i * 37) % 10) / 16;
@@ -901,7 +904,7 @@ function buildPines(){
 function buildDrifts(){
   const mat = new THREE.MeshStandardMaterial({ color: 0xf4f9ff, roughness: 1 });
   const geo = new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-  const drifts = [[-7.5, -6, 1.2], [7, -6.5, 1.0], [-11.5, -1, 1.0], [11.5, -2.5, 1.1], [-4, -10, 1.4], [3.5, -10.5, 1.1]];
+  const drifts = [[-7.5, -6, 1.2], [7, -6.5, 1.0], [-11.5, -1, 1.0], [11.5, -2.5, 1.1], [-4, -10, 1.4], [3.5, -10.5, 1.1]].map(([x, z, r]) => [x * HALL_SCALE, z * HALL_SCALE, r * 1.3]);
   drifts.forEach(([x, z, r]) => {
     const d = new THREE.Mesh(geo, mat);
     d.scale.set(r * 1.3, r * 0.25, r);

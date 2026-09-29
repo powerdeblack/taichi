@@ -1324,7 +1324,7 @@ function cancelMoveMode(){
 // that's also the direction that brings the squad closer to the enemy
 // Tank's taunt radius.
 const JOY_MAX_PX = 24;
-const UNIT_MOVE_SPEED = 1.8; // local units/sec at full stick deflection
+const UNIT_MOVE_SPEED = 2.6; // local units/sec at full stick deflection
 let joyHolding = false;
 let joyDirX = 0, joyDirZ = 0;
 let joyStartX = 0, joyStartY = 0;
@@ -1414,7 +1414,7 @@ window.addEventListener('blur', () => { keysDown.clear(); if (state) updateKeyMo
 // hall on its own timer instead of standing still: drives the exact same
 // game.moveSquadWithTank the player's joystick uses, just picking a
 // random direction/hold period instead of reading a pointer.
-const AI_MOVE_SPEED = 1.3; // a bit slower than the player's own joystick
+const AI_MOVE_SPEED = 2.0; // a bit slower than the player's own joystick
 let aiMoveTimer = 1 + Math.random() * 1.5;
 let aiMoveDirX = 0, aiMoveDirZ = 0;
 let aiWandering = false;
