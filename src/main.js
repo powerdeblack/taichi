@@ -4,8 +4,10 @@ import * as W from './wallet.js';
 import { NAVES } from './data.js';
 import {
   TELAS, recursosHtml, abasHtml, alertasAbas, lateralHtml, painelSelecaoHtml, modalMarchaHtml, resumoMarcha, fmtTempo,
+  hudMarchasHtml, hudMarcadoresHtml, FILTROS,
 } from './ui.js';
-import { desenharMapa, celulaDoClique } from './mapa.js';
+import { desenharMapa, desenharMinimapa, celulaDoClique, progressoMarcha } from './mapa.js';
+import { TAMANHO_MAPA } from './territorio.js';
 
 const PREFIXO = 'guerra-sideral:v2:';
 const $ = (id) => document.getElementById(id);
@@ -26,12 +28,16 @@ function carregar(tokenId) {
   if (bruto) {
     try {
       const s = JSON.parse(bruto);
-      if (s.versao === 2) return s;
+      if (s.versao === 2) return E.migrar(s);
     } catch { /* save corrompido: começa de novo */ }
   }
   const s = E.novoEstado(Date.now());
   s.nave.tokenId = tokenId || null;
   return s;
+}
+
+function lerJson(chave) {
+  try { return JSON.parse(lerStorage(chave)) || {}; } catch { return {}; }
 }
 
 function salvar() {
@@ -50,6 +56,8 @@ const ui = {
   ultimoHtml: {},
   vistoRegistro: s.registro[0]?.t ?? 0,
   modalAlvo: null,
+  filtros: { ...Object.fromEntries(FILTROS.map(([id]) => [id, true])), ...lerJson(PREFIXO + 'filtros') },
+  paineis: { busca: false, marcadores: false, filtro: false },
   carteira: {
     providerDisponivel: Boolean(W.providerInjetado()),
     configurado: W.contratosConfigurados(),
@@ -90,7 +98,7 @@ function definirHtml(id, html) {
 
 function digitando() {
   const a = document.activeElement;
-  return a && ['INPUT', 'SELECT', 'TEXTAREA'].includes(a.tagName) && $('conteudo').contains(a);
+  return a && ['INPUT', 'SELECT', 'TEXTAREA'].includes(a.tagName) && a.type !== 'checkbox' && $('conteudo').contains(a);
 }
 
 function renderizar(forcar = false) {
@@ -104,10 +112,12 @@ function renderizar(forcar = false) {
     const mudou = definirHtml('conteudo', TELAS[ui.aba](s, now, { ...ui, rede: W.rede() }));
     if (ui.aba === 'galaxia') {
       if (mudou) {
-        delete ui.ultimoHtml.painelSelecao;
+        // Os painéis do HUD foram recriados vazios: invalida o cache para preenchê-los de novo.
+        for (const id of ['painelSelecao', 'hudMarchas', 'hudMarcadores']) delete ui.ultimoHtml[id];
         ligarMapa();
       }
       atualizarPainelSelecao();
+      atualizarHud();
     }
   }
   atualizarRelogios(now);
@@ -125,7 +135,7 @@ function avisarNovosRegistros() {
   if (s.registro[0]) ui.vistoRegistro = Math.max(ui.vistoRegistro, s.registro[0].t);
 }
 
-// ---------- mapa ----------
+// ---------- mapa e HUD ----------
 
 function ligarMapa() {
   const canvas = $('mapa');
@@ -136,7 +146,27 @@ function ligarMapa() {
     ui.selecionado = cel;
     atualizarPainelSelecao();
   });
+  canvas.addEventListener('mousemove', (ev) => {
+    const cel = celulaDoClique(canvas, ev, ui.celula);
+    if (cel && $('hudCoord')) $('hudCoord').textContent = `X:${cel.x} Y:${cel.y}`;
+  });
+  $('moldura').addEventListener('scroll', (ev) => {
+    ui.rolagem = { left: ev.currentTarget.scrollLeft, top: ev.currentTarget.scrollTop };
+    desenharMini();
+  }, { passive: true });
+  $('minimapa').addEventListener('click', (ev) => {
+    const r = ev.currentTarget.getBoundingClientRect();
+    centralizar(((ev.clientX - r.left) / r.width) * TAMANHO_MAPA, ((ev.clientY - r.top) / r.height) * TAMANHO_MAPA);
+  });
   desenhar();
+  if (ui.centralizarAoAbrir !== false || !ui.rolagem) {
+    centralizar(s.base.x + 0.5, s.base.y + 0.5);
+  } else {
+    $('moldura').scrollLeft = ui.rolagem.left;
+    $('moldura').scrollTop = ui.rolagem.top;
+    desenharMini();
+  }
+  ui.centralizarAoAbrir = false;
 }
 
 function atualizarPainelSelecao() {
@@ -144,10 +174,63 @@ function atualizarPainelSelecao() {
   atualizarRelogios(Date.now());
 }
 
+function atualizarHud() {
+  if ($('hudMarchas')) definirHtml('hudMarchas', hudMarchasHtml(s));
+  if ($('hudMarcadores')) definirHtml('hudMarcadores', hudMarcadoresHtml(s));
+}
+
 function desenhar() {
   const canvas = $('mapa');
-  if (canvas) ui.celula = desenharMapa(canvas, s, { selecionado: ui.selecionado, zoom: ui.zoom, now: Date.now() });
+  if (!canvas) return;
+  ui.celula = desenharMapa(canvas, s, { selecionado: ui.selecionado, zoom: ui.zoom, now: Date.now(), filtros: ui.filtros });
+  desenharMini();
 }
+
+function desenharMini() {
+  const mini = $('minimapa');
+  const moldura = $('moldura');
+  if (!mini || !moldura) return;
+  const c = ui.celula;
+  desenharMinimapa(mini, s, { x: moldura.scrollLeft / c, y: moldura.scrollTop / c, w: moldura.clientWidth / c, h: moldura.clientHeight / c });
+}
+
+// Rola o mapa para deixar a coordenada (em casas) no centro da área visível.
+function centralizar(x, y) {
+  const moldura = $('moldura');
+  if (!moldura) return;
+  moldura.scrollLeft = x * ui.celula - moldura.clientWidth / 2;
+  moldura.scrollTop = y * ui.celula - moldura.clientHeight / 2;
+  desenharMini();
+}
+
+function irPara(x, y) {
+  ui.selecionado = { x, y };
+  if (ui.aba !== 'galaxia') {
+    ui.aba = 'galaxia';
+    renderizar(true);
+  }
+  centralizar(x + 0.5, y + 0.5);
+  atualizarPainelSelecao();
+}
+
+function mudarZoom(delta) {
+  const moldura = $('moldura');
+  const centro = moldura
+    ? { x: (moldura.scrollLeft + moldura.clientWidth / 2) / ui.celula, y: (moldura.scrollTop + moldura.clientHeight / 2) / ui.celula }
+    : { x: s.base.x, y: s.base.y };
+  ui.zoom = Math.min(3, Math.max(1, ui.zoom + delta));
+  renderizar(true);
+  desenhar();
+  centralizar(centro.x, centro.y);
+}
+
+document.addEventListener('change', (ev) => {
+  const filtro = ev.target.dataset?.filtro;
+  if (!filtro) return;
+  ui.filtros[filtro] = ev.target.checked;
+  gravarStorage(PREFIXO + 'filtros', JSON.stringify(ui.filtros));
+  desenhar();
+});
 
 // ---------- modal de marcha ----------
 
@@ -261,7 +344,12 @@ function trocarNave(tokenId, nome) {
 const NOME_VALIDO = /^[A-Za-z0-9 _-]{1,24}$/;
 
 const ACOES = {
-  aba: (d) => { ui.aba = d.aba; renderizar(true); window.scrollTo({ top: 0 }); },
+  aba: (d) => {
+    if (d.aba === 'galaxia' && ui.aba !== 'galaxia') ui.centralizarAoAbrir = true;
+    ui.aba = d.aba;
+    renderizar(true);
+    window.scrollTo({ top: 0 });
+  },
   evoluir: (d) => resultado(E.evoluir(s, d.id, Date.now())),
   treinar: (d) => {
     const qtd = Math.floor(Number($(`qtd-${d.id}`)?.value) || 0);
@@ -282,8 +370,34 @@ const ACOES = {
   estacao: (d) => resultado(E.ancorarEstacao(s, Number(d.x), Number(d.y), Date.now())) && atualizarPainelSelecao(),
   monolito: (d) => resultado(E.erguerMonolito(s, Number(d.x), Number(d.y), Date.now())) && atualizarPainelSelecao(),
   saltar: (d) => resultado(E.saltar(s, Number(d.x), Number(d.y), Date.now())) && atualizarPainelSelecao(),
-  irMapa: (d) => { ui.aba = 'galaxia'; ui.selecionado = { x: Number(d.x), y: Number(d.y) }; renderizar(true); },
-  zoom: () => { ui.zoom = ui.zoom > 1 ? 1 : 2; renderizar(true); desenhar(); },
+  irMapa: (d) => irPara(Number(d.x), Number(d.y)),
+  irPara: (d) => irPara(Number(d.x), Number(d.y)),
+  zoom: (d) => mudarZoom(Number(d.delta)),
+  alternar: (d) => { ui.paineis[d.painel] = !ui.paineis[d.painel]; renderizar(true); atualizarHud(); },
+  buscar: () => {
+    const x = Math.floor(Number($('buscaX')?.value));
+    const y = Math.floor(Number($('buscaY')?.value));
+    if (!(x >= 0 && y >= 0 && x < TAMANHO_MAPA && y < TAMANHO_MAPA)) return aviso(`Coordenadas de 0 a ${TAMANHO_MAPA - 1}.`, 'erro');
+    irPara(x, y);
+  },
+  marcar: (d) => {
+    const x = Number(d.x);
+    const y = Number(d.y);
+    const e = s.mapa.find((m) => m.x === x && m.y === y);
+    const nome = prompt('Nome do marcador:', e ? E.nomeAlvo(s, e) : `Setor ${x},${y}`);
+    if (nome === null) return;
+    resultado(E.adicionarMarcador(s, x, y, nome), 'Marcador salvo.') && atualizarPainelSelecao();
+    atualizarHud();
+  },
+  removerMarcador: (d) => { resultado(E.removerMarcador(s, Number(d.x), Number(d.y))); atualizarPainelSelecao(); atualizarHud(); },
+  centralizarBase: () => irPara(s.base.x, s.base.y),
+  centralizarMarcha: (d) => {
+    const m = s.marchas.find((x) => x.id === Number(d.id));
+    if (!m) return;
+    const p = progressoMarcha(m, Date.now());
+    centralizar(s.base.x + 0.5 + (m.alvoX - s.base.x) * p, s.base.y + 0.5 + (m.alvoY - s.base.y) * p);
+  },
+  sonda: (d) => resultado(E.enviarSonda(s, Number(d.id), Date.now()), 'Sonda lançada!') && atualizarPainelSelecao(),
   marcha: (d) => abrirMarcha(Number(d.id)),
   maxNave: (d) => { const i = $(`m-${d.id}`); if (i) i.value = s.tropas[d.id]; atualizarResumo(); },
   fecharModal,
@@ -380,7 +494,10 @@ function loop() {
   } else {
     atualizarRelogios(now);
   }
-  if (ui.aba === 'galaxia') desenhar();
+  if (ui.aba === 'galaxia') {
+    desenhar();
+    atualizarHud();
+  }
   if (now - ultimoSave > 5000) {
     salvar();
     ultimoSave = now;

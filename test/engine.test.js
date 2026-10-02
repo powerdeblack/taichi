@@ -302,3 +302,62 @@ test('comandantes forjados on-chain são desbloqueados no jogo', () => {
   assert.equal(s.comandantes.vega.estrelas, 2);
   assert.equal(E.sincronizarComandantesOnChain(s, [0, 0, 2, 0, 0, 0], T0), 0);
 });
+
+test('Sondas exploram cavernas e destroços (exigem Torre de Radar)', () => {
+  const s = novo();
+  pausarRivais(s);
+  const caverna = dePorTipo(s, 'caverna').find((e) => e.zona === 1);
+  const destroco = dePorTipo(s, 'destroco').find((e) => e.zona === 1);
+  assert.match(E.enviarSonda(s, caverna.id, T0).motivo, /Radar/);
+  s.edificios.radar = 1;
+  assert.ok(E.enviarSonda(s, caverna.id, T0).ok);
+  assert.match(E.enviarSonda(s, destroco.id, T0).motivo, /em missão/);
+  // Sondas não ocupam vagas de marcha: as 2 vagas de frota continuam livres.
+  const [p1, p2] = dePorTipo(s, 'pirata').filter((p) => p.zona === 1);
+  assert.ok(E.enviarMarcha(s, { alvoId: p1.id, comandante: 'kaito', tropas: { drone: 1 } }, T0).ok);
+  assert.ok(E.enviarMarcha(s, { alvoId: p2.id, comandante: 'orion', tropas: { drone: 1 } }, T0).ok);
+  s.marchas = s.marchas.filter((m) => m.tipo === 'sonda');
+  const q = s.quasares;
+  E.tick(s, T0 + 3600_000);
+  assert.equal(caverna.investigado, true);
+  assert.ok(s.quasares > q);
+  assert.equal(s.stats.explorados, 1);
+  assert.match(E.avaliarSonda(s, caverna).motivo, /explorado/);
+  assert.ok(E.enviarSonda(s, destroco.id, T0 + 3600_000).ok);
+  const minerio = s.recursos.minerio;
+  E.tick(s, T0 + 7200_000);
+  assert.equal(destroco.visitado, true);
+  assert.ok(s.recursos.minerio >= Math.min(minerio + 600, E.capacidade(s)));
+});
+
+test('naves rivais: protegidas no território, saqueáveis fora dele', () => {
+  const s = novo();
+  pausarRivais(s);
+  const naves = dePorTipo(s, 'nave');
+  assert.equal(naves.length, 8);
+  const protegida = naves.find((n) => E.donoDe(s.mapa, n.x, n.y) === n.alianca);
+  const exposta = naves.find((n) => E.donoDe(s.mapa, n.x, n.y) !== n.alianca && E.zona(n.x, n.y) === 1);
+  assert.match(E.avaliarAlvo(s, protegida).motivo, /território/);
+  assert.ok(exposta, 'existe nave rival exposta na Borda');
+  exposta.tropas = { ...SEM_TROPAS, drone: 1 };
+  assert.ok(E.enviarMarcha(s, { alvoId: exposta.id, comandante: 'kaito', tropas: { drone: 60, artilharia: 40 } }, T0).ok);
+  E.tick(s, T0 + 3600_000);
+  assert.equal(s.stats.navesSaqueadas, 1);
+  assert.equal(E.donoDe(s.mapa, exposta.x, exposta.y), exposta.alianca, 'fugiu para o território');
+  assert.ok(E.totalTropas(exposta.tropas) > 1, 'reabastecida');
+});
+
+test('marcadores, regiões e migração de saves antigos', () => {
+  const s = novo();
+  assert.ok(E.adicionarMarcador(s, 10, 10, 'Base inimiga').ok);
+  assert.equal(E.adicionarMarcador(s, 10, 10, 'de novo').ok, false);
+  assert.ok(E.removerMarcador(s, 10, 10).ok);
+  assert.equal(E.regiao(20, 20), 'Sagitário A*');
+  assert.notEqual(E.regiao(0, 20), E.regiao(39, 20));
+  const antigo = JSON.parse(JSON.stringify(s));
+  delete antigo.marcadores;
+  delete antigo.stats.explorados;
+  E.migrar(antigo);
+  assert.deepEqual(antigo.marcadores, []);
+  assert.equal(antigo.stats.explorados, 0);
+});

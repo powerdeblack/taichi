@@ -13,6 +13,14 @@ export function zona(x, y) {
   return d <= 6 ? 3 : d <= 13 ? 2 : 1;
 }
 
+// Nome da região (província) de uma coordenada: octantes por anel, e o buraco negro no núcleo.
+export function indiceRegiao(x, y) {
+  const z = zona(x, y);
+  if (z === 3) return { zona: 3, indice: 0 };
+  const angulo = Math.atan2(y - CENTRO, x - CENTRO);
+  return { zona: z, indice: Math.floor(((angulo + Math.PI) / (2 * Math.PI)) * 8) % 8 };
+}
+
 export const ehEstrutura = (e) => e.tipo === 'estacao' || e.tipo === 'monolito';
 
 // Estruturas se conectam quando suas áreas se tocam; só o que liga à Estação gera território.

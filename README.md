@@ -24,10 +24,12 @@ check-in diário.
 |---|---|
 | Nave-Cidade | 16 módulos (Centro de Comando, extratores, hangares, Laboratório, Cantina, Radar, Embaixada…) com filas e requisitos no estilo RoK |
 | Naves | Drones de Enxame > Interceptores > Fragatas de Artilharia > Drones; Couraçados de Cerco (×2 contra estruturas); Naves de Extração (únicas que coletam) |
-| Galáxia | Mapa 40×40 com Borda Exterior, Braço Espiral e Núcleo Galáctico; Portais Estelares liberam zonas com loot melhor |
+| Galáxia | Mapa 40×40 com Borda Exterior, Braço Espiral e Núcleo Galáctico, 17 regiões nomeadas; Portais Estelares liberam zonas com loot melhor |
+| HUD do mapa | Coordenadas, busca, marcadores, filtros, minimapa, painel de marchas e zoom, no estilo do mapa do reino do RoK |
+| Exploração | Sondas investigam Cavernas Gravitacionais e vasculham Destroços (como cavernas e vilas do RoK) |
 | Comandantes | 6 comandantes com fragmentos, estrelas (1–5), nível, comandante principal + secundário |
 | Aliança | Estação Central + Monólitos de Domínio formam território; **dentro dele a Nave-Cidade não pode ser atacada** |
-| Guerra | Alianças rivais (bots) expandem e atacam seus Monólitos; você reforça os seus e destrói os delas |
+| Guerra | Alianças rivais (bots) expandem e atacam seus Monólitos; você reforça os seus e destrói os delas; Naves-Cidade rivais fora do território podem ser saqueadas |
 | Saque | Só recursos de mineração, e só o que passa do cofre; caixas no inventário, Escudo de Paz e território protegem |
 | Progressão | Pesquisas, missões, presentes e ajuda da aliança, Cantina com Sinais, invasões piratas, progresso offline |
 

@@ -2,11 +2,12 @@
 // Ações devolvem { ok: true } ou { ok: false, motivo }.
 import {
   RECURSOS, EDIFICIOS, NAVES, TIPOS_COMBATE, COMANDANTES, RARIDADES, SINAIS, ITENS, PESQUISAS, ZONAS,
-  ALIANCAS_RIVAIS, MISSOES,
+  ALIANCAS_RIVAIS, MISSOES, REGIOES, NOMES_NAVES_RIVAIS,
 } from './data.js';
 import { batalha, gerarExercito, totalTropas, tropasVazias, TIPOS_NAVE } from './combate.js';
 import {
   TAMANHO_MAPA, RAIO, cheb, dentroDoMapa, zona, ehEstrutura, alcanceConexao, estruturasConectadas, donoDe, areaPorAlianca,
+  mapaTerritorio, indiceRegiao,
 } from './territorio.js';
 
 export { batalha, gerarExercito, totalTropas, TIPOS_NAVE, TAMANHO_MAPA, zona, donoDe };
@@ -23,6 +24,8 @@ export const DURACAO_ESCUDO = 4 * 60 * MIN;
 export const MAX_OFFLINE = 8 * 60 * MIN;
 export const CUSTO_SALTO = 50;
 export const MAX_MONOLITOS = 15;
+export const MAX_MARCADORES = 20;
+export const VEL_SONDA = 3;
 const MAX_MONOLITOS_RIVAL = 10;
 const MAX_ESTRELAS = 5;
 const TIPOS_RECURSO = Object.keys(RECURSOS);
@@ -89,7 +92,29 @@ const PORTAIS = [
   { x: 13, y: 20, abre: 3, nivel: 15 }, { x: 27, y: 20, abre: 3, nivel: 15 }, { x: 20, y: 13, abre: 3, nivel: 15 }, { x: 20, y: 27, abre: 3, nivel: 15 },
 ];
 
-const QUANTIDADES = { 1: { recurso: 22, pirata: 16, fortaleza: 1 }, 2: { recurso: 14, pirata: 10, fortaleza: 2 }, 3: { recurso: 6, pirata: 5, fortaleza: 1 } };
+const QUANTIDADES = {
+  1: { recurso: 22, pirata: 16, fortaleza: 1, caverna: 5, destroco: 7 },
+  2: { recurso: 14, pirata: 10, fortaleza: 2, caverna: 4, destroco: 4 },
+  3: { recurso: 6, pirata: 5, fortaleza: 1, caverna: 2, destroco: 1 },
+};
+
+const STATS_INICIAIS = {
+  tropasTreinadas: 0, extratoresTreinados: 0, piratas: 0, fortalezas: 0, portais: 0, coletado: 0, pesquisas: 0, ajudas: 0,
+  raidsDefendidas: 0, vitorias: 0, monolitosErguidos: 0, monolitosDestruidos: 0, monolitosPerdidos: 0, sinais: 0,
+  explorados: 0, navesSaqueadas: 0,
+};
+
+// Completa saves antigos com campos adicionados depois.
+export function migrar(s) {
+  s.stats = { ...STATS_INICIAIS, ...s.stats };
+  s.marcadores ??= [];
+  return s;
+}
+
+export function regiao(x, y) {
+  const { zona: z, indice } = indiceRegiao(x, y);
+  return REGIOES[z][indice];
+}
 
 export function novoEstado(now = Date.now(), seed = Math.floor(Math.random() * 2 ** 31)) {
   const s = {
@@ -122,10 +147,8 @@ export function novoEstado(now = Date.now(), seed = Math.floor(Math.random() * 2
     ultimoPresente: 0,
     ultimoSinalGratis: 0,
     checkIn: { ultimoDia: 0 },
-    stats: {
-      tropasTreinadas: 0, extratoresTreinados: 0, piratas: 0, fortalezas: 0, portais: 0, coletado: 0, pesquisas: 0, ajudas: 0,
-      raidsDefendidas: 0, vitorias: 0, monolitosErguidos: 0, monolitosDestruidos: 0, monolitosPerdidos: 0, sinais: 0,
-    },
+    stats: { ...STATS_INICIAIS },
+    marcadores: [],
     missoesResgatadas: [],
     registro: [],
   };
@@ -144,6 +167,7 @@ export function novoEstado(now = Date.now(), seed = Math.floor(Math.random() * 2
   for (const [z, qtd] of Object.entries(QUANTIDADES)) {
     for (const [tipo, n] of Object.entries(qtd)) for (let i = 0; i < n; i++) gerarEntidade(s, tipo, Number(z), r);
   }
+  for (const id of Object.keys(ALIANCAS_RIVAIS)) gerarNavesRivais(s, id, r);
   registrar(s, now, 'Bem-vindo, Comandante! Sua Nave-Cidade ancorou na Borda Exterior da Via Láctea.', 'sucesso');
   return s;
 }
@@ -167,6 +191,12 @@ function gerarEntidade(s, tipo, z, r) {
     } else if (tipo === 'pirata') {
       e.nivel = entre(r, faixa.pirata);
       e.tropas = gerarExercito(e.nivel);
+    } else if (tipo === 'caverna') {
+      e.nivel = z;
+      e.investigado = false;
+    } else if (tipo === 'destroco') {
+      e.nivel = z;
+      e.visitado = false;
     } else {
       e.nivel = entre(r, faixa.fortaleza);
       e.tropas = gerarExercito(e.nivel, 3);
@@ -184,6 +214,41 @@ function removerEntidade(s, id) {
 }
 
 // ---------- alianças rivais (bots) ----------
+
+// Cada aliança rival tem Naves-Cidade de jogadores (bots): 3 dentro do território (protegidas) e 1 exposta.
+function gerarNavesRivais(s, id, r) {
+  const territorio = mapaTerritorio(s.mapa);
+  const estacao = s.mapa.find((e) => e.tipo === 'estacao' && e.alianca === id);
+  const livres = (filtro) => {
+    const lista = [];
+    for (let x = 0; x < TAMANHO_MAPA; x++) {
+      for (let y = 0; y < TAMANHO_MAPA; y++) if (!ocupado(s, x, y) && zona(x, y) < 3 && filtro(x, y)) lista.push({ x, y });
+    }
+    return lista;
+  };
+  const dentro = livres((x, y) => territorio.get(`${x},${y}`) === id);
+  const fora = livres((x, y) => !territorio.has(`${x},${y}`) && estacao && cheb({ x, y }, estacao) >= 5 && cheb({ x, y }, estacao) <= 8);
+  NOMES_NAVES_RIVAIS[id].forEach((nome, i) => {
+    const opcoes = i < 3 ? dentro : fora;
+    if (!opcoes.length) return;
+    const [pos] = opcoes.splice(Math.floor(r() * opcoes.length), 1);
+    const nivel = 5 + Math.floor(r() * 8);
+    s.mapa.push({ id: novoId(s), tipo: 'nave', alianca: id, nome, x: pos.x, y: pos.y, nivel, tropas: gerarExercito(nivel, 1.2) });
+  });
+}
+
+// Nave rival saqueada salta de volta para o território da aliança dela e se reabastece.
+function realocarNave(s, nave, r) {
+  const territorio = mapaTerritorio(s.mapa);
+  const livres = [];
+  for (const [k, dono] of territorio) {
+    if (dono !== nave.alianca) continue;
+    const [x, y] = k.split(',').map(Number);
+    if (!ocupado(s, x, y)) livres.push({ x, y });
+  }
+  if (livres.length) Object.assign(nave, livres[Math.floor(r() * livres.length)]);
+  nave.tropas = gerarExercito(nave.nivel, 1.2);
+}
 
 function criarEstacaoRival(s, id) {
   const { x, y } = ALIANCAS_RIVAIS[id].estacao;
@@ -727,6 +792,7 @@ export const comandanteOcupado = (s, id) => s.marchas.some((m) => m.comandante =
 // O tipo de marcha é definido pelo alvo.
 export function tipoMarcha(alvo) {
   if (alvo.tipo === 'recurso') return 'coleta';
+  if (alvo.tipo === 'caverna' || alvo.tipo === 'destroco') return 'sonda';
   if (ehEstrutura(alvo) && alvo.alianca === 'jogador') return 'reforco';
   return 'ataque';
 }
@@ -758,7 +824,72 @@ export function avaliarAlvo(s, alvo) {
     if (!perto) return falta('O território da aliança precisa alcançar o Portal');
   }
   if (alvo.tipo === 'recurso' && alvo.ocupadoPor) return falta('Outra frota já coleta aqui');
+  if (alvo.tipo === 'nave' && donoDe(s.mapa, alvo.x, alvo.y) === alvo.alianca) {
+    return falta('Dentro do território da aliança dela: destrua os Monólitos primeiro');
+  }
   return OK;
+}
+
+// ---------- exploração (Sondas) ----------
+
+export const maxSondas = (s) => (s.edificios.radar >= 1 ? 1 + Math.floor(s.edificios.radar / 4) : 0);
+export const sondasEmUso = (s) => s.marchas.filter((m) => m.tipo === 'sonda').length;
+const marchasDeFrota = (s) => s.marchas.filter((m) => m.tipo !== 'sonda').length;
+export const explorado = (e) => Boolean(e.investigado || e.visitado);
+
+export function avaliarSonda(s, alvo) {
+  if (!alvo || !['caverna', 'destroco'].includes(alvo.tipo)) return falta('Sondas só exploram cavernas e destroços');
+  if (explorado(alvo)) return falta('Já explorado');
+  if (zona(alvo.x, alvo.y) > s.zonasLiberadas) return falta('Zona ainda bloqueada');
+  if (!maxSondas(s)) return falta('Construa a Torre de Radar para lançar Sondas');
+  if (sondasEmUso(s) >= maxSondas(s)) return falta('Todas as Sondas estão em missão');
+  if (s.marchas.some((m) => m.tipo === 'sonda' && m.alvoId === alvo.id)) return falta('Uma Sonda já está a caminho');
+  return OK;
+}
+
+export function enviarSonda(s, alvoId, now) {
+  const alvo = s.mapa.find((e) => e.id === alvoId);
+  const v = avaliarSonda(s, alvo);
+  if (!v.ok) return v;
+  const viagem = ((Math.hypot(alvo.x - s.base.x, alvo.y - s.base.y) * SEG_POR_CASA) / VEL_SONDA) * 1000;
+  s.marchas.push({
+    id: novoId(s), tipo: 'sonda', alvoId, alvoX: alvo.x, alvoY: alvo.y, comandante: null, secundario: null, tropas: tropasVazias(),
+    fase: 'indo', inicio: now, fim: now + viagem, viagem, carga: {},
+  });
+  return OK;
+}
+
+function explorar(s, m, alvo, now) {
+  const r = rngDe(s, alvo.id);
+  const z = alvo.nivel;
+  s.stats.explorados++;
+  if (alvo.tipo === 'caverna') {
+    alvo.investigado = true;
+    const premio = { quasares: 10 * z + Math.floor(r() * 10), ...(r() < 0.35 ? { sinalPrata: 1 } : {}) };
+    receber(s, premio);
+    registrar(s, now, `🕳️ Caverna investigada em (${alvo.x}, ${alvo.y}): +${premio.quasares} Quasares${premio.sinalPrata ? ' e 1 Sinal de Prata' : ''}.`, 'sucesso');
+  } else {
+    alvo.visitado = true;
+    m.carga = { minerio: 600 * z, cristal: 500 * z };
+    receber(s, { [['caixaMinerio', 'caixaCristal', 'caixaPlasma'][Math.floor(r() * 3)]]: 1 });
+    registrar(s, now, `🔩 Destroços vasculhados em (${alvo.x}, ${alvo.y}): recursos a caminho e uma caixa no inventário.`, 'sucesso');
+  }
+}
+
+// ---------- marcadores (como os do RoK) ----------
+
+export function adicionarMarcador(s, x, y, nome) {
+  if (!dentroDoMapa(x, y)) return falta('Fora do mapa');
+  if (s.marcadores.some((m) => m.x === x && m.y === y)) return falta('Já existe um marcador aqui');
+  if (s.marcadores.length >= MAX_MARCADORES) return falta(`Máximo de ${MAX_MARCADORES} marcadores`);
+  s.marcadores.push({ x, y, nome: String(nome || `Marcador ${x},${y}`).slice(0, 30) });
+  return OK;
+}
+
+export function removerMarcador(s, x, y) {
+  const antes = s.marcadores.length;
+  s.marcadores = s.marcadores.filter((m) => !(m.x === x && m.y === y));
+  return s.marcadores.length < antes ? OK : falta('Marcador não encontrado');
 }
 
 export function enviarMarcha(s, { alvoId, comandante, secundario = null, tropas }, now) {
@@ -768,8 +899,9 @@ export function enviarMarcha(s, { alvoId, comandante, secundario = null, tropas 
   if (!s.comandantes[comandante]) return falta('Escolha um comandante desbloqueado');
   if (secundario && (!s.comandantes[secundario] || secundario === comandante)) return falta('Comandante secundário inválido');
   if (comandanteOcupado(s, comandante) || (secundario && comandanteOcupado(s, secundario))) return falta('Comandante já está em marcha');
-  if (s.marchas.length >= maxMarchas(s)) return falta(`Máximo de ${maxMarchas(s)} marchas`);
+  if (marchasDeFrota(s) >= maxMarchas(s)) return falta(`Máximo de ${maxMarchas(s)} marchas`);
   const tipo = tipoMarcha(alvo);
+  if (tipo === 'sonda') return falta('Envie uma Sonda para explorar');
   const t = tropasVazias();
   for (const k of TIPOS_NAVE) {
     const q = Math.floor(tropas[k] || 0);
@@ -877,6 +1009,9 @@ export function nomeAlvo(s, alvo) {
     case 'portal': return `Portal Estelar → ${ZONAS[alvo.abre].nome}`;
     case 'monolito': return `Monólito [${s.aliancas[alvo.alianca].tag}]`;
     case 'estacao': return `Estação Central [${s.aliancas[alvo.alianca].tag}]`;
+    case 'nave': return `[${s.aliancas[alvo.alianca].tag}]${alvo.nome} · CC ${alvo.nivel}`;
+    case 'caverna': return `Caverna Gravitacional${alvo.investigado ? ' (investigada)' : ''}`;
+    case 'destroco': return `Destroços de nave${alvo.visitado ? ' (visitados)' : ''}`;
     default: return 'alvo';
   }
 }
@@ -900,6 +1035,9 @@ function recompensaVitoria(s, alvo, r) {
     case 'monolito':
       s.stats.monolitosDestruidos++;
       return { carga: { minerio: 500 * n, cristal: 500 * n }, premio: { quasares: 20, cristaisDominio: 100 }, xp: 40 * n, remover: true };
+    case 'nave':
+      s.stats.navesSaqueadas++;
+      return { carga: { minerio: 1000 * n, cristal: 800 * n, plasma: 300 * n }, premio: { quasares: 15 }, xp: 40 * n, remover: false, realocar: true };
     case 'estacao':
       sortearFragmentos(s, r, 0.6, [5, 8]);
       // Sem a Estação, todo o território rival colapsa.
@@ -929,6 +1067,10 @@ function resolverAtaque(s, m, alvo, now) {
     if (m.secundario) ganharXp(s, m.secundario, Math.round(rec.xp / 2), now);
     if (rec.colapso) s.bots.reconstrucao[rec.colapso] = now + RECONSTRUCAO_ESTACAO;
     if (rec.remover) removerEntidade(s, alvo.id);
+    if (rec.realocar) {
+      realocarNave(s, alvo, rngDe(s, m.id + 1));
+      registrar(s, now, `🌀 ${nome} foi saqueada e fugiu com Salto Warp para o território da aliança dela.`);
+    }
     registrar(s, now, `⚔️ Vitória contra ${nome}! Feridos: ${baixas.feridos}, destruídos: ${baixas.mortos}.`, 'sucesso');
     if (rec.msg) registrar(s, now, rec.msg, 'sucesso');
   } else {
@@ -946,6 +1088,9 @@ function processarMarcha(s, m, now) {
         voltar(m, m.fim);
       } else if (m.tipo === 'ataque') {
         resolverAtaque(s, m, alvo, m.fim);
+        voltar(m, m.fim);
+      } else if (m.tipo === 'sonda') {
+        explorar(s, m, alvo, m.fim);
         voltar(m, m.fim);
       } else if (m.tipo === 'reforco') {
         m.fase = 'guarnecendo';

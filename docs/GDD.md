@@ -46,6 +46,24 @@ alianças rivais.
 
 ---
 
+### 2.1 Referências visuais do mapa (capturas do RoK) → implementação
+
+| No RoK (referência) | Guerra Sideral |
+|---|---|
+| Barra `#1031 X:556 Y:305` + lupa + estrela | HUD `#Setor 1 X:.. Y:..` com busca por coordenada 🔍 e marcadores ⭐ |
+| Minimapa do reino no canto superior direito | Minimapa com territórios, Portais, sua nave e o retângulo da área visível (toque para navegar) |
+| Painel de marchas `2/5` com retratos dos comandantes | Painel `n/m` com um retrato por marcha (toque centraliza na frota) e contador de Sondas |
+| Filtro: Aliança, Exploração, Recursos, Marcadores, Fortaleza Bárbara | Filtro: Aliança, Exploração, Recursos, Marcadores, Piratas e Fortalezas |
+| Cavernas (Não investigado / Investigado) e vilas (Não visitado / Visitado) | Cavernas Gravitacionais 🕳️ e Destroços de nave 🔩, explorados por **Sondas** (Torre de Radar) |
+| Mapa afastado com nomes das províncias (Siam, Ladakh…) | Zoom afastado com nomes das regiões (Órion, Cygnus, Áquila…) e o buraco negro **Sagitário A*** no centro |
+| Passes com nível (vermelho = inimigo, azul = aliado) e cordilheiras entre zonas | Portais Estelares com selo de nível (vermelho = não capturado, azul = capturado) e cinturões de detritos entre zonas |
+| Cidades de outros jogadores com `[tag]Nome` e nível | Naves-Cidade rivais `[VTX]Kraken 9`: protegidas no território da aliança delas, saqueáveis fora dele |
+| Botão do castelo (voltar à cidade) | Botão 🛸 que centraliza na sua Nave-Cidade |
+| Relógio `UTC 10/02 11:52` | Relógio UTC no topo |
+| Névoa de guerra explorada por batedores | *Pendente* (fase 2) |
+| Chat da aliança/reino | *Pendente* (fase 2, multiplayer) |
+| Vista da cidade com prédios 3D | *Pendente*: hoje a Nave-Cidade é uma grade de módulos |
+
 ## 3. A Cidade → Nave-Cidade (NFT)
 
 No RoK a cidade fica parada num ponto do mapa e se move por teleporte. A nossa **Nave-Cidade** é igual: tem uma
@@ -272,7 +290,9 @@ RPC `https://saigon-testnet.roninchain.com/rpc`).
 |---|---|
 | 16 módulos da Nave-Cidade, filas por hangar, 2 construtores a partir do Centro de Comando 4 | Tiers Mk II–V |
 | Drones, Interceptores, Artilharia, Cerco e Naves de Extração (só elas coletam) | Sondas e espionagem |
-| Mapa 40×40 com 3 zonas, Portais (exigem território encostado), piratas, Fortalezas | Anomalias Ancestrais, Guerra de Setores |
+| Mapa 40×40 com 3 zonas e 17 regiões, Portais (exigem território encostado), piratas, Fortalezas | Anomalias Ancestrais, Guerra de Setores, névoa de guerra |
+| HUD do mapa: coordenadas, busca, marcadores, filtros, minimapa, painel de marchas, zoom | Chat |
+| Exploração de cavernas e destroços com Sondas; naves rivais saqueáveis fora do território | Vista 3D da Nave-Cidade |
 | Aliança, Estação Central, Monólitos conectados, território, zona segura, Cristais de Domínio | Alianças reais (multiplayer), Ataque Coordenado |
 | Alianças rivais (bots) que expandem, atacam Monólitos e reconstroem a Estação | Tecnologia e loja da aliança |
 | Saque só acima do cofre; caixas, Escudo de Paz, Salto Warp, interceptação de coleta | Itens de VIP / Patente de Frota |

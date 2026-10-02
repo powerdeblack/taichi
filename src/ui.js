@@ -72,6 +72,9 @@ export function recursosHtml(s, now) {
   itens.push(`<span class="recurso" title="${PREMIUM.nome}">${PREMIUM.icone} ${fmt(s.quasares)}</span>`);
   if (s.aliancas.jogador) itens.push(`<span class="recurso" title="${DOMINIO.nome}">${DOMINIO.icone} ${fmt(s.aliancas.jogador.cristais)}</span>`);
   itens.push(`<span class="recurso" title="Poder">💪 ${fmt(E.poder(s))}</span>`);
+  const d = new Date(now);
+  const p2 = (n) => String(n).padStart(2, '0');
+  itens.push(`<span class="recurso" title="Horário do servidor">🕒 UTC ${p2(d.getUTCDate())}/${p2(d.getUTCMonth() + 1)} ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}</span>`);
   const protegida = E.naveProtegida(s, now);
   const motivo = s.escudoAte > now ? 'Escudo de Paz' : protegida ? 'Dentro do território' : 'Fora do território: pode ser saqueada acima do cofre';
   itens.push(`<span class="recurso ${protegida ? 'protegida' : 'exposta'}" title="${motivo}">${protegida ? '🛡️ Protegida' : '⚠️ Exposta'}</span>`);
@@ -106,7 +109,7 @@ function itemFila(s, fila, f, rotulo, now) {
   </div>`;
 }
 
-const FASES = { indo: 'a caminho', coletando: 'coletando', guarnecendo: 'guarnecendo', voltando: 'retornando' };
+export const FASES = { indo: 'a caminho', coletando: 'coletando', guarnecendo: 'guarnecendo', voltando: 'retornando' };
 
 export function lateralHtml(s, now) {
   const filas = [];
@@ -120,7 +123,7 @@ export function lateralHtml(s, now) {
     const alvo = s.mapa.find((e) => e.id === m.alvoId);
     const nome = alvo ? E.nomeAlvo(s, alvo) : `(${m.alvoX}, ${m.alvoY})`;
     return `<div class="fila-item">
-      <div class="titulo"><span>${COMANDANTES[m.comandante].icone} ${esc(nome)}</span><span class="suave">${m.fim ? relogio(m.fim) : '∞'}</span></div>
+      <div class="titulo"><span>${m.tipo === 'sonda' ? '📡' : COMANDANTES[m.comandante].icone} ${esc(nome)}</span><span class="suave">${m.fim ? relogio(m.fim) : '∞'}</span></div>
       <div class="suave">${FASES[m.fase]} · ${fmt(E.totalTropas(m.tropas))} naves</div>
       ${m.fase !== 'voltando' ? `<div class="acoes">${botao('retornar', '↩️ Retornar', { dados: { id: m.id }, classe: 'mini secundario' })}</div>` : ''}
     </div>`;
@@ -138,7 +141,7 @@ export function lateralHtml(s, now) {
   return `
     <div class="cartao"><h3>Filas <span class="suave">(${livres} construtor${livres === 1 ? '' : 'es'} livre${livres === 1 ? '' : 's'})</span></h3>
       ${filas.join('') || '<div class="suave">Nada em andamento.</div>'}</div>
-    <div class="cartao"><h3>Marchas <span class="suave">${s.marchas.length}/${E.maxMarchas(s)}</span></h3>
+    <div class="cartao"><h3>Marchas <span class="suave">${s.marchas.filter((m) => m.tipo !== 'sonda').length}/${E.maxMarchas(s)}</span></h3>
       ${marchas.join('') || '<div class="suave">Nenhuma frota no espaço.</div>'}</div>
     <div class="cartao"><h3>Radar</h3>${eventos.join('')}</div>`;
 }
@@ -332,33 +335,54 @@ function telaRegistro(s) {
 
 // ---------- galáxia ----------
 
-const NOMES_TIPO = { recurso: 'Campo de recursos', pirata: 'Frota pirata', fortaleza: 'Fortaleza Xeno', portal: 'Portal Estelar', monolito: 'Monólito de Domínio', estacao: 'Estação Central' };
+const NOMES_TIPO = {
+  recurso: 'Campo de recursos', pirata: 'Frota pirata', fortaleza: 'Fortaleza Xeno', portal: 'Portal Estelar', monolito: 'Monólito de Domínio',
+  estacao: 'Estação Central', nave: 'Nave-Cidade de outro comandante', caverna: 'Exploração', destroco: 'Exploração',
+};
+
+export const FILTROS = [
+  ['alianca', 'Aliança'], ['exploracao', 'Exploração'], ['recursos', 'Recursos'], ['marcadores', 'Marcadores'], ['inimigos', 'Piratas e Fortalezas'],
+];
 
 function tropasHtml(s, tropas) {
   if (s.edificios.radar < 1) return '<span class="suave">?? (construa a Torre de Radar)</span>';
   return Object.entries(tropas).filter(([, n]) => n > 0).map(([k, n]) => `${NAVES[k].icone} ${fmt(n)}`).join(' · ') || 'nenhuma';
 }
 
+const marcado = (s, x, y) => s.marcadores.some((m) => m.x === x && m.y === y);
+
 export function painelSelecaoHtml(s, sel) {
-  if (!sel) return '<div class="suave">Clique num setor do mapa para ver detalhes e agir.</div>';
+  if (!sel) return '<div class="suave">Clique num setor do mapa para ver detalhes e agir. Use o minimapa, a busca 🔍 e os marcadores ⭐ para navegar.</div>';
   const { x, y } = sel;
   const z = E.zona(x, y);
   const dono = E.donoDe(s.mapa, x, y);
   const donoTxt = dono ? `Território de [${esc(s.aliancas[dono].tag)}]` : 'Espaço livre';
-  const cab = `<div class="suave">(${x}, ${y}) · ${ZONAS[z].nome}${z > s.zonasLiberadas ? ' 🔒' : ''} · ${donoTxt}</div>`;
+  const estrela = marcado(s, x, y)
+    ? botao('removerMarcador', '★ Desmarcar', { dados: { x, y }, classe: 'mini secundario' })
+    : botao('marcar', '☆ Marcar', { dados: { x, y }, classe: 'mini secundario' });
+  const cab = `<div class="linha"><span class="suave">X:${x} Y:${y} · ${esc(E.regiao(x, y))} · ${ZONAS[z].nome}${z > s.zonasLiberadas ? ' 🔒' : ''} · ${donoTxt}</span>${estrela}</div>`;
 
   if (s.base.x === x && s.base.y === y) {
-    return `<h3>🛸 Sua Nave-Cidade</h3>${cab}<div>${tropasHtml({ edificios: { radar: 1 } }, s.tropas)}</div>`;
+    const tag = s.aliancas.jogador ? `[${esc(s.aliancas.jogador.tag)}]` : '';
+    return `<h3>🛸 ${tag}${esc(s.nome)} <span class="suave">· CC ${s.edificios.comando}</span></h3>${cab}<div>${tropasHtml({ edificios: { radar: 1 } }, s.tropas)}</div>`;
   }
   const e = s.mapa.find((m) => m.x === x && m.y === y);
   if (e) {
-    const valido = E.avaliarAlvo(s, e);
     const tipo = E.tipoMarcha(e);
-    const rotulo = { coleta: '🛸 Coletar', ataque: '⚔️ Atacar', reforco: '🛡️ Reforçar' }[tipo];
     let info = '';
     if (e.tipo === 'recurso') info = `<div>${RECURSOS[e.recurso].icone} ${fmt(e.quantidade)} restantes · nível ${e.nivel}${e.ocupadoPor ? ' · <span class="motivo">sendo coletado</span>' : ''}</div>`;
     else if (e.tropas) info = `<div>Defesa: ${e.alianca === 'jogador' ? tropasHtml({ edificios: { radar: 1 } }, e.tropas) : tropasHtml(s, e.tropas)}</div>`;
     if (e.tipo === 'portal') info += `<div class="suave">Abre o ${ZONAS[e.abre].nome}. ${e.capturado ? '✅ Capturado' : 'Exige território da aliança encostado no Portal.'}</div>`;
+    if (e.tipo === 'nave') info += `<div class="${dono === e.alianca ? 'suave' : 'sucesso'}">${dono === e.alianca ? '🛡️ Protegida pelo território da aliança dela' : '⚠️ Fora do território: pode ser saqueada'}</div>`;
+    if (tipo === 'sonda') {
+      const estado = e.tipo === 'caverna' ? (e.investigado ? '✅ Investigada' : '❔ Não investigada') : (e.visitado ? '✅ Visitados' : '❔ Não visitados');
+      const v = E.avaliarSonda(s, e);
+      return `<h3>${e.tipo === 'caverna' ? '🕳️' : '🔩'} ${esc(E.nomeAlvo(s, e))}</h3>${cab}<div>${estado} · Sondas ${E.sondasEmUso(s)}/${E.maxSondas(s)}</div>
+        ${!v.ok && !E.explorado(e) ? `<div class="motivo">${esc(v.motivo)}</div>` : ''}
+        <div class="acoes">${E.explorado(e) ? '' : botao('sonda', '📡 Enviar Sonda', { dados: { id: e.id }, desativado: !v.ok })}</div>`;
+    }
+    const valido = E.avaliarAlvo(s, e);
+    const rotulo = { coleta: '🛸 Coletar', ataque: e.tipo === 'nave' ? '🏴‍☠️ Saquear' : '⚔️ Atacar', reforco: '🛡️ Reforçar' }[tipo];
     const onChain = e.tipo === 'monolito' && e.alianca === 'jogador' ? botao('monolitoOnChain', '⛓️ Registrar no Setor', { dados: { x, y }, classe: 'secundario' }) : '';
     return `<h3>${esc(E.nomeAlvo(s, e))}</h3><div class="suave">${NOMES_TIPO[e.tipo]}</div>${cab}${info}
       ${!valido.ok ? `<div class="motivo">${esc(valido.motivo)}</div>` : ''}
@@ -369,7 +393,7 @@ export function painelSelecaoHtml(s, sel) {
   const temEstacao = s.mapa.some((m) => m.tipo === 'estacao' && m.alianca === 'jogador');
   if (s.aliancas.jogador && !temEstacao) {
     const v = E.avaliarEstacao(s, x, y);
-    acoes.push(botao('estacao', '🏛️ Ancorar Estação', { dados: { x, y }, desativado: !v.ok, titulo: v.motivo || '' }) + (v.ok ? '' : ` <span class="motivo">${esc(v.motivo)}</span>`));
+    acoes.push(`<div>${botao('estacao', '🏛️ Ancorar Estação', { dados: { x, y }, desativado: !v.ok })} ${v.ok ? custoHtml(s, E.CUSTO_ESTACAO) : `<span class="motivo">${esc(v.motivo)}</span>`}</div>`);
   }
   if (temEstacao) {
     const v = E.avaliarMonolito(s, x, y);
@@ -381,19 +405,50 @@ export function painelSelecaoHtml(s, sel) {
   return `<h3>Setor vazio</h3>${cab}<div class="acoes" style="flex-direction:column;align-items:flex-start">${acoes.join('')}</div>`;
 }
 
+// Painel de marchas no canto do mapa (como o "2/5" do RoK): um retrato por marcha.
+export function hudMarchasHtml(s) {
+  const frotas = s.marchas.filter((m) => m.tipo !== 'sonda');
+  const retratos = s.marchas.map((m) => {
+    const icone = m.tipo === 'sonda' ? '📡' : COMANDANTES[m.comandante].icone;
+    return `<button class="retrato fase-${m.fase}" data-acao="centralizarMarcha" data-id="${m.id}" title="${esc(FASES[m.fase])}">${icone}</button>`;
+  }).join('');
+  return `<div class="hud-contador">${frotas.length}/${E.maxMarchas(s)}${E.maxSondas(s) ? ` · 📡${E.sondasEmUso(s)}/${E.maxSondas(s)}` : ''}</div>${retratos}`;
+}
+
+export function hudMarcadoresHtml(s) {
+  if (!s.marcadores.length) return '<div class="suave">Nenhum marcador. Selecione um setor e toque em ☆ Marcar.</div>';
+  return s.marcadores.map((m) => `<div class="linha">
+    <button class="link" data-acao="irPara" data-x="${m.x}" data-y="${m.y}">📍 ${esc(m.nome)} <span class="suave">X:${m.x} Y:${m.y}</span></button>
+    ${botao('removerMarcador', '✕', { dados: { x: m.x, y: m.y }, classe: 'mini secundario' })}</div>`).join('');
+}
+
 function telaGalaxia(s, now, ctx) {
-  const legenda = [
-    ['🛸', 'Sua Nave-Cidade'], ['⛏️💎⚡', 'Recursos'], ['🏴‍☠️', 'Piratas'], ['👾', 'Fortaleza Xeno'], ['🌀', 'Portal'], ['🪨', 'Monólito'], ['🏛️', 'Estação'],
-  ].map(([i, t]) => `<span>${i} ${t}</span>`).join('');
-  const cores = Object.values(s.aliancas).filter(Boolean).map((a) => `<span><span class="cor" style="background:${a.cor}"></span>[${esc(a.tag)}]</span>`).join('');
-  return `<h2>🌌 Setor Galáctico</h2>
-    <p class="subtitulo">Borda Exterior → Braço Espiral → Núcleo Galáctico. Capture Portais para avançar e conseguir loot melhor.</p>
-    <div class="mapa-area">
-      <div class="linha"><div class="legenda">${legenda}${cores}</div>
-        ${botao('zoom', ctx.zoom > 1 ? '🔍 Afastar' : '🔍 Aproximar', { classe: 'mini secundario' })}</div>
-      <div class="mapa-moldura"><canvas id="mapa"></canvas></div>
-      <div class="cartao" id="painelSelecao"></div>
-    </div>`;
+  const filtros = FILTROS.map(([id, nome]) => `<label class="filtro"><input type="checkbox" data-filtro="${id}" ${ctx.filtros[id] ? 'checked' : ''}> ${nome}</label>`).join('');
+  return `<div class="mapa-palco">
+      <div class="mapa-moldura" id="moldura"><canvas id="mapa"></canvas></div>
+      <div class="hud hud-topo">
+        <div class="hud-coord"><strong>#Setor 1</strong> <span id="hudCoord">X:${s.base.x} Y:${s.base.y}</span>
+          <button class="hud-botao" data-acao="alternar" data-painel="busca" title="Buscar coordenada">🔍</button>
+          <button class="hud-botao" data-acao="alternar" data-painel="marcadores" title="Marcadores">⭐</button>
+          <button class="hud-botao" data-acao="alternar" data-painel="filtro" title="Filtro">☰</button></div>
+        <div class="hud-painel" ${ctx.paineis.busca ? '' : 'hidden'}>
+          <div class="linha"><input type="number" id="buscaX" min="0" max="39" placeholder="X" aria-label="X">
+          <input type="number" id="buscaY" min="0" max="39" placeholder="Y" aria-label="Y">${botao('buscar', 'Ir', { classe: 'mini' })}</div></div>
+        <div class="hud-painel" id="hudMarcadores" ${ctx.paineis.marcadores ? '' : 'hidden'}></div>
+        <div class="hud-painel" ${ctx.paineis.filtro ? '' : 'hidden'}><strong>Filtro</strong>${filtros}
+          <div class="legenda-exp"><span>🕳️ Não investigado</span><span>🕳️✅ Investigado</span><span>🔩 Não visitado</span><span>🔩✅ Visitado</span></div></div>
+      </div>
+      <div class="hud hud-direita">
+        <canvas id="minimapa" width="150" height="150" title="Minimapa: toque para navegar"></canvas>
+        <div class="hud-marchas" id="hudMarchas"></div>
+      </div>
+      <button class="hud-base" data-acao="centralizarBase" title="Voltar à Nave-Cidade">🛸</button>
+      <div class="hud hud-zoom">
+        <button class="hud-botao" data-acao="zoom" data-delta="1" title="Aproximar" ${ctx.zoom >= 3 ? 'disabled' : ''}>＋</button>
+        <button class="hud-botao" data-acao="zoom" data-delta="-1" title="Afastar (nomes das regiões)" ${ctx.zoom <= 1 ? 'disabled' : ''}>－</button>
+      </div>
+    </div>
+    <div class="cartao" id="painelSelecao"></div>`;
 }
 
 // ---------- Ronin / on-chain ----------

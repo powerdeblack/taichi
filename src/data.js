@@ -112,6 +112,18 @@ export const ZONAS = {
   3: { nome: 'Núcleo Galáctico', pirata: [13, 20], recurso: [5, 5], fortaleza: [16, 18] },
 };
 
+// Regiões nomeadas do Setor (como as províncias do mapa do RoK): 8 por anel + o buraco negro central.
+export const REGIOES = {
+  1: ['Órion', 'Perseu', 'Cygnus', 'Cassiopeia', 'Carina', 'Centauro', 'Scutum', 'Norma'],
+  2: ['Lira', 'Áquila', 'Draco', 'Hydra', 'Pégaso', 'Andrômeda', 'Fênix', 'Vela'],
+  3: ['Sagitário A*'],
+};
+
+export const NOMES_NAVES_RIVAIS = {
+  vtx: ['Kraken', 'Tempestade', 'Hélice', 'Ciclone'],
+  nbl: ['Umbra', 'Penumbra', 'Eclipse', 'Breu'],
+};
+
 export const ALIANCAS_RIVAIS = {
   vtx: { nome: 'Vórtice', tag: 'VTX', cor: '#ff5470', estacao: { x: 33, y: 6 } },
   nbl: { nome: 'Nébula Sombria', tag: 'NBL', cor: '#ffb020', estacao: { x: 31, y: 34 } },
@@ -131,6 +143,8 @@ export const MISSOES = [
   { id: 'recrutar', titulo: 'Desbloqueie um novo comandante', premio: { sinalOuro: 1 }, feita: (s) => Object.keys(s.comandantes).length >= 3 },
   { id: 'monolitoInimigo', titulo: 'Destrua um Monólito inimigo', premio: { quasares: 100 }, feita: (s) => s.stats.monolitosDestruidos >= 1 },
   { id: 'zona2', titulo: 'Capture um Portal Estelar e libere o Braço Espiral', premio: { sinalOuro: 2 }, feita: (s) => s.zonasLiberadas >= 2 },
+  { id: 'explorar3', titulo: 'Explore 3 cavernas ou destroços com Sondas', premio: { sinalPrata: 1, caixaMinerio: 1 }, feita: (s) => s.stats.explorados >= 3 },
+  { id: 'saque1', titulo: 'Saqueie uma Nave-Cidade rival fora do território dela', premio: { quasares: 80 }, feita: (s) => s.stats.navesSaqueadas >= 1 },
   { id: 'fortaleza1', titulo: 'Conquiste uma Fortaleza Xeno', premio: { quasares: 200 }, feita: (s) => s.stats.fortalezas >= 1 },
   { id: 'poder30k', titulo: 'Alcance 30.000 de poder', premio: { sinalOuro: 2, quasares: 150 }, feita: (s, ctx) => ctx.poder >= 30000 },
 ];
