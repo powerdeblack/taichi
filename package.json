@@ -1,6 +1,11 @@
 {
+  "name": "guerra-sideral",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "start": "servor --reload"
+    "start": "servor . index.html 8080 --reload",
+    "test": "node --test"
   },
   "dependencies": {
     "servor": "^4.0.2"
