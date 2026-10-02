@@ -1,54 +1,30 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Taichi</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guerra Sideral</title>
+  <meta name="description" content="Estratégia espacial inspirada em Rise of Kingdoms, na Ronin.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛸</text></svg>">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- Header -->
-    <header>
-        <nav>
-            <h1>Taichi</h1>
-            <ul>
-                <li><a href="#" id="homeLink">Home</a></li>
-                <li><a href="#" id="portfolioLink">Portfolio</a></li>
-                <li><a href="#">Chat</a></li>
-                <li><a href="#">Soon</a></li>
-                <li><a href="#">Bundles</a></li>
-                <li><a href="#">Contests</a></li>
-            </ul>
-        </nav>
-    </header>
+  <header class="topo">
+    <div class="marca">🛸 <strong>Guerra Sideral</strong></div>
+    <div id="recursos" class="recursos"></div>
+    <button id="botaoCarteira" class="botao secundario" data-acao="aba" data-aba="ronin">⛓️ Conectar Ronin</button>
+  </header>
 
-    <!-- Main Content -->
-    <main>
-        <section id="portfolioSection" class="hidden">
-            <!-- Connect MetaMask Button -->
-            <button id="connectButton">Connect MetaMask</button>
+  <nav id="abas" class="abas" aria-label="Seções do jogo"></nav>
 
-            <!-- Wallet Balance -->
-            <div id="walletInfo">
-                <h2>Saldo da Carteira</h2>
-                <p id="balance">0 ETH</p>
-            </div>
+  <div class="layout">
+    <main id="conteudo" class="conteudo"></main>
+    <aside id="lateral" class="lateral" aria-label="Filas e marchas"></aside>
+  </div>
 
-            <!-- Crypto Prices -->
-            <div id="cryptoPrices">
-                <h2>Preços das Criptomoedas</h2>
-                <p id="btcValue">BTC: Carregando...</p>
-                <p id="ethValue">ETH: Carregando...</p>
-                <p id="astarValue">Astar: Carregando...</p>
-            </div>
-        </section>
-    </main>
+  <div id="modal" class="modal" hidden></div>
+  <div id="avisos" class="avisos" aria-live="polite"></div>
 
-    <!-- Footer -->
-    <footer>
-        <p>&copy; 2024 Taichi. Todos os direitos reservados.</p>
-    </footer>
-
-    <script src="script.js"></script>
+  <script type="module" src="src/main.js"></script>
 </body>
 </html>

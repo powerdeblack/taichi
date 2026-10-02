@@ -5,9 +5,23 @@
   "type": "module",
   "scripts": {
     "start": "servor . index.html 8080 --reload",
-    "test": "node --test"
+    "test": "node --test && hardhat test",
+    "test:jogo": "node --test",
+    "test:contratos": "hardhat test",
+    "compilar": "hardhat compile",
+    "deploy:saigon": "hardhat run scripts/deploy.cjs --network saigon",
+    "deploy:ronin": "hardhat run scripts/deploy.cjs --network ronin"
   },
   "dependencies": {
     "servor": "^4.0.2"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.1.2",
+    "@nomicfoundation/hardhat-ethers": "^3.1.3",
+    "@openzeppelin/contracts": "^5.6.1",
+    "chai": "^4.5.0",
+    "ethers": "^6.17.0",
+    "hardhat": "^2.29.1",
+    "solc": "0.8.28"
   }
 }

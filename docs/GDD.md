@@ -266,11 +266,15 @@ RPC `https://saigon-testnet.roninchain.com/rpc`).
 
 ## 12. Estado atual do código
 
-| Já existe (`src/engine.js`, `src/data.js`) | Precisa adaptar a este GDD |
+**Fase 1 implementada** (ver README):
+
+| Implementado | Pendente |
 |---|---|
-| Módulos com níveis, custos, tempos e requisitos | Renomear naves (Drones, Interceptores, Artilharia) e adicionar **Naves de Extração** + Doca de Extração |
-| Produção, capacidade e cofre do Armazém | Caixas de recurso no inventário, Escudo de Paz |
-| Mapa com recursos, piratas e fortalezas | **Monólitos**, território, alianças-bot, zona segura, Portais e Setores |
-| Marchas de coleta e ataque, combate, feridos | Coleta só por Naves de Extração; interceptação fora do território |
-| Comandantes com bônus e XP | Fragmentos (ERC-1155), estrelas, principal + secundário |
-| Pesquisas, missões, ajuda e presentes da aliança, invasões piratas | Interface no navegador, Ronin Wallet, contratos |
+| 16 módulos da Nave-Cidade, filas por hangar, 2 construtores a partir do Centro de Comando 4 | Tiers Mk II–V |
+| Drones, Interceptores, Artilharia, Cerco e Naves de Extração (só elas coletam) | Sondas e espionagem |
+| Mapa 40×40 com 3 zonas, Portais (exigem território encostado), piratas, Fortalezas | Anomalias Ancestrais, Guerra de Setores |
+| Aliança, Estação Central, Monólitos conectados, território, zona segura, Cristais de Domínio | Alianças reais (multiplayer), Ataque Coordenado |
+| Alianças rivais (bots) que expandem, atacam Monólitos e reconstroem a Estação | Tecnologia e loja da aliança |
+| Saque só acima do cofre; caixas, Escudo de Paz, Salto Warp, interceptação de coleta | Itens de VIP / Patente de Frota |
+| Comandantes com fragmentos, estrelas, principal + secundário; Cantina com Sinais | Talentos e equipamentos |
+| Contratos NaveCidade (ERC-721), Comandantes (ERC-1155), Setor; Ronin Wallet no jogo | Servidor OPERADOR, Ronin VRF, auditoria |
