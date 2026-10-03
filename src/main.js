@@ -384,8 +384,7 @@ const ACOES = {
     const x = Number(d.x);
     const y = Number(d.y);
     const e = s.mapa.find((m) => m.x === x && m.y === y);
-    const nome = prompt('Nome do marcador:', e ? E.nomeAlvo(s, e) : `Setor ${x},${y}`);
-    if (nome === null) return;
+    const nome = e ? E.nomeAlvo(s, e) : `Setor ${E.regiao(x, y)} ${x},${y}`;
     resultado(E.adicionarMarcador(s, x, y, nome), 'Marcador salvo.') && atualizarPainelSelecao();
     atualizarHud();
   },
@@ -408,8 +407,10 @@ const ACOES = {
       atualizarPainelSelecao();
     }
   },
-  reiniciar: () => {
-    if (!confirm('Apagar o progresso desta Nave-Cidade e começar de novo?')) return;
+  reiniciar: () => { ui.confirmarReinicio = true; renderizar(true); },
+  cancelarReinicio: () => { ui.confirmarReinicio = false; renderizar(true); },
+  confirmarReinicio: () => {
+    ui.confirmarReinicio = false;
     const tokenId = s.nave.tokenId;
     s = E.novoEstado(Date.now());
     s.nave.tokenId = tokenId;

@@ -326,11 +326,13 @@ function telaMissoes(s) {
   return `<h2>📜 Missões</h2><p class="subtitulo">Guia de progressão: siga as missões para aprender o jogo.</p><div class="grade">${lista}</div>`;
 }
 
-function telaRegistro(s) {
+function telaRegistro(s, now, ctx) {
   const itens = s.registro.map((r) => `<li class="${r.tipo}"><time>${new Date(r.t).toLocaleTimeString('pt-BR')}</time>${esc(r.msg)}</li>`).join('');
   return `<h2>📋 Registro</h2><p class="subtitulo">Relatórios de batalha e eventos.</p>
     <ul class="registro">${itens}</ul>
-    <div class="secao" style="margin-top:24px">${botao('reiniciar', 'Reiniciar jogo desta nave', { classe: 'perigo' })}</div>`;
+    <div class="secao acoes" style="margin-top:24px">${ctx.confirmarReinicio
+    ? `<span class="motivo">Isso apaga todo o progresso desta Nave-Cidade.</span>${botao('confirmarReinicio', 'Apagar e recomeçar', { classe: 'perigo' })}${botao('cancelarReinicio', 'Cancelar', { classe: 'secundario' })}`
+    : botao('reiniciar', 'Reiniciar jogo desta nave', { classe: 'perigo' })}</div>`;
 }
 
 // ---------- galáxia ----------

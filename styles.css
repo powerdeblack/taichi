@@ -31,7 +31,7 @@ button { font: inherit; }
 .topo {
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   padding: 10px 16px; background: rgba(13, 18, 38, 0.92); border-bottom: 1px solid var(--borda);
-  position: sticky; top: 0; z-index: 10; backdrop-filter: blur(6px);
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; backdrop-filter: blur(6px);
 }
 .marca { font-size: 18px; white-space: nowrap; }
 .recursos { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
